@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 
 // New Sections
-import Preloader from '../components/Preloader';
+import Preloader from '../components/common/Preloader';
 import HeroSection from '../components/landing/HeroSection';
 import GlobalAssetSection from '../components/landing/GlobalAssetSection';
 import TraderModeSection from '../components/landing/TraderModeSection';

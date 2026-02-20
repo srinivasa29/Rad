@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Mail, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
-import AuthLayout from '../components/AuthLayout';
+import AuthLayout from "../components/auth/AuthLayout";
 import { motion } from 'framer-motion';
 
 export default function ForgotPassword() {
     const [email, setEmail] = useState('');
-    const [status, setStatus] = useState('idle'); 
+    const [status, setStatus] = useState('idle');
     const [message, setMessage] = useState('');
 
     const handleSubmit = (e) => {
@@ -16,7 +16,7 @@ export default function ForgotPassword() {
             return;
         }
         setStatus('loading');
-        
+
         setTimeout(() => {
             setStatus('success');
             setMessage('Password reset link sent to ' + email);

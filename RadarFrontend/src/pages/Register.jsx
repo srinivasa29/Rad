@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import AuthLayout from '../components/AuthLayout';
+import AuthLayout from '../components/auth/AuthLayout';
 import api from '../api/api';
 import { useGoogleLogin } from '@react-oauth/google';
 
@@ -60,12 +60,12 @@ export default function Register() {
       await api.post('/auth/register', {
         username,
         password
-        
-        
-        
+
+
+
       });
 
-      
+
       window.location.href = '/login';
     } catch (error) {
       setLoading(false);

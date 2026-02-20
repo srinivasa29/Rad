@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, AlertCircle, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import AuthLayout from '../components/AuthLayout';
+import AuthLayout from '../components/auth/AuthLayout';
 import api from '../api/api';
 import { useGoogleLogin } from '@react-oauth/google';
 

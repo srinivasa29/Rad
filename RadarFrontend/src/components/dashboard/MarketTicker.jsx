@@ -20,17 +20,17 @@ const MarketTicker = () => {
 
   return (
     <div
-      className="ticker-wrapper"
+      className="market-ticker-container"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className={`ticker-track ${isHovered ? 'paused' : ''}`}>
+      <div className={`ticker-wrapper-track ${isHovered ? 'paused' : ''}`}>
         {duplicated.map((s, idx) => (
-          <div className="ticker-item" key={idx}>
-            <span className="symbol">{s.symbol}</span>
-            <span className="price">{s.price}</span>
-            <span className={s.change > 0 ? 'positive' : 'negative'}>
-              {s.change > 0 ? '▲' : '▼'} {Math.abs(s.change).toFixed(2)}%
+          <div className="ticker-item-simple" key={idx}>
+            <span className="ticker-sym">{s.symbol}</span>
+            <span className="ticker-val">{s.price}</span>
+            <span className={`ticker-chg ${s.change >= 0 ? 'up' : 'down'}`}>
+              {s.change >= 0 ? '▲' : '▼'} {Math.abs(s.change).toFixed(2)}%
             </span>
           </div>
         ))}

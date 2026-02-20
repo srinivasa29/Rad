@@ -5,7 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
-import Preloader from './components/Preloader';
+import Preloader from './components/common/Preloader';
 
 function App() {
   return (

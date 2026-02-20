@@ -1,0 +1,98 @@
+/* ===== PROFESSIONAL MARKET TICKER STYLES ===== */
+
+@keyframes ticker-scroll {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* ===== Flat continuous market ticker (professional) ===== */
+
+.market-ticker-container {
+  width: 100%;
+  overflow: hidden;
+  background: #0f172a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  height: 48px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  z-index: 10;
+}
+
+.market-ticker-container::before,
+.market-ticker-container::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 100px;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.market-ticker-container::before {
+  left: 0;
+  background: linear-gradient(to right, #0f172a, transparent);
+}
+
+.market-ticker-container::after {
+  right: 0;
+  background: linear-gradient(to left, #0f172a, transparent);
+}
+
+.ticker-wrapper-track {
+  display: flex;
+  gap: 80px;
+  white-space: nowrap;
+  align-items: center;
+  padding: 0 20px;
+  animation: ticker-scroll 35s linear infinite;
+}
+
+.ticker-wrapper-track.paused {
+  animation-play-state: paused;
+}
+
+.ticker-item-simple {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+
+.ticker-sym {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.ticker-val {
+  color: #f1f5f9;
+  font-weight: 800;
+}
+
+.ticker-chg {
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ticker-chg.up {
+  color: #10b981;
+}
+
+.ticker-chg.down {
+  color: #ef4444;
+}
+
+@media (max-width: 640px) {
+  .market-ticker-container {
+    height: 32px;
+  }
+}
