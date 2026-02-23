@@ -8,8 +8,8 @@
   background-image: none;
   color: #E5E7EB;
   --bg-primary: #0B0F17;
-  --bg-section: #111827;
-  --bg-card: #151C2B;
+  --bg-section: #0B0F17;
+  --bg-card: #0B0F17;
   --border-color: #1F2937;
   --accent-green: #3db26b;
   --text-primary: #E5E7EB;
@@ -25,7 +25,7 @@
 
 /* Trader Cards */
 .dashboard-container.trader-theme .trader-card {
-  background: #111827;
+  background: #0B0F17 !important;
   border: 1px solid #1F2937;
   border-radius: 12px;
   padding: 16px;
@@ -54,6 +54,7 @@
 
 .dashboard-container.trader-theme .card-header {
   border-bottom: 1px solid #1F2937;
+  background: #0B0F17 !important;
 }
 
 .dashboard-container.trader-theme h3 {
@@ -158,6 +159,7 @@
   font-size: 0.72rem;
   padding: 12px 8px;
   border-bottom: 1px solid #1F2937;
+  background: #0B0F17 !important;
 }
 
 .dashboard-container.trader-theme table td {
@@ -202,9 +204,24 @@
 }
 
 .bento-card {
-  background: #111827;
+  background: #0B0F17 !important;
   border: 1px solid #1F2937;
   border-radius: 8px;
   position: relative;
   overflow: hidden;
+}
+
+/* Ticker tape background override for trader theme */
+.dashboard-container.trader-theme .ticker-wrapper {
+  background: #0B0F17;
+  border-top-color: #1F2937;
+  border-bottom-color: #1F2937;
+}
+
+.dashboard-container.trader-theme .ticker-wrapper::before {
+  background: linear-gradient(to right, #0B0F17, transparent);
+}
+
+.dashboard-container.trader-theme .ticker-wrapper::after {
+  background: linear-gradient(to left, #0B0F17, transparent);
 }

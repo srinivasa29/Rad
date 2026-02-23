@@ -349,7 +349,7 @@ const MultiChartGrid = ({ className, onOpenChart, chartType, timeframe = "15m", 
           {chartsToShow.map((title, i) => (
             <div
               key={i}
-              className={`bg-[#0b0e14] relative group flex flex-col ${layout === "4-grid" && i % 2 === 0 ? 'border-r border-white/5' : ''
+              className={`bg-[#0B0F17] relative group flex flex-col ${layout === "4-grid" && i % 2 === 0 ? 'border-r border-white/5' : ''
                 } ${layout === "4-grid" && i < 2 ? 'border-b border-white/5' : ''
                 } ${layout === "2-grid" && i === 0 ? 'border-r border-white/5' : ''
                 }`}
@@ -514,7 +514,7 @@ const AdvancedWatchlist = () => (
     </div>
     <div className="watchlist-body flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
       <table className="w-full text-left border-collapse">
-        <thead className="sticky top-0 z-10 bg-[#0f1520]">
+        <thead className="sticky top-0 z-10 bg-[#0B0F17]">
           <tr className="text-[10px] text-[#5d606b] font-bold uppercase tracking-wider border-b border-white/10">
             <th className="py-2 pl-3 w-[22%]">Symbol</th>
             <th className="py-2 text-center w-[18%]">Trend</th>
@@ -663,9 +663,9 @@ const KeyLevelsPanel = () => (
 );
 
 const TrendStrengthPanel = () => (
-  <div className="trader-card flex flex-col h-full border border-white/10" style={{ background: '#0d1117' }}>
+  <div className="trader-card flex flex-col h-full border border-white/10" style={{ background: '#0B0F17' }}>
     {/* Header */}
-    <div className="card-header flex justify-between items-center px-3 py-2.5 border-b border-white/10" style={{ background: '#161b27' }}>
+    <div className="card-header flex justify-between items-center px-3 py-2.5 border-b border-white/10" style={{ background: '#0B0F17' }}>
       <div className="flex items-center gap-2">
         <div className="w-1.5 h-1.5 bg-[#3db26b] rounded-full animate-pulse"></div>
         <div>
@@ -681,7 +681,7 @@ const TrendStrengthPanel = () => (
       <table className="w-full text-xs border-collapse">
         {/* Column Headers */}
         <thead>
-          <tr style={{ background: '#1a1f2e' }}>
+          <tr style={{ background: '#0B0F17' }}>
             <th className="py-2 px-2 text-left text-[9px] text-[#5d606b] uppercase tracking-wider font-semibold rounded-l w-[28%]">Symbol</th>
             <th className="py-2 text-center text-[9px] text-[#5d606b] uppercase tracking-wider font-semibold">5M</th>
             <th className="py-2 text-center text-[9px] text-[#5d606b] uppercase tracking-wider font-semibold">15M</th>
@@ -739,7 +739,7 @@ const TrendStrengthPanel = () => (
     </div>
 
     {/* Legend + Market Bias Footer */}
-    <div className="px-3 py-2 border-t border-white/10 flex items-center justify-between" style={{ background: '#161b27' }}>
+    <div className="px-3 py-2 border-t border-white/10 flex items-center justify-between" style={{ background: '#0B0F17' }}>
       <div className="flex items-center gap-3 text-[9px]">
         <div className="flex items-center gap-1">
           <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold" style={{ background: 'rgba(61,178,107,0.2)', color: '#3db26b' }}>↑</span>
@@ -764,9 +764,9 @@ const TrendStrengthPanel = () => (
 
 
 const InstrumentSummaryPanel = () => (
-  <div className="trader-card flex flex-col h-full border border-white/10" style={{ background: '#0d1117' }}>
+  <div className="trader-card flex flex-col h-full border border-white/10" style={{ background: '#0B0F17' }}>
     {/* Header */}
-    <div className="card-header flex justify-between items-center px-3 py-2.5 border-b border-white/10" style={{ background: '#161b27' }}>
+    <div className="card-header flex justify-between items-center px-3 py-2.5 border-b border-white/10" style={{ background: '#0B0F17' }}>
       <div className="flex items-center gap-2">
         <div className="w-1.5 h-1.5 bg-[#3db26b] rounded-full animate-pulse"></div>
         <div>
@@ -1445,7 +1445,7 @@ function TraderView({ data, activeModule }) {
 
   return (
     <div className="dashboard-layout w-full">
-      <div className="main-content-area w-full max-w-[1920px] mx-auto p-4">
+      <div className="main-content-area w-full max-w-[1920px] mx-auto pt-4 px-4 pb-4">
         <div className="trader-bento-grid">
 
           {/* Row 1 - Left: Workspace */}

@@ -21,13 +21,13 @@
 
 .investor-theme .content {
     background-color: #FBF7F2 !important;
-    padding: 2rem 2.5rem;
+    padding: 0.5rem 1rem 2rem;
 }
 
 /* Investor Cards */
 .dashboard-container.investor-theme .investor-card {
     background: white;
-    border: 1px solid #e2e8f0;
+    border: 1px solid rgba(16, 185, 129, 0.1);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     backdrop-filter: none;
     color: #1e293b;
@@ -56,14 +56,14 @@
     border: 1px solid rgba(16, 185, 129, 0.1);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
     border-radius: 1.25rem;
-    margin: 1rem 2rem;
+    margin: 0.3rem 1rem 0.8rem;
     padding: 0 2rem;
     height: 72px;
     width: auto;
     position: sticky;
-    top: 1rem;
-    left: 2rem;
-    right: 2rem;
+    top: 0.3rem;
+    left: 1rem;
+    right: 1rem;
     display: flex;
     align-items: center;
     z-index: 1000;

@@ -145,7 +145,7 @@ export default function InvestorMode({ onToggleMode }) {
 
     return (
         <div className="dashboard-container investor-theme">
-            <header className="navbar mb-6">
+            <header className="navbar">
                 <div className="flex items-center gap-4 shrink-0">
                     <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 overflow-hidden shadow-inner">
                         <img
@@ -213,15 +213,15 @@ export default function InvestorMode({ onToggleMode }) {
 
 
                         {isNotificationsOpen && (
-                            <div className="absolute right-0 top-12 w-80 rounded-xl shadow-2xl border py-2 backdrop-blur-xl z-[100] transform origin-top-right transition-all bg-[#FBF7F2]/95 border-[#1F3D2B]/10">
+                            <div className="absolute right-0 top-12 w-80 rounded-xl shadow-2xl border py-2 backdrop-blur-xl z-[100] transform origin-top-right transition-all bg-white border-[#1F3D2B]/10">
                                 <div className="px-4 py-2 border-b border-gray-700/50 flex justify-between items-center">
                                     <h3 className="font-bold text-sm text-[#1F3D2B]">Notifications</h3>
-                                    <span className="text-xs text-[#00f3ff] cursor-pointer">Mark read</span>
+                                    <span className="text-xs text-[#10B981] cursor-pointer hover:text-emerald-700 transition-colors">Mark read</span>
                                 </div>
                                 <div className="max-h-64 overflow-y-auto">
                                     {mockNotifications.map(n => (
-                                        <div key={n.id} className={`px-4 py-3 border-b border-gray-700/30 hover:bg-gray-700/20 cursor-pointer flex gap-3 ${!n.read ? 'bg-blue-500/5' : ''}`}>
-                                            <div className="mt-1"><CheckCircle size={14} className={n.read ? "text-gray-500" : "text-[#00f3ff]"} /></div>
+                                        <div key={n.id} className="px-4 py-3 border-b border-gray-700/30 hover:bg-gray-50 cursor-pointer flex gap-3">
+                                            <div className="mt-1"><CheckCircle size={14} className={n.read ? "text-gray-400" : "text-[#10B981]"} /></div>
                                             <div>
                                                 <p className="text-xs font-semibold text-[#1F3D2B]">{n.text}</p>
                                                 <p className="text-[10px] text-gray-500 mt-1">{n.time}</p>
@@ -229,7 +229,7 @@ export default function InvestorMode({ onToggleMode }) {
                                         </div>
                                     ))}
                                 </div>
-                                <div className="px-4 py-2 text-center text-xs text-gray-500 cursor-pointer hover:text-[#00f3ff]">View all activity</div>
+                                <div className="px-4 py-2 text-center text-xs text-gray-500 cursor-pointer hover:text-[#10B981] transition-colors">View all activity</div>
                             </div>
                         )}
                     </div>
@@ -318,9 +318,11 @@ export default function InvestorMode({ onToggleMode }) {
                 </div>
             </header>
 
-            <div className="px-8 mb-6">
-                <TickerTape />
-            </div>
+            {activeModule === "DASHBOARD" && (
+                <div className="px-4 mb-1">
+                    <TickerTape />
+                </div>
+            )}
 
             <main className="content fade-in transition-all duration-300">
                 <InvestorView data={mockStock} movers={topMovers} activeModule={activeModule} />
@@ -328,26 +330,26 @@ export default function InvestorMode({ onToggleMode }) {
 
             {/* Logout Confirmation Modal */}
             {showLogoutModal && (
-                <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 fade-in">
-                    <div className="w-full max-w-md rounded-2xl p-6 shadow-2xl transform transition-all scale-100 bg-[#FBF7F2] border border-[#1F3D2B]/10">
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 fade-in">
+                    <div className="w-full max-w-[420px] rounded-3xl p-8 shadow-[0_20px_50px_rgba(0,0,0,0.1)] transform transition-all scale-100 bg-[#FCFBF8] border-none">
                         <div className="text-center">
-                            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-red-50 text-red-500">
-                                <LogOut size={32} />
+                            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5 bg-[#FFF0F2] text-[#E12B56]">
+                                <LogOut size={28} strokeWidth={2.5} />
                             </div>
-                            <h3 className="text-xl font-bold mb-2 text-[#1F3D2B]">Signing Out?</h3>
-                            <p className="text-sm mb-8 text-[#1F3D2B]/60">
+                            <h3 className="text-[22px] font-bold mb-2.5 text-[#1E293B]">Signing Out?</h3>
+                            <p className="text-[15px] mb-8 text-[#64748B] font-medium leading-relaxed">
                                 Ready to sign off, Captain? The market sleeps for no one!
                             </p>
                             <div className="flex gap-4">
                                 <button
                                     onClick={() => setShowLogoutModal(false)}
-                                    className="flex-1 py-3 rounded-xl font-bold transition-all bg-[#1F3D2B]/5 text-[#1F3D2B] hover:bg-[#1F3D2B]/10"
+                                    className="flex-1 py-3.5 rounded-xl font-bold transition-all bg-[#F1EFEA] text-[#1F3D2B] hover:bg-[#E5E2DB]"
                                 >
                                     No, Stay
                                 </button>
                                 <button
                                     onClick={handleLogout}
-                                    className="flex-1 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-red-500 to-pink-600 hover:shadow-lg hover:shadow-red-500/30 transition-all"
+                                    className="flex-1 py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-[#FF416C] to-[#FF4B2B] hover:opacity-90 shadow-lg shadow-rose-500/30 transition-all"
                                 >
                                     Yes, Logout
                                 </button>
@@ -792,13 +794,13 @@ const EconomicCalendar = () => {
     ];
 
     return (
-        <div className="investor-card p-6 h-full flex flex-col">
-            <div className="card-header mb-6">
+        <div className="investor-card p-4 h-full flex flex-col">
+            <div className="card-header mb-3">
                 <h3 className="text-lg font-bold text-slate-800">Economic Calendar</h3>
             </div>
-            <div className="space-y-4 flex-1">
+            <div className="space-y-2 flex-1">
                 {events.map((e) => (
-                    <div key={e.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-emerald-200 transition-colors">
+                    <div key={e.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100 hover:border-emerald-200 transition-colors">
                         <div className="flex items-center gap-3">
                             <span className="text-lg">{e.country}</span>
                             <div>
@@ -826,14 +828,14 @@ const TrendingThemes = () => {
     ];
 
     return (
-        <div className="investor-card p-6 h-full flex flex-col">
-            <div className="card-header mb-6 flex justify-between items-center">
+        <div className="investor-card p-4 h-full flex flex-col">
+            <div className="card-header mb-3 flex justify-between items-center">
                 <h3 className="text-lg font-bold text-slate-800">Trending Themes</h3>
                 <TrendingUp size={16} className="text-emerald-500" />
             </div>
-            <div className="grid grid-cols-1 gap-3 flex-1">
+            <div className="grid grid-cols-1 gap-2 flex-1">
                 {themes.map((t, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer">
+                    <div key={i} className="flex items-center justify-between p-2 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer">
                         <div className="flex items-center gap-3">
                             <span className="text-xl">{t.icon}</span>
                             <span className="text-xs font-bold text-slate-700">{t.name}</span>
@@ -867,13 +869,13 @@ function InvestorView({ data, movers, activeModule }) {
             <div className="main-content-area transition-all duration-300">
                 {/* Top Ticker was moved to InvestorMode */}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-1 mb-4">
                     <MarketMoodGauge />
                     <ValuationThermometer />
                     <YourInvestments />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div className="md:col-span-2">
                         <MostBoughtStocks />
                     </div>
@@ -882,7 +884,7 @@ function InvestorView({ data, movers, activeModule }) {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div className="md:col-span-1">
                         <DiscoveryShelves />
                     </div>
@@ -891,7 +893,7 @@ function InvestorView({ data, movers, activeModule }) {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
                     <div className="md:col-span-1">
                         <EconomicCalendar />
                     </div>

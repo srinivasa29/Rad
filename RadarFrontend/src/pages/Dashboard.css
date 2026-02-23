@@ -508,7 +508,7 @@ body {
 
 /* Ticker overrides for Dark Mode */
 .dashboard-container.trader-theme .ticker-tape-container {
-  background: #111827;
+  background: #0B0F17;
   border-bottom: 1px solid #1F2937;
   padding: 8px 0;
 }
@@ -637,7 +637,7 @@ body {
   gap: 12px;
   padding: 6px 12px;
   border-bottom: 1px solid #2a2e39;
-  background: #131722;
+  background: #0B0F17;
   font-size: 12px;
 }
 
@@ -697,7 +697,7 @@ body {
 }
 
 .dashboard-container.trader-theme .pane {
-  background: #131722;
+  background: #0B0F17;
   border-right: 1px solid #2a2e39;
   border-bottom: 1px solid #2a2e39;
 }
@@ -755,7 +755,7 @@ body {
   gap: 4px;
   padding: 6px 8px;
   border-bottom: 1px solid #2a2e39;
-  background: #131722;
+  background: #0B0F17;
 }
 
 .dashboard-container.trader-theme .terminal-tab {
