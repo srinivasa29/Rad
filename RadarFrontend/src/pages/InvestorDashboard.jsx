@@ -1427,73 +1427,29 @@ const TrendingThemes = () => {
 };
 
 function InvestorView({ activeModule }) {
-    if (activeModule === 'WATCHLIST') {
-        return (
-            <div className="dashboard-layout fade-in" style={{ backgroundColor: '#FBF7F2' }}>
-                <div className="main-content-area transition-all duration-300">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-1 mb-4">
-                        <YourInvestments />
-                        <MostBoughtStocks />
-                        <GlobalPulse />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div className="md:col-span-2">
-                            <SectorLandscape />
-                        </div>
-                        <div className="md:col-span-1">
-                            <EconomicCalendar />
-                        </div>
+    const ComingSoonModule = ({ title }) => (
+        <div className="dashboard-layout fade-in" style={{ backgroundColor: '#FBF7F2' }}>
+            <div className="main-content-area transition-all duration-300">
+                <div className="min-h-[60vh] rounded-3xl border border-emerald-100 bg-white/80 flex items-center justify-center">
+                    <div className="text-center px-6">
+                        <h2 className="text-3xl md:text-4xl font-black tracking-tight text-[#1F3D2B]">{title}</h2>
+                        <p className="mt-3 text-sm md:text-base font-semibold text-emerald-700">This section will come soon.</p>
                     </div>
                 </div>
             </div>
-        );
+        </div>
+    );
+
+    if (activeModule === 'WATCHLIST') {
+        return <ComingSoonModule title="Watchlist" />;
     }
 
     if (activeModule === 'SCREENERS') {
-        return (
-            <div className="dashboard-layout fade-in" style={{ backgroundColor: '#FBF7F2' }}>
-                <div className="main-content-area transition-all duration-300">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-1 mb-4">
-                        <MarketMoodGauge />
-                        <ValuationThermometer />
-                        <TrendingThemes />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div className="md:col-span-2">
-                            <SectorLandscape />
-                        </div>
-                        <div className="md:col-span-1">
-                            <DiscoveryShelves />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
+        return <ComingSoonModule title="Screeners" />;
     }
 
     if (activeModule === 'NEWS') {
-        return (
-            <div className="dashboard-layout fade-in" style={{ backgroundColor: '#FBF7F2' }}>
-                <div className="main-content-area transition-all duration-300">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-1 mb-4">
-                        <div className="md:col-span-2">
-                            <EconomicCalendar />
-                        </div>
-                        <div className="md:col-span-1">
-                            <TrendingThemes />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div className="md:col-span-1">
-                            <GlobalPulse />
-                        </div>
-                        <div className="md:col-span-2">
-                            <SectorLandscape />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
+        return <ComingSoonModule title="News" />;
     }
 
     return (
