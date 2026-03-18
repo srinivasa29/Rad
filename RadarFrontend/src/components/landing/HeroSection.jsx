@@ -1,7 +1,7 @@
 import React from 'react';
+import { Globe, Zap, Users, Target, Merge, ScanSearch, Layers } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { TrendingUp, Activity, Search, Globe, Target, Merge, ScanSearch, Users, Zap, Layers } from 'lucide-react';
 
 const HeroSection = () => {
 

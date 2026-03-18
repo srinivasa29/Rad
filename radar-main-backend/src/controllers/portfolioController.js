@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Portfolio = require('../models/Portfolio');
+const logger = require('../utils/logger');
 
 const getPortfolio = async (req, res) => {
     const userId = req.user._id;
@@ -44,17 +45,21 @@ const executeTrade = async (req, res) => {
         return res.status(400).json({ error: "Symbol is required" });
     }
 
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
         const portfolio = await Portfolio.findOneAndUpdate(
             { user: userId },
             { $setOnInsert: { user: userId } },
-            { new: true, upsert: true, setDefaultsOnInsert: true }
+            { new: true, upsert: true, setDefaultsOnInsert: true, session }
         );
 
         const totalCost = qty * px;
 
         if (normalizedAction === 'BUY') {
             if (portfolio.cashBalance < totalCost) {
+                await session.abortTransaction();
                 return res.status(400).json({ error: "Insufficient Funds" });
             }
 
@@ -85,11 +90,13 @@ const executeTrade = async (req, res) => {
             const holdingIndex = portfolio.holdings.findIndex((p) => p.symbol === normalizedSymbol);
 
             if (holdingIndex === -1) {
+                await session.abortTransaction();
                 return res.status(400).json({ error: "Not enough shares to sell" });
             }
 
             const existingQty = Number(portfolio.holdings[holdingIndex].quantity) || 0;
             if (existingQty < qty) {
+                await session.abortTransaction();
                 return res.status(400).json({ error: "Not enough shares to sell" });
             }
 
@@ -102,12 +109,16 @@ const executeTrade = async (req, res) => {
         }
 
         portfolio.totalTrades += 1;
-        await portfolio.save();
+        await portfolio.save({ session });
 
+        await session.commitTransaction();
         res.json(portfolio);
     } catch (error) {
-        console.error(error);
+        await session.abortTransaction();
+        logger.error("Trade Execution Error", { error: error.message });
         res.status(500).json({ error: "Trade Failed" });
+    } finally {
+        session.endSession();
     }
 };
 

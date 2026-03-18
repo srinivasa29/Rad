@@ -1,8 +1,8 @@
-/* ============================= */
-/* INVESTOR DASHBOARD STYLES */
-/* ============================= */
 
-/* Investor Theme Variables & Base */
+
+
+
+
 .dashboard-container.investor-theme {
     background-color: #FBF7F2 !important;
     background-image: none !important;
@@ -24,7 +24,7 @@
     padding: 0.5rem 1rem 2rem;
 }
 
-/* Investor Cards */
+
 .dashboard-container.investor-theme .investor-card {
     background: white;
     border: 1px solid rgba(16, 185, 129, 0.1);
@@ -50,7 +50,7 @@
     font-weight: 700;
 }
 
-/* Navbar Style Override - Floating Pill */
+
 .investor-theme .navbar {
     background: #FFFFFF !important;
     border: 1px solid rgba(16, 185, 129, 0.1);
@@ -95,12 +95,12 @@
     line-height: 1;
 }
 
-/* Fix TickerTape overlap and spacing */
+
 .investor-theme .main-content-area {
     padding-top: 1rem;
 }
 
-/* Sidebar */
+
 .investor-sidebar {
     width: 250px;
     background: white;
@@ -134,7 +134,7 @@
     border-right: 3px solid #059669;
 }
 
-/* Emerald Utility Classes */
+
 .text-emerald-500 {
     color: #10B981;
 }
@@ -151,7 +151,7 @@
     border-color: #d1fae5;
 }
 
-/* Navbar Elements Refinement */
+
 .investor-theme .nav-buttons {
     display: flex;
     align-items: center;
@@ -182,7 +182,7 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* Utility for text colors */
+
 .text-slate-800 {
     color: #1e293b;
 }
@@ -201,4 +201,36 @@
 
 .text-slate-400 {
     color: #94a3b8;
+}
+
+
+.investor-theme .main-content-area > .grid {
+    align-items: stretch;
+}
+
+.investor-theme .main-content-area > .grid > div,
+.investor-theme .main-content-area > .grid > section,
+.investor-theme .main-content-area > .grid > article {
+    min-height: 0;
+}
+
+.investor-theme .main-content-area .investor-card {
+    height: 100%;
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+    .investor-theme .navbar {
+        margin: 0.35rem 0.75rem 0.7rem;
+        padding: 0 1.1rem;
+        height: 66px;
+        gap: 1rem;
+    }
+
+    .investor-theme .brand-name {
+        font-size: 1.25rem;
+    }
+
+    .investor-theme .content {
+        padding: 0.4rem 0.75rem 1.5rem;
+    }
 }

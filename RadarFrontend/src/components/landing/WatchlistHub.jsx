@@ -1,14 +1,54 @@
-import React from "react";
-import { Bell, Star, MoreHorizontal, X } from "lucide-react";
+import { useEffect, useState } from 'react';
+import { Bell, X } from 'lucide-react';
+import { fetchMarketData } from '../../api/marketApi';
 
-const watchlistItems = [
-    { symbol: "BTC-USD", price: "42,505.20", change: "+2.4%", type: "CRYPTO", miniChart: "up" },
-    { symbol: "AAPL", price: "185.92", change: "+0.5%", type: "STOCK", miniChart: "up" },
-    { symbol: "EUR/USD", price: "1.0950", change: "-0.1%", type: "FOREX", miniChart: "down" },
-    { symbol: "GOLD", price: "2,045.00", change: "+0.2%", type: "COMMODITY", miniChart: "neutral" },
+const fallbackWatchlistItems = [
+    { symbol: 'BTC-USD', price: 42505.2, change_24h: 2.4, type: 'CRYPTO' },
+    { symbol: 'AAPL', price: 185.92, change_24h: 0.5, type: 'STOCK' },
+    { symbol: 'EUR/USD', price: 1.095, change_24h: -0.1, type: 'FOREX' },
+    { symbol: 'GOLD', price: 2045, change_24h: 0.2, type: 'COMMODITY' },
 ];
 
+const formatSignedPercent = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return '0.00%';
+    return `${numeric > 0 ? '+' : ''}${numeric.toFixed(2)}%`;
+};
+
 export default function WatchlistHub() {
+    const [watchlistItems, setWatchlistItems] = useState(fallbackWatchlistItems);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadWatchlist = async () => {
+            try {
+                const rows = await fetchMarketData();
+                const marketRows = Array.isArray(rows) ? rows : [];
+                const picked = marketRows
+                    .filter((item) => ['CRYPTO', 'STOCK', 'FOREX', 'COMMODITY'].includes(String(item?.type || '').toUpperCase()))
+                    .slice(0, 6);
+
+                if (isMounted && picked.length) {
+                    setWatchlistItems(picked);
+                }
+            } catch (error) {
+                console.error('Failed to load watchlist hub:', error);
+                if (isMounted) {
+                    setWatchlistItems(fallbackWatchlistItems);
+                }
+            }
+        };
+
+        loadWatchlist();
+        const intervalId = setInterval(loadWatchlist, 30000);
+
+        return () => {
+            isMounted = false;
+            clearInterval(intervalId);
+        };
+    }, []);
+
     return (
         <div className="bg-[#0b1d21] rounded-3xl border border-white/10 p-6 overflow-hidden relative">
             <div className="flex justify-between items-center mb-6">
@@ -28,14 +68,14 @@ export default function WatchlistHub() {
                                     <span className="font-bold text-white">{item.symbol}</span>
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 bg-white/10 text-white/50 rounded">{item.type}</span>
                                 </div>
-                                <div className="text-white/40 text-xs mt-0.5">{item.price}</div>
+                                <div className="text-white/40 text-xs mt-0.5">{Number(item?.price || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
                             </div>
                         </div>
 
                         {}
                         <div className="flex items-center gap-4">
-                            <span className={`font-mono text-sm font-bold ${item.change.startsWith('+') ? 'text-[#42C0A5]' : 'text-red-400'}`}>
-                                {item.change}
+                            <span className={`font-mono text-sm font-bold ${Number(item?.change_24h || 0) >= 0 ? 'text-[#42C0A5]' : 'text-red-400'}`}>
+                                {formatSignedPercent(item?.change_24h)}
                             </span>
 
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -1,21 +1,51 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './MarketTicker.css';
+import { fetchMarketData } from '../../api/marketApi';
+
+const displaySymbol = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
 
 const MarketTicker = () => {
   const [isHovered, setIsHovered] = useState(false);
 
-  const stocks = [
+  const [stocks, setStocks] = useState([
     { symbol: 'HDFCBANK', price: '1,650', change: 0.48 },
     { symbol: 'INFY', price: '1,420', change: -0.21 },
     { symbol: 'TCS', price: '3,845', change: 0.92 },
-    { symbol: 'WIPRO', price: '348', change: -0.55 },
-    { symbol: 'TATAMOTORS', price: '452', change: 2.45 },
-    { symbol: 'RELIANCE', price: '2,550', change: 0.72 },
     { symbol: 'NIFTY 50', price: '18,500', change: 0.52 },
     { symbol: 'BANKNIFTY', price: '44,200', change: 0.35 },
-  ];
+  ]);
 
-  // duplicate items for seamless continuous scroll
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setError(false);
+        const res = await fetchMarketData({ type: 'STOCK', sort: 'gainers' });
+        if (res && res.length > 0) {
+          const mapped = res
+            .slice(0, 8)
+            .map((item) => {
+              const price = Number(item.price || 0);
+              const change = Number(item.change_24h ?? item.change ?? 0);
+              return {
+                symbol: displaySymbol(item.symbol || item.name).substring(0, 10),
+                price: Number.isFinite(price) ? price.toLocaleString() : '0',
+                change: Number.isFinite(change) ? change : 0,
+              };
+            });
+
+          if (mapped.length > 0) {
+            setStocks(mapped);
+          }
+        }
+      } catch (err) {
+          console.error("Ticker fetch failed:", err);
+          setError(true);
+      }
+    }
+    load();
+  }, []);
   const duplicated = [...stocks, ...stocks];
 
   return (
@@ -24,7 +54,12 @@ const MarketTicker = () => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className={`ticker-wrapper-track ${isHovered ? 'paused' : ''}`}>
+      <div className={`ticker-wrapper-track ${isHovered || error ? 'paused' : ''}`}>
+        {error && (
+            <div className="ticker-item-simple text-rose-500 font-bold px-4">
+                ⚠ Market Feed Offline
+            </div>
+        )}
         {duplicated.map((s, idx) => (
           <div className="ticker-item-simple" key={idx}>
             <span className="ticker-sym">{s.symbol}</span>

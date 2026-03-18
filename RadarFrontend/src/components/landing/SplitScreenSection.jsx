@@ -1,6 +1,6 @@
+import { clsx } from 'clsx';
 import React from 'react';
 import { motion } from 'framer-motion';
-import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 function cn(...inputs) {
@@ -71,7 +71,7 @@ const SplitScreenSection = ({
                                             <div className="mb-2">
                                                 {feature.icon && (
                                                     typeof feature.icon === 'string' ? (
-                                                        <img src={feature.icon} alt="" className="w-24 h-24 object-contain rounded-2xl" />
+                                                        <img src={feature.icon} alt={`${feature.title} icon`} className="w-24 h-24 object-contain rounded-2xl" />
                                                     ) : (
                                                         <feature.icon className="w-24 h-24 text-[#348E87] rounded-2xl overflow-hidden" />
                                                     )
@@ -104,7 +104,7 @@ const SplitScreenSection = ({
                                                 <div className="mr-3 inline-block">
                                                     {feature.icon && (
                                                         typeof feature.icon === 'string' ? (
-                                                            <img src={feature.icon} alt="" className="w-8 h-8 object-contain" />
+                                                            <img src={feature.icon} alt={`${feature.title} icon`} className="w-8 h-8 object-contain" />
                                                         ) : (
                                                             <feature.icon className="w-8 h-8 text-[#348E87]" />
                                                         )

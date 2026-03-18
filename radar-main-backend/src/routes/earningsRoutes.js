@@ -1,0 +1,1 @@
+const express = require('express');const router = express.Router();const { getEarningsSummary } = require('../controllers/earningsController');const { authMiddleware } = require('../middleware/authMiddleware');router.get('/summary', authMiddleware, getEarningsSummary);module.exports = router;

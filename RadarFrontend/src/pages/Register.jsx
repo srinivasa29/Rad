@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { motion } from 'framer-motion';
-import AuthLayout from '../components/auth/AuthLayout';
 import api from '../api/api';
 import { useGoogleLogin } from '@react-oauth/google';
+import AuthLayout from '../components/auth/AuthLayout';
+import { motion } from 'framer-motion';
+import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);

@@ -1,6 +1,3 @@
-import React from 'react';
-import { motion } from "framer-motion";
-import { TrendingUp, DollarSign, BarChart3, Wallet, Activity, PieChart, ArrowUpRight, Globe } from "lucide-react";
 
 const OrbitIcon = ({ children, radius, angle, duration = 20, delay = 0 }) => {
     return (

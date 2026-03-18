@@ -1,16 +1,13 @@
 const { fetchStockData } = require('../services/stockService');
-
+const { getTechnicalIndicators, getTrendMatrix } = require('../services/indicatorService');
+const { getInstrumentScore } = require('../services/scoringService');
+const { detectPatterns } = require('../services/patternService');
 const getWatchlistData = async (req, res) => {
     try {
         const stocks = await fetchStockData();
-
-
         const technicalWatchlist = stocks.map(stock => {
-
             const currentPrice = stock.price;
             const vwap = (currentPrice * 0.98).toFixed(2);
-
-
             return {
                 ...stock,
                 technicals: {
@@ -22,13 +19,11 @@ const getWatchlistData = async (req, res) => {
                 }
             };
         });
-
         res.json(technicalWatchlist);
     } catch (error) {
         res.status(500).json({ error: 'Server Error' });
     }
 };
-
 const getBreakoutAlerts = (req, res) => {
     res.json([
         { symbol: "NVDA", type: "Resistance Breakout", price: 460.18, time: "10:30 AM" },
@@ -58,4 +53,79 @@ const getQuickOrderData = (req, res) => {
     });
 };
 
-module.exports = { getWatchlistData, getBreakoutAlerts, getIndicatorSignals, getQuickOrderData };
+const getIndicators = async (req, res) => {
+    try {
+        const { assetType, symbol } = req.params;
+        const { interval = '1D' } = req.query;
+        const data = await getTechnicalIndicators(assetType, symbol, interval);
+        res.json({ success: true, symbol, assetType, interval, ...data });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const getTrend = async (req, res) => {
+    try {
+        const { assetType, symbol } = req.params;
+        const matrix = await getTrendMatrix(assetType, symbol);
+        res.json({ success: true, symbol, assetType, trendMatrix: matrix });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const getScore = async (req, res) => {
+    try {
+        const { assetType, symbol } = req.params;
+        const result = await getInstrumentScore(assetType, symbol);
+        res.json({ success: true, symbol, assetType, ...result });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const getPatterns = async (req, res) => {
+    try {
+        const { assetType, symbol } = req.params;
+        const patterns = await detectPatterns(assetType, symbol);
+        res.json({ success: true, symbol, assetType, patterns });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const getSummary = async (req, res) => {
+    try {
+        const { assetType, symbol } = req.params;
+        const [indicators, trendMatrix, scoreResult, patterns] = await Promise.allSettled([
+            getTechnicalIndicators(assetType, symbol, '1D'),
+            getTrendMatrix(assetType, symbol),
+            getInstrumentScore(assetType, symbol),
+            detectPatterns(assetType, symbol)
+        ]);
+
+        res.json({
+            success: true,
+            symbol,
+            assetType,
+            indicators: indicators.status === 'fulfilled' ? indicators.value : null,
+            trendMatrix: trendMatrix.status === 'fulfilled' ? trendMatrix.value : null,
+            score: scoreResult.status === 'fulfilled' ? scoreResult.value : null,
+            patterns: patterns.status === 'fulfilled' ? patterns.value : []
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+module.exports = {
+    getWatchlistData,
+    getBreakoutAlerts,
+    getIndicatorSignals,
+    getQuickOrderData,
+    getIndicators,
+    getTrend,
+    getScore,
+    getPatterns,
+    getSummary
+};

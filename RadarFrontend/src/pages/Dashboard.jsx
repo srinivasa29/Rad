@@ -1,59 +1,61 @@
-import React, { useState, useEffect, useRef } from "react";
+import { Suspense, lazy, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-  ComposedChart,
-  Bar,
-  Line,
-} from "recharts";
-import {
-  Search,
-  Bell,
-  LogOut,
   LayoutDashboard,
   Star,
   Filter,
   Newspaper,
-  ChevronUp,
-  ChevronDown,
+  Search,
+  Bell,
+  CheckCircle,
+  User,
+  Settings,
+  HelpCircle,
   Activity,
   TrendingUp,
-  User,
-  HelpCircle,
-  Settings,
-  CheckCircle,
+  LogOut,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Tilt } from "react-tilt";
 import MarketTicker from "../components/dashboard/MarketTicker";
-import InvestorView from "./InvestorDashboard";
-import TraderView from "./TraderDashboard";
-import { mockStock, topMovers, chartDataByTimeframe, priceData, candlestickData, mockNews, dominanceData, COLORS, defaultTiltOptions, mockNotifications } from "./dashboardData";
+import { updateUserMode } from "../api/userApi";
+import { useHeaderData } from "../hooks/useHeaderData";
 import "./Dashboard.css";
 
+const TraderView = lazy(() => import("./TraderDashboard"));
+const InvestorMode = lazy(() => import("./InvestorDashboard"));
 
-// ============================================
-// MAIN DASHBOARD COMPONENT
-// ============================================
+const formatNotificationTime = (value) => {
+  if (!value) return "Now";
+
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return value;
+
+  const diffMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays}d ago`;
+};
+
+const DashboardLoader = ({ label = "Loading dashboard..." }) => (
+  <div className="min-h-[60vh] flex items-center justify-center text-white">
+    <div className="text-center opacity-80">
+      <div className="mx-auto mb-4 h-10 w-10 rounded-full border-2 border-[#00f3ff]/30 border-t-[#00f3ff] animate-spin" />
+      <p className="text-sm font-semibold tracking-wide">{label}</p>
+    </div>
+  </div>
+);
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [isTraderMode, setIsTraderMode] = useState(
     localStorage.getItem("mode") === "TRADER"
   );
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [userInitial, setUserInitial] = useState("U");
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeModule, setActiveModule] = useState("DASHBOARD");
@@ -61,17 +63,15 @@ export default function Dashboard() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const notifRef = useRef(null);
   const profileRef = useRef(null);
-
-  useEffect(() => {
-    const user = localStorage.getItem("user");
-    const email = localStorage.getItem("email");
-    const name = user
-      ? JSON.parse(user).name
-      : email
-        ? email.split("@")[0]
-        : "User";
-    setUserInitial(name.charAt(0).toUpperCase());
-  }, []);
+  const {
+    profile,
+    userInitial,
+    notifications,
+    unreadCount,
+    isLoadingNotifications,
+    isMarkingNotifications,
+    markAllNotificationsRead,
+  } = useHeaderData();
 
   useEffect(() => {
     if (!isTraderMode) {
@@ -81,8 +81,6 @@ export default function Dashboard() {
       document.body.style.backgroundColor = "";
       document.body.style.backgroundImage = "";
     }
-
-    // Cleanup on unmount
     return () => {
       document.body.style.backgroundColor = "";
       document.body.style.backgroundImage = "";
@@ -92,8 +90,10 @@ export default function Dashboard() {
   const toggleMode = () => {
     const newMode = !isTraderMode;
     localStorage.setItem("mode", newMode ? "TRADER" : "INVESTOR");
+    updateUserMode(newMode ? "TRADER" : "INVESTOR").catch((error) => {
+      console.error("Failed to sync preferred mode:", error);
+    });
     if (newMode) {
-      // Switching TO trader — show preloader first
       setIsProfileOpen(false);
       setIsTransitioning(true);
       setTimeout(() => {
@@ -104,8 +104,6 @@ export default function Dashboard() {
       setIsTraderMode(false);
     }
   };
-
-  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e) => {
       if (notifRef.current && !notifRef.current.contains(e.target)) {
@@ -126,12 +124,20 @@ export default function Dashboard() {
     navigate("/", { state: { skipPreloader: true } });
   };
 
+  if (!isTraderMode && !isTransitioning) {
+    return (
+      <Suspense fallback={<DashboardLoader label="Loading investor mode..." />}>
+        <InvestorMode onToggleMode={toggleMode} />
+      </Suspense>
+    );
+  }
+
   return (
     <div
       className={`dashboard-container ${isTraderMode ? "trader-theme" : "investor-theme"
         }`}
     >
-      {/* ── Preloader overlay when switching to Trader mode ── */}
+      {}
       <AnimatePresence>
         {isTransitioning && (
           <motion.div
@@ -200,7 +206,7 @@ export default function Dashboard() {
         <>
           <header className="navbar trader-glass-bar sticky top-0 z-50 px-6 mb-6">
             <div className="max-w-[1920px] mx-auto w-full flex items-center justify-between">
-              {/* Left: Brand & Nav */}
+              {}
               <div className="flex items-center gap-10">
                 <a href="/" className="brand flex items-center gap-3">
                   <img
@@ -213,7 +219,7 @@ export default function Dashboard() {
                   </span>
                 </a>
 
-                {/* Navigation Links */}
+                {}
                 <nav className="hidden lg:flex items-center gap-2">
                   {[
                     { id: "DASHBOARD", icon: LayoutDashboard, label: "Dashboard" },
@@ -240,7 +246,7 @@ export default function Dashboard() {
                 </nav>
               </div>
 
-              {/* Right: Search & Actions */}
+              {}
               <div className="flex items-center gap-6">
                 <div className="relative group w-64 hidden xl:block">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#00f3ff] transition-colors">
@@ -255,45 +261,64 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex items-center gap-4 pl-4 border-l border-white/10">
-                  {/* Notification Bell */}
+                  {}
                   <div className="relative cursor-pointer group" ref={notifRef}>
                     <button
                       onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                       className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors"
                     >
                       <Bell size={18} className="text-gray-400 group-hover:text-white transition-colors" />
-                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#00f3ff] rounded-full animate-pulse shadow-[0_0_8px_#00f3ff]"></span>
+                      {unreadCount > 0 && (
+                        <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 bg-[#00f3ff] rounded-full text-[9px] font-black text-[#041317] flex items-center justify-center shadow-[0_0_8px_#00f3ff]">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
                     </button>
 
-                    {/* Notification Dropdown */}
+                    {}
                     {isNotificationsOpen && (
                       <div className="absolute right-0 top-11 w-80 rounded-xl shadow-2xl border border-white/10 py-2 backdrop-blur-xl z-[100] origin-top-right"
-                        style={{ background: '#0B0F17' }}>
-                        {/* Header */}
+                        style={{ background: '#0b1d21' }}>
+                        {}
                         <div className="px-4 py-2 border-b border-white/10 flex justify-between items-center">
                           <h3 className="font-bold text-sm text-white">Notifications</h3>
-                          <span className="text-xs text-[#00f3ff] cursor-pointer hover:text-[#00f3ff]/70 transition-colors">Mark read</span>
+                          <button
+                            onClick={markAllNotificationsRead}
+                            disabled={isMarkingNotifications || unreadCount === 0}
+                            className="text-xs text-[#00f3ff] disabled:text-gray-600 hover:text-[#00f3ff]/70 transition-colors"
+                          >
+                            {isMarkingNotifications ? "Saving..." : "Mark read"}
+                          </button>
                         </div>
 
-                        {/* List */}
+                        {}
                         <div className="max-h-64 overflow-y-auto">
-                          {mockNotifications.map(n => (
-                            <div
-                              key={n.id}
-                              className="px-4 py-3 border-b border-white/5 hover:bg-white/5 cursor-pointer flex gap-3 transition-colors"
-                            >
-                              <div className="mt-0.5 flex-shrink-0">
-                                <CheckCircle size={14} className="text-[#00f3ff]" />
+                          {isLoadingNotifications ? (
+                            <div className="px-4 py-6 text-xs text-gray-500 text-center">Loading notifications...</div>
+                          ) : notifications.length > 0 ? (
+                            notifications.map((notification) => (
+                              <div
+                                key={notification._id || notification.id}
+                                className="px-4 py-3 border-b border-white/5 hover:bg-white/5 cursor-pointer flex gap-3 transition-colors"
+                              >
+                                <div className="mt-0.5 flex-shrink-0">
+                                  <CheckCircle size={14} className={notification.read ? "text-gray-600" : "text-[#00f3ff]"} />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-semibold text-[#E5E7EB]">{notification.title || notification.message}</p>
+                                  {notification.message && notification.title && (
+                                    <p className="text-[11px] text-gray-400 mt-1">{notification.message}</p>
+                                  )}
+                                  <p className="text-[10px] text-gray-500 mt-1">{formatNotificationTime(notification.createdAt)}</p>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-xs font-semibold text-[#E5E7EB]">{n.text}</p>
-                                <p className="text-[10px] text-gray-500 mt-1">{n.time}</p>
-                              </div>
-                            </div>
-                          ))}
+                            ))
+                          ) : (
+                            <div className="px-4 py-6 text-xs text-gray-500 text-center">No notifications yet.</div>
+                          )}
                         </div>
 
-                        {/* Footer */}
+                        {}
                         <div className="px-4 py-2 text-center text-xs text-gray-500 cursor-pointer hover:text-[#3db26b] transition-colors">
                           View all activity
                         </div>
@@ -301,7 +326,7 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  {/* Profile Dropdown */}
+                  {}
                   <div className="relative" ref={profileRef}>
                     <div
                       onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -310,21 +335,21 @@ export default function Dashboard() {
                       {userInitial}
                     </div>
 
-                    {/* Dropdown Menu */}
+                    {}
                     {isProfileOpen && (
                       <div className="absolute right-0 mt-3 w-72 bg-[#0b0e14] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl">
-                        {/* User Info Header */}
+                        {}
                         <div className="px-4 py-4 border-b border-white/10 flex items-center gap-3 bg-white/5">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#00f3ff] to-[#bc13fe] flex items-center justify-center text-base font-bold text-white shadow-lg">
                             {userInitial}
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-white">Current User</p>
-                            <p className="text-xs text-gray-500">{localStorage.getItem('email') || 'user@radar.com'}</p>
+                            <p className="text-sm font-bold text-white">{profile?.username || "Current User"}</p>
+                            <p className="text-xs text-gray-500">{profile?.email || localStorage.getItem('email') || 'user@radar.com'}</p>
                           </div>
                         </div>
 
-                        {/* Navigation Links */}
+                        {}
                         <div className="py-2">
                           <button className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
                             <User size={16} /> My Profile
@@ -337,7 +362,7 @@ export default function Dashboard() {
                           </button>
                         </div>
 
-                        {/* Mode Toggle Slider Section */}
+                        {}
                         <div className="border-t border-b border-white/10 py-3 px-4 bg-black/20">
                           <div className="text-[10px] font-bold uppercase tracking-wider mb-3 text-center text-gray-500">
                             Choose Your Interface
@@ -347,19 +372,19 @@ export default function Dashboard() {
                             className="relative w-full h-12 rounded-full cursor-pointer flex items-center p-1.5 transition-all duration-300 shadow-inner group bg-black/40 border border-white/10"
                             onClick={toggleMode}
                           >
-                            {/* Active Slider Indicator */}
+                            {}
                             <div
                               className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full shadow-[0_0_15px_rgba(0,243,255,0.2)] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform translate-x-full bg-[#161c27] border border-[#00f3ff]/30"
                             >
                             </div>
 
-                            {/* Investor Label */}
+                            {}
                             <div className="w-1/2 flex items-center justify-center relative z-10 gap-2 h-full opacity-60 hover:opacity-100 transition-opacity">
                               <Activity size={16} className="text-gray-400" />
                               <span className="text-xs font-bold text-gray-400">Investor</span>
                             </div>
 
-                            {/* Trader Label */}
+                            {}
                             <div className="w-1/2 flex items-center justify-center relative z-10 gap-2 h-full">
                               <TrendingUp size={16} className="text-[#00f3ff] drop-shadow-[0_0_5px_rgba(0,243,255,0.5)]" />
                               <span className="text-xs font-bold text-[#00f3ff]">Trader</span>
@@ -367,7 +392,7 @@ export default function Dashboard() {
                           </div>
                         </div>
 
-                        {/* Logout Section */}
+                        {}
                         <div className="pt-1 pb-1 bg-[#0b0e14]">
                           <button
                             onClick={() => { setIsProfileOpen(false); setShowLogoutModal(true); }}
@@ -395,29 +420,24 @@ export default function Dashboard() {
       )}
 
       <main className="content fade-in transition-all duration-300 w-full">
-        {isTraderMode ? (
-          <TraderView data={mockStock} activeModule={activeModule} />
-        ) : (
-          <InvestorView
-            data={mockStock}
-            movers={topMovers}
-            activeModule={activeModule}
-            onToggleMode={toggleMode}
-          />
-        )}
+        <Suspense fallback={<DashboardLoader label="Loading trader mode..." />}>
+          {isTraderMode && (
+            <TraderView activeModule={activeModule} />
+          )}
+        </Suspense>
       </main>
 
-      {/* Trader Logout Confirmation Modal */}
+      {}
       {showLogoutModal && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className="w-full max-w-md rounded-2xl p-6 shadow-2xl"
-            style={{ background: '#0B0F17', border: '1px solid rgba(0,243,255,0.15)' }}
+            style={{ background: '#0b1d21', border: '1px solid rgba(0,243,255,0.15)' }}
           >
             <div className="text-center">
-              {/* Icon */}
+              {}
               <div
                 className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
                 style={{ background: 'rgba(0,243,255,0.08)', color: '#00f3ff', boxShadow: '0 0 24px rgba(0,243,255,0.15)' }}

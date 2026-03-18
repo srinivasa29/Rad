@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, AlertCircle, ChevronDown } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import AuthLayout from '../components/auth/AuthLayout';
 import api from '../api/api';
 import { useGoogleLogin } from '@react-oauth/google';
+import AuthLayout from '../components/auth/AuthLayout';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AlertCircle, Eye, EyeOff, ChevronDown } from 'lucide-react';
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -13,7 +13,7 @@ export default function Login() {
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const [userMode, setUserMode] = useState(''); // Default to empty to show placeholder
+  const [userMode, setUserMode] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const handleInputChange = (e) => {
@@ -48,13 +48,7 @@ export default function Login() {
       return;
     }
 
-    // Secret bypass for Trader mode
-    if (identifier === 'secret' && password === 'secret') {
-      localStorage.setItem('token', 'secret-bypass-token');
-      localStorage.setItem('mode', 'TRADER');
-      window.location.href = '/dashboard';
-      return;
-    }
+
 
     if (!userMode) {
       setErrors({ general: 'Please select a mode (Investor or Trader)' });
@@ -141,7 +135,7 @@ export default function Login() {
 
 
 
-            {/* Preferred Mode Selection - Custom Stylish Dropdown */}
+            {}
             <div>
               <div className="relative">
                 <button

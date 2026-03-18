@@ -1,10 +1,24 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import SplitScreenSection from './SplitScreenSection';
-import { Globe, Activity } from 'lucide-react';
 import RealtimeIcon from './RealtimeIcon';
+import { motion } from 'framer-motion';
+import { Activity } from 'lucide-react';
+import SplitScreenSection from './SplitScreenSection';
+import { fetchMarketData } from '../../api/marketApi';
 
+const formatSignedPercent = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return '0.00%';
+    return `${numeric > 0 ? '+' : ''}${numeric.toFixed(2)}%`;
+};
 
+const findBySymbolHint = (rows, hints = []) => {
+    const normalizedHints = hints.map((hint) => String(hint || '').toLowerCase());
+    return rows.find((row) => {
+        const symbol = String(row?.symbol || '').toLowerCase();
+        const name = String(row?.name || '').toLowerCase();
+        return normalizedHints.some((hint) => symbol.includes(hint) || name.includes(hint));
+    });
+};
 
 const VisualComponent = ({ activeAsset, setActiveAsset, orbits }) => {
     return (
@@ -193,54 +207,66 @@ const GlobalAssetSection = () => {
     ]);
 
     React.useEffect(() => {
+        let isMounted = true;
+
         const fetchData = async () => {
             try {
+                const rows = await fetchMarketData();
+                const marketRows = Array.isArray(rows) ? rows : [];
 
-                const btcRes = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
-                const btcData = await btcRes.json();
-                const btcPrice = parseFloat(btcData.lastPrice).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
-                const btcChange = parseFloat(btcData.priceChangePercent).toFixed(2) + '%';
+                const btc = findBySymbolHint(marketRows, ['btc']);
+                const usdIndex = findBySymbolHint(marketRows, ['dxy', 'usd']);
+                const eurUsd = findBySymbolHint(marketRows, ['eurusd', 'eur/usd', 'eur']);
+                const gbpUsd = findBySymbolHint(marketRows, ['gbpusd', 'gbp/usd', 'gbp']);
 
-
-                const forexRes = await fetch('https://api.frankfurter.app/latest?from=USD&to=EUR,GBP');
-
-
-                const eurRes = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD');
-                const eurData = await eurRes.json();
-                const eurPrice = eurData.rates.USD.toFixed(4);
-
-                const gbpRes = await fetch('https://api.frankfurter.app/latest?from=GBP&to=USD');
-                const gbpData = await gbpRes.json();
-                const gbpPrice = gbpData.rates.USD.toFixed(4);
-
-
-                const randTrend = () => {
-                    const val = (Math.random() * 1 - 0.5).toFixed(2);
-                    return (val > 0 ? '+' : '') + val + '%';
+                if (!isMounted) {
+                    return;
                 }
 
                 setOrbits(prev => [
-                    { ...prev[0], value: btcPrice, trend: (btcData.priceChangePercent > 0 ? '+' : '') + btcChange },
-                    { ...prev[1], value: "103.45", trend: "-0.1%" },
-                    { ...prev[2], value: eurPrice, trend: "+0.15%" },
-                    { ...prev[3], value: gbpPrice, trend: "+0.08%" },
+                    {
+                        ...prev[0],
+                        value: Number(btc?.price || 83915).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+                        trend: formatSignedPercent(btc?.change_24h),
+                    },
+                    {
+                        ...prev[1],
+                        value: Number(usdIndex?.price || 103.45).toFixed(2),
+                        trend: formatSignedPercent(usdIndex?.change_24h),
+                    },
+                    {
+                        ...prev[2],
+                        value: Number(eurUsd?.price || 1.0842).toFixed(4),
+                        trend: formatSignedPercent(eurUsd?.change_24h),
+                    },
+                    {
+                        ...prev[3],
+                        value: Number(gbpUsd?.price || 1.2750).toFixed(4),
+                        trend: formatSignedPercent(gbpUsd?.change_24h),
+                    },
                 ]);
 
             } catch (err) {
                 console.error("Failed to fetch market data", err);
 
-                setOrbits(prev => [
-                    { ...prev[0], value: "$83,915", trend: "+0.99%" },
-                    { ...prev[1], value: "103.45", trend: "-0.1%" },
-                    { ...prev[2], value: "1.0842", trend: "+0.2%" },
-                    { ...prev[3], value: "1.2750", trend: "+0.1%" },
-                ]);
+                if (isMounted) {
+                    setOrbits(prev => [
+                        { ...prev[0], value: "$83,915", trend: "+0.99%" },
+                        { ...prev[1], value: "103.45", trend: "-0.10%" },
+                        { ...prev[2], value: "1.0842", trend: "+0.20%" },
+                        { ...prev[3], value: "1.2750", trend: "+0.10%" },
+                    ]);
+                }
             }
         };
 
         fetchData();
         const interval = setInterval(fetchData, 30000);
-        return () => clearInterval(interval);
+
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
     }, []);
 
     return (

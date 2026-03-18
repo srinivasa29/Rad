@@ -1,4 +1,4 @@
-/* ===== PROFESSIONAL MARKET TICKER STYLES ===== */
+
 
 @keyframes ticker-scroll {
   0% {
@@ -10,7 +10,7 @@
   }
 }
 
-/* ===== Flat continuous market ticker (professional) ===== */
+
 
 .market-ticker-container {
   width: 100%;

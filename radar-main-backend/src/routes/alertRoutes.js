@@ -1,0 +1,1 @@
+const express = require('express');const router = express.Router();const { createAlert, getAlerts, deleteAlert } = require('../controllers/alertController');const { authMiddleware } = require('../middleware/authMiddleware');router.use(authMiddleware);router.post('/', createAlert);router.get('/', getAlerts);router.delete('/:id', deleteAlert);module.exports = router;

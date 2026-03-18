@@ -1,7 +1,4 @@
-import React, { useState } from 'react';
-import { Mail, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
-import AuthLayout from "../components/auth/AuthLayout";
-import { motion } from 'framer-motion';
+import { useState } from 'react';
 
 export default function ForgotPassword() {
     const [email, setEmail] = useState('');

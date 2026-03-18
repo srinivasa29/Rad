@@ -8,6 +8,33 @@ let macroCache = {
 
 const CACHE_DURATION = 1000 * 60 * 60;
 
+const fetchFredLatest = async (seriesId, apiKey) => {
+    const url = 'https://api.stlouisfed.org/fred/series/observations';
+    const response = await axios.get(url, {
+        params: {
+            series_id: seriesId,
+            api_key: apiKey,
+            file_type: 'json',
+            limit: 1,
+            sort_order: 'desc',
+        },
+        timeout: 6000,
+    });
+
+    const value = Number(response.data?.observations?.[0]?.value);
+    return Number.isFinite(value) ? value : null;
+};
+
+const fetchWorldBankLatest = async (indicatorCode) => {
+    const url = `https://api.worldbank.org/v2/country/US/indicator/${indicatorCode}`;
+    const response = await axios.get(url, {
+        params: { format: 'json', per_page: 1 },
+        timeout: 6000,
+    });
+    const value = Number(response.data?.[1]?.[0]?.value);
+    return Number.isFinite(value) ? value : null;
+};
+
 const getGlobalPulse = async () => {
     const now = Date.now();
     if (macroCache.pulse && (now - macroCache.lastFetch < CACHE_DURATION)) {
@@ -25,6 +52,7 @@ const getGlobalPulse = async () => {
         ];
 
         macroCache.pulse = pulse;
+        macroCache.lastFetch = Date.now();
         return pulse;
 
     } catch (error) {
@@ -40,50 +68,53 @@ const getMacroIndicators = async () => {
     }
 
     try {
-        const wbUrl = 'http://api.worldbank.org/v2/country/US/indicator/NY.GDP.MKTP.KD.ZG?format=json&per_page=1';
-
         const fredKey = process.env.FRED_API_KEY;
-        let interestRate = "5.50%";
-        let inflationRate = "3.2%";
-
-        const wbRes = await axios.get(wbUrl);
-        let gdpGrowth = "2.5%";
-        if (wbRes.data && wbRes.data[1] && wbRes.data[1][0]) {
-            gdpGrowth = `${parseFloat(wbRes.data[1][0].value).toFixed(1)}%`;
-        }
+        let gdpGrowth = null;
+        let inflationRate = null;
+        let interestRate = null;
 
         if (fredKey) {
             try {
-                const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=FEDFUNDS&api_key=${fredKey}&file_type=json&limit=1&sort_order=desc`;
-                const fredRes = await axios.get(fredUrl);
-                if (fredRes.data.observations && fredRes.data.observations.length > 0) {
-                    interestRate = `${parseFloat(fredRes.data.observations[0].value).toFixed(2)}%`;
-                }
+                const [fredGdp, fredCpi, fredFunds] = await Promise.all([
+                    fetchFredLatest('A191RL1Q225SBEA', fredKey),
+                    fetchFredLatest('CPIAUCSL', fredKey),
+                    fetchFredLatest('FEDFUNDS', fredKey),
+                ]);
 
-                const cpiUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=CPIAUCSL&api_key=${fredKey}&file_type=json&limit=1&sort_order=desc`;
-                const cpiRes = await axios.get(cpiUrl);
+                if (Number.isFinite(fredGdp)) gdpGrowth = `${fredGdp.toFixed(1)}%`;
+                if (Number.isFinite(fredCpi)) inflationRate = `${fredCpi.toFixed(1)} index`;
+                if (Number.isFinite(fredFunds)) interestRate = `${fredFunds.toFixed(2)}%`;
             } catch (e) {
-                console.warn("FRED API Error:", e.message);
+                console.warn('FRED API Error:', e.message);
+            }
+        }
+
+        if (!gdpGrowth || !inflationRate) {
+            try {
+                const [wbGdp, wbInflation] = await Promise.all([
+                    fetchWorldBankLatest('NY.GDP.MKTP.KD.ZG'),
+                    fetchWorldBankLatest('FP.CPI.TOTL.ZG'),
+                ]);
+
+                if (!gdpGrowth && Number.isFinite(wbGdp)) gdpGrowth = `${wbGdp.toFixed(1)}%`;
+                if (!inflationRate && Number.isFinite(wbInflation)) inflationRate = `${wbInflation.toFixed(1)}%`;
+            } catch (e) {
+                console.warn('World Bank API Error:', e.message);
             }
         }
 
         const indicators = {
-            gdp_growth: gdpGrowth,
-            inflation_rate: inflationRate,
-            interest_rate: interestRate
+            gdp_growth: gdpGrowth || '2.1% (Est)',
+            inflation_rate: inflationRate || '3.4% (Est)',
+            interest_rate: interestRate || '5.33%',
         };
-
         macroCache.indicators = indicators;
         macroCache.lastFetch = Date.now();
         return indicators;
 
     } catch (error) {
-        console.error("Macro API Error:", error);
-        return {
-            gdp_growth: "2.1% (Est)",
-            inflation_rate: "3.4% (Est)",
-            interest_rate: "5.33%"
-        };
+        console.error("Macro API Error:", error.message);
+        return { gdp_growth: "2.1% (Est)", inflation_rate: "3.4% (Est)", interest_rate: "5.33%" };
     }
 };
 

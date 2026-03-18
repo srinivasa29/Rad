@@ -29,11 +29,11 @@ const FilterTag = ({ label, active }) => (
     </span>
 );
 
-export default function AssetExplorer() {
+export default function AssetExplorer({ className }) {
     const [activeTab, setActiveTab] = useState("stocks");
 
     return (
-        <div className="w-full bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 p-6">
+        <div className={className ?? "w-full bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 p-6"}>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
                     <h3 className="text-2xl font-bold text-white font-['Plus_Jakarta_Sans'] mb-2">Asset Explorer</h3>

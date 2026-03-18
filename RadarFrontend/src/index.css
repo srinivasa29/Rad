@@ -21,7 +21,7 @@
   --bg-dark: #050511;
 }
 
-/* ... existing code ... */
+
 
 .bg-gradient-light {
   --angle: 45deg;
@@ -156,7 +156,7 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
-  /* Fallback */
+  
   animation: rotate-gradient 10s linear infinite;
 }
 

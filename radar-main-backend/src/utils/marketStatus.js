@@ -7,7 +7,7 @@ const getMarketStatus = () => {
     const minute = nyTime.getMinutes();
     const totalMinutes = hour * 60 + minute;
 
-    const isOpenTime = totalMinutes >= 570 && totalMinutes < 960; 
+    const isOpenTime = totalMinutes >= 570 && totalMinutes < 960;
     const isWeekday = day >= 1 && day <= 5;
 
     return {

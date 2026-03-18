@@ -1,0 +1,1 @@
+const express = require('express');const router = express.Router();const { getMarketIndices, getLatency } = require('../controllers/tickerController');router.get('/indices', getMarketIndices);router.get('/latency', getLatency);module.exports = router;

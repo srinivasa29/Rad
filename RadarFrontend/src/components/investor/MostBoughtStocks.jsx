@@ -1,51 +1,100 @@
-import React from 'react';
-import { Bookmark, TrendingUp, TrendingDown } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Bookmark, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { fetchPulse } from '../../api/analyticsApi';
+
+const displaySymbol = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
 
 const mockMostBought = [
-    {
-        id: 1,
-        name: "Newgen Software Tech",
-        price: "₹528.80",
-        change: "65.75 (14.20%)",
-        isPositive: true,
-        logo: "N" // Placeholder
-    },
-    {
-        id: 2,
-        name: "TATA SILVER",
-        price: "₹22.55",
-        change: "-0.49 (2.13%)",
-        isPositive: false,
-        logo: "T"
-    },
-    {
-        id: 3,
-        name: "TATA GOLD",
-        price: "₹14.64",
-        change: "-0.23 (1.55%)",
-        isPositive: false,
-        logo: "T"
-    },
-    {
-        id: 4,
-        name: "Hindustan Copper",
-        price: "₹552.70",
-        change: "-21.70 (3.78%)",
-        isPositive: false,
-        logo: "H"
-    }
+    { id: 'mock-1', name: 'RELIANCE', price: '₹2,845', change: '+1.40%', isPositive: true, logo: 'R', tag: 'Gap Up' },
+    { id: 'mock-2', name: 'INFY', price: '₹1,510', change: '+1.05%', isPositive: true, logo: 'I', tag: 'Gap Up' },
+    { id: 'mock-3', name: 'TATASTEEL', price: '₹152', change: '-1.10%', isPositive: false, logo: 'T', tag: 'Gap Down' },
+    { id: 'mock-4', name: 'ICICIBANK', price: '2.3x vol', change: '2.3x', isPositive: true, logo: 'I', tag: 'Volume' },
 ];
 
 const MostBoughtStocks = () => {
+    const [pulse, setPulse] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
+
+    useEffect(() => {
+        const loadPulse = async () => {
+            try {
+                setIsLoading(true);
+                setHasError(false);
+                const response = await fetchPulse();
+                setPulse(response);
+            } catch (error) {
+                console.error('Failed to load pre-market pulse:', error);
+                setHasError(true);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadPulse();
+    }, []);
+
+    const cards = useMemo(() => {
+        const gapUp = (pulse?.gapUp ?? []).map((item, index) => ({
+            id: `gap-up-${item.symbol}-${index}`,
+            name: item.symbol,
+            price: `₹${Number(item.price || 0).toLocaleString()}`,
+            change: item.change,
+            isPositive: true,
+            logo: displaySymbol(item.symbol || '?').slice(0, 1),
+            tag: 'Gap Up'
+        }));
+
+        const gapDown = (pulse?.gapDown ?? []).map((item, index) => ({
+            id: `gap-down-${item.symbol}-${index}`,
+            name: item.symbol,
+            price: `₹${Number(item.price || 0).toLocaleString()}`,
+            change: item.change,
+            isPositive: false,
+            logo: displaySymbol(item.symbol || '?').slice(0, 1),
+            tag: 'Gap Down'
+        }));
+
+        const volumeShockers = (pulse?.volumeShockers ?? []).map((item, index) => ({
+            id: `volume-${item.symbol}-${index}`,
+            name: item.symbol,
+            price: `${item.volume} vol`,
+            change: item.shock,
+            isPositive: true,
+            logo: displaySymbol(item.symbol || '?').slice(0, 1),
+            tag: 'Volume'
+        }));
+
+        const liveCards = [...gapUp, ...gapDown, ...volumeShockers].slice(0, 8);
+
+        if (liveCards.length > 0) {
+            return liveCards;
+        }
+
+        return mockMostBought;
+    }, [pulse]);
+
     return (
-        <div className="investor-card p-6 h-full flex flex-col">
+        <div className="investor-card p-6 h-full flex flex-col relative overflow-hidden">
+            {isLoading && (
+                <div className="absolute inset-0 bg-white/75 backdrop-blur-sm z-20 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+            )}
+
             <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-slate-800">Most Searched Stocks on Radar</h3>
-                <button className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded">View all</button>
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800">Pre-Market Pulse</h3>
+                    <p className="text-[11px] text-slate-400 mt-1">Gap movers and volume shockers from the analytics feed</p>
+                </div>
+                <div className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded inline-flex items-center gap-1">
+                    <Activity size={11} />
+                    {hasError ? 'Fallback mode' : 'Live feed'}
+                </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
-                {mockMostBought.map((stock) => (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 content-start">
+                {cards.map((stock) => (
                     <div key={stock.id} className="p-4 relative group hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-500 border border-slate-100 rounded-2xl bg-white">
                         <div className="absolute top-3 right-3 text-slate-200 group-hover:text-emerald-500 cursor-pointer transition-colors">
                             <Bookmark size={15} />
@@ -55,7 +104,13 @@ const MostBoughtStocks = () => {
                             {stock.logo}
                         </div>
 
-                        <h4 className="text-xs font-bold text-slate-700 mb-5 line-clamp-2 h-8 leading-tight group-hover:text-emerald-700 transition-colors">{stock.name}</h4>
+                        <h4 className="text-xs font-bold text-slate-700 mb-5 line-clamp-2 h-8 leading-tight group-hover:text-emerald-700 transition-colors">{displaySymbol(stock.name)}</h4>
+
+                        {stock.tag && (
+                            <div className={`inline-flex items-center mb-4 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-full ${stock.isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {stock.tag}
+                            </div>
+                        )}
 
                         <div className="mt-auto border-t border-slate-50 pt-3">
                             <div className="text-sm font-black text-slate-800">{stock.price}</div>

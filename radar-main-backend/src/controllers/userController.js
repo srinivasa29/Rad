@@ -99,13 +99,20 @@ const loginUser = async (req, res) => {
 };
 
 const getUserProfile = async (req, res) => {
-    
     res.json({
         _id: req.user._id,
         username: req.user.username,
         preferredMode: req.user.preferredMode,
         watchlist: req.user.watchlist
     });
+};
+
+const getMode = async (req, res) => {
+    try {
+        res.json({ preferredMode: req.user.preferredMode });
+    } catch (error) {
+        res.status(500).json({ error: 'Server Error' });
+    }
 };
 
 const updateMode = async (req, res) => {
@@ -119,4 +126,4 @@ const updateMode = async (req, res) => {
     res.json({ message: "Mode updated", preferredMode: user.preferredMode });
 };
 
-module.exports = { registerUser, loginUser, getUserProfile, updateMode, googleAuth };
+module.exports = { registerUser, loginUser, getUserProfile, getMode, updateMode, googleAuth };

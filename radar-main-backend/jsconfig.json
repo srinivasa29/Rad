@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "checkJs": false,
+    "skipLibCheck": true,
+    "types": [],
+    "module": "commonjs",
+    "target": "ES2020"
+  },
+  "typeAcquisition": {
+    "enable": false
+  },
+  "include": [
+    "server.js",
+    "src/**/*.js"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

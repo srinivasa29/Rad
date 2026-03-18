@@ -1,56 +1,129 @@
 const axios = require('axios');
 
+const BINANCE_BASE_URL = 'https://api.binance.com';
+const COINGECKO_BASE_URL = 'https://api.coingecko.com/api/v3';
+const DEFAULT_PAIRS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'BNBUSDT'];
+
+const PAIR_META = {
+    BTCUSDT: { id: 'bitcoin', symbol: 'btc', name: 'Bitcoin' },
+    ETHUSDT: { id: 'ethereum', symbol: 'eth', name: 'Ethereum' },
+    SOLUSDT: { id: 'solana', symbol: 'sol', name: 'Solana' },
+    XRPUSDT: { id: 'ripple', symbol: 'xrp', name: 'XRP' },
+    BNBUSDT: { id: 'binancecoin', symbol: 'bnb', name: 'BNB' },
+};
+
+const toBinancePair = (value = 'BTC') => {
+    const normalized = String(value).trim().toUpperCase();
+    const aliasMap = {
+        BTC: 'BTCUSDT',
+        BITCOIN: 'BTCUSDT',
+        ETH: 'ETHUSDT',
+        ETHEREUM: 'ETHUSDT',
+        SOL: 'SOLUSDT',
+        SOLANA: 'SOLUSDT',
+        XRP: 'XRPUSDT',
+        RIPPLE: 'XRPUSDT',
+        BNB: 'BNBUSDT',
+        BINANCECOIN: 'BNBUSDT',
+    };
+
+    if (aliasMap[normalized]) {
+        return aliasMap[normalized];
+    }
+
+    if (normalized.endsWith('USDT')) {
+        return normalized;
+    }
+
+    return `${normalized}USDT`;
+};
+
+const toBinanceInterval = (interval = '1D') => {
+    const key = String(interval).toUpperCase();
+    const map = {
+        '1M': { interval: '4h', limit: 180 },
+        '1W': { interval: '1h', limit: 168 },
+        '1D': { interval: '15m', limit: 96 },
+        '4H': { interval: '15m', limit: 64 },
+        '1H': { interval: '5m', limit: 60 },
+    };
+    return map[key] || { interval: '1h', limit: 120 };
+};
+
 const fetchCryptoData = async () => {
     try {
-        const url = 'https://api.coingecko.com/api/v3/coins/markets';
-        const params = {
-            vs_currency: 'usd',
-            ids: 'bitcoin,ethereum,solana,ripple,cardano',
-            order: 'market_cap_desc'
-        };
-
-        const response = await axios.get(url, {
-            params,
-            timeout: 3000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
+        const response = await axios.get(`${BINANCE_BASE_URL}/api/v3/ticker/24hr`, {
+            params: { symbols: JSON.stringify(DEFAULT_PAIRS) },
+            timeout: 5000,
         });
 
-        return response.data.map(coin => ({
-            ...coin,
+        return response.data.map((ticker) => {
+            const meta = PAIR_META[ticker.symbol] || {
+                id: ticker.symbol.toLowerCase(),
+                symbol: ticker.symbol.replace('USDT', '').toLowerCase(),
+                name: ticker.symbol,
+            };
+
+            const currentPrice = Number(ticker.lastPrice);
+            const change24h = Number(ticker.priceChangePercent);
+            const quoteVolume = Number(ticker.quoteVolume);
+
+            return {
+                id: meta.id,
+                symbol: meta.symbol,
+                name: meta.name,
+                current_price: Number.isFinite(currentPrice) ? currentPrice : 0,
+                price_change_percentage_24h: Number.isFinite(change24h) ? change24h : 0,
+                market_cap: null,
+                total_volume: Number.isFinite(quoteVolume) ? quoteVolume : 0,
+                image: null,
             details: {
                 sector: "Blockchain",
-                market_cap: `$${(coin.market_cap / 1e9).toFixed(2)}B`,
-                about: `A decentralized digital currency based on ${coin.id} blockchain.`,
-                volume: `$${(coin.total_volume / 1e6).toFixed(2)}M`
+                    market_cap: "N/A",
+                    about: `${meta.name} market data sourced from Binance.`,
+                    volume: Number.isFinite(quoteVolume) ? `$${(quoteVolume / 1e6).toFixed(2)}M` : 'N/A',
             }
-        }));
+            };
+        });
     } catch (error) {
-        console.warn("CoinGecko failed, switching to CoinCap...", error.message);
+        console.error('Binance crypto fetch failed, trying CoinGecko:', error.message);
         try {
-            const coincapUrl = 'https://api.coincap.io/v2/assets';
-            const coincapRes = await axios.get(coincapUrl, {
-                params: { ids: 'bitcoin,ethereum,solana,xrp,cardano', limit: 5 }
+            const ids = Object.values(PAIR_META).map((item) => item.id).join(',');
+            const response = await axios.get(`${COINGECKO_BASE_URL}/coins/markets`, {
+                params: {
+                    vs_currency: 'usd',
+                    ids,
+                    order: 'market_cap_desc',
+                    per_page: 20,
+                    page: 1,
+                    sparkline: false,
+                    price_change_percentage: '24h',
+                },
+                timeout: 6000,
+                headers: process.env.COINGECKO_API_KEY
+                    ? { 'x-cg-demo-api-key': process.env.COINGECKO_API_KEY }
+                    : undefined,
             });
 
-            return coincapRes.data.data.map(coin => ({
+            const rows = Array.isArray(response.data) ? response.data : [];
+            return rows.map((coin) => ({
                 id: coin.id,
-                symbol: coin.symbol.toLowerCase(),
+                symbol: String(coin.symbol || '').toLowerCase(),
                 name: coin.name,
-                current_price: parseFloat(parseFloat(coin.priceUsd).toFixed(2)),
-                price_change_percentage_24h: parseFloat(parseFloat(coin.changePercent24Hr).toFixed(2)),
-                market_cap: parseInt(coin.marketCapUsd),
-                total_volume: parseInt(coin.volumeUsd24Hr),
+                current_price: Number(coin.current_price) || 0,
+                price_change_percentage_24h: Number(coin.price_change_percentage_24h) || 0,
+                market_cap: Number(coin.market_cap) || null,
+                total_volume: Number(coin.total_volume) || 0,
+                image: coin.image || null,
                 details: {
-                    sector: "Blockchain",
-                    market_cap: `$${(parseFloat(coin.marketCapUsd) / 1e9).toFixed(2)}B`,
-                    about: `A decentralized digital currency based on ${coin.id} blockchain.`,
-                    volume: `$${(parseFloat(coin.volumeUsd24Hr) / 1e6).toFixed(2)}M`
+                    sector: 'Blockchain',
+                    market_cap: Number(coin.market_cap) > 0 ? `$${(Number(coin.market_cap) / 1e9).toFixed(2)}B` : 'N/A',
+                    about: `${coin.name} market data sourced from CoinGecko.`,
+                    volume: Number(coin.total_volume) > 0 ? `$${(Number(coin.total_volume) / 1e6).toFixed(2)}M` : 'N/A',
                 }
             }));
-        } catch (ccError) {
-            console.error("CoinCap also failed:", ccError.message);
+        } catch (fallbackError) {
+            console.error('CoinGecko crypto fetch failed:', fallbackError.message);
             return [];
         }
     }
@@ -58,44 +131,74 @@ const fetchCryptoData = async () => {
 
 const fetchCryptoHistory = async (symbol, interval) => {
     try {
-        const coinId = symbol.toLowerCase() === 'btc' ? 'bitcoin' : 'ethereum';
-        const days = interval === '1M' ? 30 : 1;
-
-        const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart`;
-        const response = await axios.get(url, {
-            params: { vs_currency: 'usd', days: days },
-            timeout: 4000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
+        const pair = toBinancePair(symbol);
+        const timeConfig = toBinanceInterval(interval);
+        const response = await axios.get(`${BINANCE_BASE_URL}/api/v3/klines`, {
+            params: {
+                symbol: pair,
+                interval: timeConfig.interval,
+                limit: timeConfig.limit,
+            },
+            timeout: 5000,
         });
 
-        return response.data.prices.map(price => ({
-            date: new Date(price[0]).toLocaleTimeString(),
-            price: price[1]
+        return response.data.map((candle) => ({
+            date: new Date(candle[0]).toLocaleString(),
+            price: Number(candle[4]),
         }));
     } catch (error) {
-        return [];
+        console.error('Binance crypto history fetch failed, trying CoinGecko:', error.message);
+        try {
+            const pair = toBinancePair(symbol);
+            const coinId = PAIR_META[pair]?.id || String(symbol || '').toLowerCase();
+            const daysMap = {
+                '1D': 1,
+                '1W': 7,
+                '1M': 30,
+                '3M': 90,
+                '6M': 180,
+                '1Y': 365,
+            };
+            const days = daysMap[String(interval || '1M').toUpperCase()] || 30;
+
+            const response = await axios.get(`${COINGECKO_BASE_URL}/coins/${coinId}/market_chart`, {
+                params: {
+                    vs_currency: 'usd',
+                    days,
+                    interval: days <= 1 ? 'hourly' : 'daily',
+                },
+                timeout: 6000,
+                headers: process.env.COINGECKO_API_KEY
+                    ? { 'x-cg-demo-api-key': process.env.COINGECKO_API_KEY }
+                    : undefined,
+            });
+
+            const prices = Array.isArray(response.data?.prices) ? response.data.prices : [];
+            return prices.map((point) => ({
+                date: new Date(point[0]).toLocaleString(),
+                price: Number(point[1]),
+            })).filter((item) => Number.isFinite(item.price));
+        } catch (fallbackError) {
+            console.error('CoinGecko crypto history fetch failed:', fallbackError.message);
+            return [];
+        }
     }
 };
 
 const fetchOrderBook = async (symbol) => {
     try {
-        const coinId = symbol.toLowerCase() === 'btc' ? 'bitcoin' : 'ethereum';
-        const url = `https://api.coingecko.com/api/v3/coins/${coinId}/depth`;
-        const response = await axios.get(url, {
-            params: { vs_currency: 'usd', limit: 5 },
-            timeout: 4000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
+        const pair = toBinancePair(symbol);
+        const response = await axios.get(`${BINANCE_BASE_URL}/api/v3/depth`, {
+            params: { symbol: pair, limit: 10 },
+            timeout: 5000,
         });
 
         return {
-            bids: response.data.bids,
-            asks: response.data.asks
+            bids: response.data.bids || [],
+            asks: response.data.asks || [],
         };
     } catch (error) {
+        console.error('Binance order book fetch failed:', error.message);
         return null;
     }
 };

@@ -11,11 +11,11 @@ const fetchCompanyFilings = async (cik) => {
             headers: {
                 'User-Agent': USER_AGENT,
                 'Accept-Encoding': 'gzip, deflate'
-            }
+            },
+            timeout: 8000
         });
 
         const filings = response.data.filings.recent;
-
         const recentFilings = [];
         for (let i = 0; i < Math.min(10, filings.accessionNumber.length); i++) {
             recentFilings.push({
@@ -46,9 +46,7 @@ const getFilingsForSymbol = async (symbol) => {
     };
 
     const cik = cikMap[symbol.toUpperCase()];
-    if (!cik) {
-        return [];
-    }
+    if (!cik) return [];
 
     return await fetchCompanyFilings(cik);
 };

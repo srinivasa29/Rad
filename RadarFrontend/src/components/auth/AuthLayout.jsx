@@ -1,13 +1,6 @@
-import React from 'react';
-
-
-
-
-
-import { Link } from 'react-router-dom';
-import { TrendingUp, Shield, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Tilt } from 'react-tilt';
+import { Link } from 'react-router-dom';
+import Tilt from '../common/Tilt';
 
 export default function AuthLayout({ children }) {
     const defaultTiltOptions = {

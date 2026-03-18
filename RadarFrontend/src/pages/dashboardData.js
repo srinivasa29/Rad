@@ -1,6 +1,3 @@
-// ============================================
-// SHARED DASHBOARD DATA & UTILITIES
-// ============================================
 
 export const mockStock = {
     symbol: "BTC",
@@ -51,10 +48,6 @@ export const mockNotifications = [
     { id: 3, text: "Margin Call Warning: 80% usage", time: "3h ago", read: true },
 ];
 
-// ============================================
-// CHART DATA GENERATORS
-// ============================================
-
 export const generatePriceData = (basePrice, points, volatility = 100) => {
     let price = basePrice;
     return Array.from({ length: points }, (_, i) => {
@@ -75,8 +68,6 @@ export const generateCandlestickData = (basePrice, points, volatility = 100) => 
         return { time: i, open, high, low, close };
     });
 };
-
-// Timeframe configurations
 const timeframeConfig = {
     "1m": { points: 60, volatility: 20, labels: Array.from({ length: 60 }, (_, i) => `${i}s`) },
     "5m": { points: 48, volatility: 40, labels: Array.from({ length: 48 }, (_, i) => `${i * 5}m`) },
@@ -96,7 +87,5 @@ export const chartDataByTimeframe = Object.fromEntries(
         }];
     })
 );
-
-// Default 15m data (backward compat)
 export const priceData = chartDataByTimeframe["15m"].area;
 export const candlestickData = chartDataByTimeframe["15m"].candles;

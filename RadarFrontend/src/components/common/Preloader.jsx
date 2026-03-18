@@ -1,11 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Preloader = ({ children }) => {
     const location = useLocation();
-
-    // Check if we should skip preloader based on navigation state or session storage
     const shouldSkip = location.state?.skipPreloader || sessionStorage.getItem('hasVisited');
 
     const [isLoading, setIsLoading] = useState(!shouldSkip && location.pathname === '/');
