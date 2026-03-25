@@ -1,5 +1,13 @@
 const { getTechnicalIndicators, getTrendMatrix } = require('./indicatorService');
 
+const parseThreshold = (value, fallback) => {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const FORCE_BEARISH_DROP_PCT = parseThreshold(process.env.TECH_FORCE_BEARISH_DROP_PCT, -1.5);
+const CAP_BULLISH_DROP_PCT = parseThreshold(process.env.TECH_CAP_BULLISH_DROP_PCT, -0.75);
+
 
 
 const getVolumePoints = (volumeStatus) => {
@@ -42,25 +50,47 @@ const getTrendPoints = (trendMatrix) => {
     return Math.round(points);
 };
 
+const getPriceActionPoints = (lastChangePercent) => {
+    const change = Number(lastChangePercent);
+    if (!Number.isFinite(change)) return 12;
+    if (change <= -2.5) return 0;
+    if (change <= -1.0) return 4;
+    if (change <= -0.3) return 8;
+    if (change < 0.3) return 12;
+    if (change < 1.0) return 16;
+    if (change < 2.5) return 20;
+    return 24;
+};
+
 const getBias = (score) => {
     if (score >= 65) return 'bullish';
     if (score >= 40) return 'neutral';
     return 'bearish';
 };
 
-const getInstrumentScore = async (assetType, symbol) => {
+const getInstrumentScore = async (assetType, symbol, options = {}) => {
     const [indicators, trendMatrix] = await Promise.all([
-        getTechnicalIndicators(assetType, symbol, '1D'),
-        getTrendMatrix(assetType, symbol)
+        getTechnicalIndicators(assetType, symbol, '1D', options),
+        getTrendMatrix(assetType, symbol, options)
     ]);
 
     const rsiPoints = getRsiPoints(indicators.rsi);
     const macdPoints = getMacdPoints(indicators.macd);
     const volumePoints = getVolumePoints(indicators.volumeStatus);
     const trendPoints = getTrendPoints(trendMatrix);
+    const priceActionPoints = getPriceActionPoints(indicators.lastChangePercent);
 
-    const score = Math.min(100, rsiPoints + macdPoints + volumePoints + trendPoints);
-    const bias = getBias(score);
+    let score = Math.min(100, rsiPoints + macdPoints + volumePoints + trendPoints + priceActionPoints);
+    let bias = getBias(score);
+
+    const lastChange = Number(indicators.lastChangePercent);
+    if (Number.isFinite(lastChange) && lastChange <= FORCE_BEARISH_DROP_PCT) {
+        score = Math.min(score, 39);
+        bias = 'bearish';
+    } else if (Number.isFinite(lastChange) && lastChange <= CAP_BULLISH_DROP_PCT && bias === 'bullish') {
+        score = Math.min(score, 64);
+        bias = 'neutral';
+    }
 
     return {
         score,
@@ -69,8 +99,15 @@ const getInstrumentScore = async (assetType, symbol) => {
             rsi: rsiPoints,
             macd: macdPoints,
             volume: volumePoints,
-            trend: trendPoints
-        }
+            trend: trendPoints,
+            priceAction: priceActionPoints,
+        },
+        context: {
+            lastChangePercent: Number.isFinite(lastChange) ? lastChange : null,
+            lastUpdatedAt: indicators.lastUpdatedAt || null,
+            forceBearishDropPercent: FORCE_BEARISH_DROP_PCT,
+            capBullishDropPercent: CAP_BULLISH_DROP_PCT,
+        },
     };
 };
 

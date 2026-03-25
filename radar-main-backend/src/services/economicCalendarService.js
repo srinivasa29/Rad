@@ -133,10 +133,6 @@ const fetchTradingEconomicsEvents = async (region, limit = 8, credentialOverride
                 return null;
             }
 
-            if (!hasAnyKeyword(eventName, IMPORTANT_EVENT_KEYWORDS)) {
-                return null;
-            }
-
             const date = toIsoDate(row.Date || row.date);
             if (!date) {
                 return null;
@@ -150,11 +146,19 @@ const fetchTradingEconomicsEvents = async (region, limit = 8, credentialOverride
                 forecast: row.Forecast || row.forecast || '-',
                 previous: row.Previous || row.previous || '-',
                 actual: row.Actual || row.actual || '-',
+                source: 'tradingeconomics',
+                factual: true,
             };
         })
         .filter(Boolean);
 
-    const sorted = sortEvents(dedupeEvents(mapped));
+    const keywordMatched = mapped.filter((item) => hasAnyKeyword(item.event, IMPORTANT_EVENT_KEYWORDS));
+    const highImpactFallback = mapped.filter((item) => item.impact !== 'Low');
+    const selected = keywordMatched.length > 0
+        ? keywordMatched
+        : (highImpactFallback.length > 0 ? highImpactFallback : mapped);
+
+    const sorted = sortEvents(dedupeEvents(selected));
     return sorted.slice(0, limit);
 };
 

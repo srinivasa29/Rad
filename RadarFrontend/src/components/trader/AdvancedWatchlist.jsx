@@ -1,40 +1,77 @@
 import { useState, useEffect } from "react";
 import { useAsset } from "../../context/AssetContext";
 import { fetchWatchlistTechnicals } from "../../api/technicalApi";
-import { priceData } from "../../pages/dashboardData";
 import { Search } from "lucide-react";
+
+const BACKEND_SYMBOL_MAP = {
+  RELIANCE: "RELIANCE.NS",
+  HDFCBANK: "HDFCBANK.NS",
+  INFY: "INFY.NS",
+  TCS: "TCS.NS",
+  ICICIBANK: "ICICIBANK.NS",
+  SBIN: "SBIN.NS",
+  ITC: "ITC.NS",
+  LT: "LT.NS",
+  "NIFTY 50": "^NSEI",
+  BANKNIFTY: "^NSEBANK",
+};
+
+const normalizeDisplaySymbol = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const upper = raw.toUpperCase();
+  if (upper === "^NSEI" || upper === "NIFTY" || upper === "NIFTY50") return "NIFTY 50";
+  if (upper === "^NSEBANK" || upper === "BANKNIFTY") return "BANKNIFTY";
+  return upper.replace(/\.(NS|BO)$/i, "");
+};
+
+const resolveBackendSymbol = (value) => {
+  const normalized = normalizeDisplaySymbol(value);
+  if (!normalized) return "";
+  return BACKEND_SYMBOL_MAP[normalized] || normalized;
+};
 
 const AdvancedWatchlist = () => {
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const { setAsset } = useAsset();
 
   useEffect(() => {
     const load = async () => {
       try {
         setIsLoading(true);
+        setHasError(false);
         const rows = await fetchWatchlistTechnicals();
         const normalized = (Array.isArray(rows) ? rows : []).map((item) => {
-          const rawChange = Number(item.changePercent ?? item.change_24h ?? item.change ?? 0);
-          const changePercent = `${rawChange >= 0 ? '+' : ''}${rawChange.toFixed(2)}`;
+          const rawPrice = Number(item.price ?? item.ltp ?? item.lastPrice);
+          const rawChange = Number(item.changePercent ?? item.change_24h ?? item.change);
           const volumeRaw = String(item?.details?.volume || '');
-          const volume = Number.parseInt(volumeRaw.replace(/[^\d]/g, ''), 10) || 50;
+          const parsedVolume = Number.parseInt(volumeRaw.replace(/[^\d]/g, ''), 10);
+          const technicalScoreRaw = Number(item.technicalScore ?? item?.technicals?.score);
+          const displaySymbol = normalizeDisplaySymbol(item.symbol);
 
           return {
-            symbol: item.symbol,
-            price: Number(item.price || 0),
-            changePercent,
-            volume,
+            symbol: displaySymbol,
+            backendSymbol: resolveBackendSymbol(item.symbol),
+            price: Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : null,
+            changePercent: Number.isFinite(rawChange) ? rawChange : null,
+            volume: Number.isFinite(parsedVolume) && parsedVolume > 0 ? parsedVolume : null,
             history: Array.isArray(item?.technicals?.sparkline)
               ? item.technicals.sparkline.map((value) => Number(value)).filter((value) => Number.isFinite(value))
               : [],
-            technicalScore: Math.max(5, Math.min(95, Math.round(50 + rawChange * 8))),
+            technicalScore: Number.isFinite(technicalScoreRaw)
+              ? Math.max(0, Math.min(100, Math.round(technicalScoreRaw)))
+              : null,
+            outlook: String(item?.technicals?.signal || item?.outlook || '').trim() || null,
           };
-        });
+        }).filter((item) => item.symbol);
 
         setData(normalized);
       } catch (err) {
         console.error(err);
+        setHasError(true);
+        setData([]);
       } finally {
         setIsLoading(false);
       }
@@ -54,9 +91,8 @@ const AdvancedWatchlist = () => {
             </div>
         </div>
         <div className="flex gap-2 text-white/50 items-center">
-          <div className="text-[10px] text-[#42C0A5] bg-[#42C0A5]/10 px-2.5 flex items-center gap-1 py-1 rounded-full border border-[#42C0A5]/20 font-bold uppercase tracking-wider">
-            <span className="w-1.5 h-1.5 bg-[#42C0A5] rounded-full animate-pulse"></span>
-            Live
+          <div className="text-[10px] text-[#5d606b] bg-white/5 px-2.5 py-1 rounded-full border border-white/10 font-bold uppercase tracking-wider">
+            {isLoading ? "Syncing" : `${data.length} Symbols`}
           </div>
           <Search size={18} className="cursor-pointer hover:text-white transition-colors" />
         </div>
@@ -75,63 +111,81 @@ const AdvancedWatchlist = () => {
           </thead>
           <tbody className="text-xs">
             {data.map((row, i) => {
-              const chgText = String(row.changePercent || "0");
-              const isPos = !chgText.startsWith("-");
-              const safeChg = chgText.replace('+', '').replace('%', '');
-
-              const outlookText = row.technicalScore > 75 ? "Breakout" : (row.technicalScore < 35 ? "Sell" : "Watch");
-              const outColor = row.technicalScore > 75 ? "#3db26b" : (row.technicalScore < 35 ? "#ed5750" : "#f0b429");
-              const volPct = Math.min(100, Math.max(10, parseInt(row.volume) || 50));
+              const hasChange = Number.isFinite(row.changePercent);
+              const isPos = hasChange ? row.changePercent >= 0 : true;
+              const safeChg = hasChange ? Math.abs(row.changePercent).toFixed(2) : "--";
+              const hasScore = Number.isFinite(row.technicalScore);
+              const inferredOutlook = hasScore
+                ? (row.technicalScore >= 75 ? "Breakout" : row.technicalScore <= 35 ? "Sell" : "Watch")
+                : "--";
+              const outlookText = row.outlook || inferredOutlook;
+              const outColor = outlookText === "--"
+                ? "#8b909a"
+                : String(outlookText).toLowerCase().includes("sell") || String(outlookText).toLowerCase().includes("bear")
+                  ? "#ed5750"
+                  : String(outlookText).toLowerCase().includes("watch")
+                    ? "#f0b429"
+                    : "#3db26b";
+              const hasVolume = Number.isFinite(row.volume) && row.volume > 0;
+              const volPct = hasVolume ? Math.min(100, Math.max(8, Number(row.volume))) : 0;
 
               return (
                 <tr
                   key={i}
                   className="bg-white/5 hover:bg-white/10 transition-colors group cursor-pointer"
-                  onClick={() => setAsset(row.symbol)}
+                  onClick={() => setAsset(row.backendSymbol || row.symbol, "stock")}
                 >
                   <td className="py-2.5 pl-3 rounded-l-xl font-bold text-white tracking-wide border-y border-l border-white/5 group-hover:border-white/10">
                     {row.symbol}
                   </td>
                   <td className="py-2.5 border-y border-white/5 group-hover:border-white/10">
                     <div className="flex justify-center">
-                      <svg width="52" height="22" viewBox="0 0 52 22">
-                        {(() => {
-                          const pts = (row.history && row.history.length > 2) ? row.history : priceData.map(p => p.price);
-                          const vals = pts.slice(0, 12);
-                          const min = Math.min(...vals);
-                          const max = Math.max(...vals);
-                          const range = max - min || 1;
-                          const points = vals.map((v, idx) =>
-                            `${(idx / (vals.length - 1)) * 50 + 1},${20 - ((v - min) / range) * 18 + 1}`
-                          ).join(" ");
-                          const color = isPos ? "#3db26b" : "#ed5750";
-                          return (
-                            <>
-                              <polyline
-                                points={points}
-                                fill="none"
-                                stroke={color}
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                              <circle cx={points.split(" ").pop().split(",")[0]} cy={points.split(" ").pop().split(",")[1]} r="2" fill={color} />
-                            </>
-                          );
-                        })()}
-                      </svg>
+                      {Array.isArray(row.history) && row.history.length > 2 ? (
+                        <svg width="52" height="22" viewBox="0 0 52 22">
+                          {(() => {
+                            const vals = row.history.slice(0, 12);
+                            const min = Math.min(...vals);
+                            const max = Math.max(...vals);
+                            const range = max - min || 1;
+                            const denominator = Math.max(1, vals.length - 1);
+                            const pointList = vals.map((v, idx) => (
+                              `${(idx / denominator) * 50 + 1},${20 - ((v - min) / range) * 18 + 1}`
+                            ));
+                            const points = pointList.join(" ");
+                            const lastPoint = pointList[pointList.length - 1] || "1,20";
+                            const [lastX, lastY] = lastPoint.split(",");
+                            const color = isPos ? "#3db26b" : "#ed5750";
+
+                            return (
+                              <>
+                                <polyline
+                                  points={points}
+                                  fill="none"
+                                  stroke={color}
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                <circle cx={lastX} cy={lastY} r="2" fill={color} />
+                              </>
+                            );
+                          })()}
+                        </svg>
+                      ) : (
+                        <span className="text-[10px] text-[#5d606b] font-mono uppercase tracking-wider">N/A</span>
+                      )}
                     </div>
                   </td>
                   <td className="py-2.5 text-right text-white font-mono font-medium pr-1 border-y border-white/5 group-hover:border-white/10">
-                    {(row.price || 0).toLocaleString()}
+                    {Number.isFinite(row.price) ? row.price.toLocaleString() : "--"}
                   </td>
-                  <td className={`py-2.5 text-right font-mono font-bold border-y border-white/5 group-hover:border-white/10 ${isPos ? "text-[#42C0A5]" : "text-red-400"}`}>
-                    {isPos ? '+' : ''}{safeChg}%
+                  <td className={`py-2.5 text-right font-mono font-bold border-y border-white/5 group-hover:border-white/10 ${hasChange ? (isPos ? "text-[#42C0A5]" : "text-red-400") : "text-[#8b909a]"}`}>
+                    {hasChange ? `${isPos ? '+' : '-'}${safeChg}%` : "--"}
                   </td>
                   <td className="py-2.5 px-2 border-y border-white/5 group-hover:border-white/10">
                     <div className="w-full h-1.5 bg-white/5 rounded overflow-hidden">
                       <div
-                        style={{ width: `${volPct}%`, background: isPos ? "#42C0A5" : "#f87171", opacity: 0.8 }}
+                        style={{ width: `${volPct}%`, background: hasVolume ? (isPos ? "#42C0A5" : "#f87171") : "#8b909a", opacity: hasVolume ? 0.8 : 0.4 }}
                         className="h-full rounded"
                       />
                     </div>
@@ -150,8 +204,11 @@ const AdvancedWatchlist = () => {
             {isLoading && (
               <tr><td colSpan="6" className="text-center py-4 text-[#5d606b]">Loading watchlist...</td></tr>
             )}
-            {!isLoading && data.length === 0 && (
-              <tr><td colSpan="6" className="text-center py-4 text-[#5d606b]">No watchlist data available.</td></tr>
+            {!isLoading && hasError && data.length === 0 && (
+              <tr><td colSpan="6" className="text-center py-4 text-[#f0b429]">Unable to load watchlist from backend.</td></tr>
+            )}
+            {!isLoading && !hasError && data.length === 0 && (
+              <tr><td colSpan="6" className="text-center py-4 text-[#5d606b]">No stocks in watchlist.</td></tr>
             )}
           </tbody>
         </table>

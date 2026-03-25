@@ -13,14 +13,16 @@ if (!process.env.JWT_SECRET || !process.env.MONGO_URI) {
 }
 
 const { initRealtimeService } = require('./src/services/realtimeService');
-const { startAlertEngine, stopAlertEngine } = require('./src/services/alertEngine');
+const { startAlertEngine, stopAlertEngine, setAlertEventEmitter } = require('./src/services/alertEngine');
 const { notFound, errorHandler } = require('./src/middleware/errorMiddleware');
+const dataUpdateCron = require('./src/services/dataUpdateCron');
+const smartRefreshService = require('./src/services/smartRefreshService');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: process.env.FRONTEND_URL || "http://localhost:5173",
         methods: ["GET", "POST"]
     }
 });
@@ -76,15 +78,93 @@ const scheduleDbReconnect = () => {
     }, DB_RETRY_INTERVAL_MS);
 };
 
+const normalizeSubscriptionChannels = (payload, fallback = ['ticker']) => {
+    let raw = [];
+
+    if (typeof payload === 'string') {
+        raw = [payload];
+    } else if (Array.isArray(payload)) {
+        raw = payload;
+    } else if (payload && typeof payload === 'object') {
+        raw = [
+            payload.channel,
+            ...(Array.isArray(payload.channels) ? payload.channels : []),
+            payload.room,
+            ...(Array.isArray(payload.rooms) ? payload.rooms : []),
+        ];
+
+        if (payload.symbol) {
+            raw.push(`symbol:${String(payload.symbol).trim().toUpperCase()}`);
+        }
+    }
+
+    const mapped = raw
+        .map((item) => String(item || '').trim().toLowerCase())
+        .filter(Boolean)
+        .map((channel) => {
+            if (channel === 'price_update' || channel === 'prices') return 'ticker';
+            if (channel === 'alerts' || channel === 'alert_triggered') return 'alerts';
+            if (channel === 'system' || channel === 'system_status') return 'system';
+            return channel;
+        });
+
+    if (mapped.length === 0) {
+        return [...fallback];
+    }
+
+    return [...new Set(mapped)];
+};
+
+const buildSystemStatusPayload = (overrides = {}) => ({
+    status: 'ok',
+    db: getDbStatus() ? 'connected' : 'disconnected',
+    alertEngine: alertEngineStarted ? 'running' : 'stopped',
+    timestamp: new Date().toISOString(),
+    ...overrides,
+});
+
 io.on('connection', (socket) => {
     logger.info(`User connected: ${socket.id}`);
     socket.join('ticker');
+
+    socket.emit('system_status', buildSystemStatusPayload({
+        event: 'connected',
+        socketId: socket.id,
+        channels: ['ticker'],
+    }));
+
+    socket.on('subscribe', (payload) => {
+        const channels = normalizeSubscriptionChannels(payload, ['ticker']);
+        channels.forEach((channel) => socket.join(channel));
+        socket.emit('system_status', buildSystemStatusPayload({
+            event: 'subscribed',
+            channels,
+        }));
+    });
+
+    socket.on('unsubscribe', (payload) => {
+        const channels = normalizeSubscriptionChannels(payload, []);
+        channels.forEach((channel) => socket.leave(channel));
+        socket.emit('system_status', buildSystemStatusPayload({
+            event: 'unsubscribed',
+            channels,
+        }));
+    });
+
     socket.on('disconnect', () => {
         logger.info(`User disconnected: ${socket.id}`);
+        io.to('ticker').emit('system_status', buildSystemStatusPayload({
+            event: 'client_disconnected',
+            socketId: socket.id,
+        }));
     });
 });
 
 initRealtimeService(io);
+setAlertEventEmitter((eventName, payload) => {
+    io.to('alerts').emit(eventName, payload);
+    io.to('ticker').emit(eventName, payload);
+});
 
 mongoose.connection.on('connected', () => {
     clearReconnectTimer();
@@ -121,6 +201,19 @@ app.use('/api/notifications', require('./src/routes/notificationRoutes'));
 app.use('/api/ticker',        require('./src/routes/tickerRoutes'));
 app.use('/api/sectors',       require('./src/routes/sectorRoutes'));
 app.use('/api/learning',      require('./src/routes/learningRoutes'));
+app.use('/api/ohlc',          require('./src/routes/ohlcRoutes'));
+app.use('/api/admin',         require('./src/routes/adminRoutes'));
+app.use('/api/admin/updates', require('./src/routes/updateAdminRoutes'));
+app.use('/api/admin/refresh', require('./src/routes/refreshAdminRoutes'));
+app.use('/api/admin/cache',   require('./src/routes/cacheAdminRoutes'));
+app.use('/api/quotes',        require('./src/routes/quotesRoutes'));
+app.use('/api/screener',      require('./src/routes/screenerRoutes'));
+app.use('/api/stocks',        require('./src/routes/stocksRoutes'));
+app.use('/api/options',       require('./src/routes/optionsRoutes'));
+app.use('/api/backtest',      require('./src/routes/backtestRoutes'));
+app.use('/api/signals',       require('./src/routes/signalsRoutes'));
+app.use('/api/health',        require('./src/routes/healthRoutes'));
+app.use('/api',               require('./src/routes/contractRoutes'));
 app.use(notFound);
 app.use(errorHandler);
 
@@ -148,6 +241,22 @@ const startServer = async () => {
 
     if (dbConnected) {
         maybeStartAlertEngine();
+        
+        // Start the incremental data update cron job
+        try {
+            dataUpdateCron.start();
+            logger.info('Data update cron job initialized');
+        } catch (error) {
+            logger.error('Failed to start data update cron:', error);
+        }
+
+        // Start smart refresh service
+        try {
+            smartRefreshService.start();
+            logger.info('Smart refresh service initialized');
+        } catch (error) {
+            logger.error('Failed to start smart refresh:', error);
+        }
     } else {
         logger.warn('Skipping Alert Engine startup until MongoDB becomes available.');
         scheduleDbReconnect();

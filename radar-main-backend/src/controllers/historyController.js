@@ -5,13 +5,14 @@ const { calculateSMA, calculateRSI, calculateBollinger, calculateMACD } = requir
 
 const getHistory = async (req, res) => {
     const { symbol, type, interval = '1D' } = req.query; 
+    const strictLive = String(req.query.strictLive || '').toLowerCase() === 'true';
     
     if (!symbol) return res.status(400).json({ error: "Symbol required" });
 
     let rawData = [];
 
     if (type === 'STOCK') {
-        rawData = await fetchStockHistory(symbol.toLowerCase(), interval);
+        rawData = await fetchStockHistory(symbol.toLowerCase(), interval, { allowSynthetic: !strictLive });
     } 
     else if (type === 'FOREX') {
         rawData = await fetchForexHistory(symbol.toLowerCase(), interval);

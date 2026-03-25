@@ -53,11 +53,13 @@ const getQuickOrderData = (req, res) => {
     });
 };
 
+const strictLiveEnabled = (req) => String(req.query.strictLive || '').toLowerCase() === 'true';
+
 const getIndicators = async (req, res) => {
     try {
         const { assetType, symbol } = req.params;
         const { interval = '1D' } = req.query;
-        const data = await getTechnicalIndicators(assetType, symbol, interval);
+        const data = await getTechnicalIndicators(assetType, symbol, interval, { strictLive: strictLiveEnabled(req) });
         res.json({ success: true, symbol, assetType, interval, ...data });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -67,7 +69,7 @@ const getIndicators = async (req, res) => {
 const getTrend = async (req, res) => {
     try {
         const { assetType, symbol } = req.params;
-        const matrix = await getTrendMatrix(assetType, symbol);
+        const matrix = await getTrendMatrix(assetType, symbol, { strictLive: strictLiveEnabled(req) });
         res.json({ success: true, symbol, assetType, trendMatrix: matrix });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -77,7 +79,7 @@ const getTrend = async (req, res) => {
 const getScore = async (req, res) => {
     try {
         const { assetType, symbol } = req.params;
-        const result = await getInstrumentScore(assetType, symbol);
+        const result = await getInstrumentScore(assetType, symbol, { strictLive: strictLiveEnabled(req) });
         res.json({ success: true, symbol, assetType, ...result });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -87,7 +89,7 @@ const getScore = async (req, res) => {
 const getPatterns = async (req, res) => {
     try {
         const { assetType, symbol } = req.params;
-        const patterns = await detectPatterns(assetType, symbol);
+        const patterns = await detectPatterns(assetType, symbol, { strictLive: strictLiveEnabled(req) });
         res.json({ success: true, symbol, assetType, patterns });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -97,11 +99,12 @@ const getPatterns = async (req, res) => {
 const getSummary = async (req, res) => {
     try {
         const { assetType, symbol } = req.params;
+        const options = { strictLive: strictLiveEnabled(req) };
         const [indicators, trendMatrix, scoreResult, patterns] = await Promise.allSettled([
-            getTechnicalIndicators(assetType, symbol, '1D'),
-            getTrendMatrix(assetType, symbol),
-            getInstrumentScore(assetType, symbol),
-            detectPatterns(assetType, symbol)
+            getTechnicalIndicators(assetType, symbol, '1D', options),
+            getTrendMatrix(assetType, symbol, options),
+            getInstrumentScore(assetType, symbol, options),
+            detectPatterns(assetType, symbol, options)
         ]);
 
         res.json({

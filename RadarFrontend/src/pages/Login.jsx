@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import api from '../api/api';
 import { useGoogleLogin } from '@react-oauth/google';
 import AuthLayout from '../components/auth/AuthLayout';

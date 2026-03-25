@@ -11,10 +11,12 @@ const normalizeCrypto = (data) => {
     }));
 };
 
+const cleanSymbolSuffix = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
+
 const normalizeStock = (data) => {
     return data.map(stock => ({
-        id: stock.symbol,
-        symbol: stock.symbol,
+        id: cleanSymbolSuffix(stock.symbol),
+        symbol: cleanSymbolSuffix(stock.symbol),
         name: stock.name,
         price: stock.price,
         change_24h: stock.change,

@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const logger = require('./logger');
+const { setupTimeSeriesCollection } = require('./timeseriesSetup');
 
 mongoose.set('bufferCommands', false);
 
@@ -15,6 +16,10 @@ const connectDB = async () => {
             serverSelectionTimeoutMS: 10000,
         });
         logger.info(`MongoDB Connected: ${conn.connection.host}`);
+        
+        // Setup time-series collection for OHLC data
+        await setupTimeSeriesCollection();
+        
         return true;
     } catch (error) {
         logger.error(`MongoDB connection failed: ${error.message}`);

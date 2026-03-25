@@ -13,6 +13,17 @@ let lastWsErrorKey = null;
 let lastWsErrorLogAt = 0;
 let lastCloseCodeLogAt = 0;
 let lastCloseCodeLogged = null;
+let stocksSocket;
+let stocksReconnectTimer;
+let stocksReconnectAttempts = 0;
+let stocksConnectedAt = 0;
+let lastStocksReconnectLogAt = 0;
+let lastStocksLoggedReconnectDelay = null;
+let lastStocksNormalCloseLogAt = 0;
+let lastStocksWsErrorKey = null;
+let lastStocksWsErrorLogAt = 0;
+let lastStocksCloseCodeLogAt = 0;
+let lastStocksCloseCodeLogged = null;
 let tickerInterval = null;
 
 const CRYPTO_RECONNECT_BASE_DELAY_MS = 5000;
@@ -23,6 +34,8 @@ const MAX_BACKOFF_RECONNECT_LOG_THROTTLE_MS = 600000;
 const NORMAL_CLOSE_LOG_THROTTLE_MS = 300000;
 const WS_ERROR_LOG_THROTTLE_MS = 120000;
 const CLOSE_CODE_LOG_THROTTLE_MS = 120000;
+const FINNHUB_WS_URL = 'wss://ws.finnhub.io';
+const FINNHUB_WS_DEFAULT_SYMBOLS = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMZN'];
 const BINANCE_STREAM_MAP = {
     BTCUSDT: 'bitcoin',
     ETHUSDT: 'ethereum',
@@ -30,12 +43,22 @@ const BINANCE_STREAM_MAP = {
     XRPUSDT: 'ripple',
     BNBUSDT: 'binance-coin',
 };
+const parseFinnhubSymbols = () => {
+    const raw = String(process.env.FINNHUB_WS_SYMBOLS || FINNHUB_WS_DEFAULT_SYMBOLS.join(','));
+    const symbols = raw
+        .split(',')
+        .map((item) => String(item || '').trim().toUpperCase())
+        .filter(Boolean);
+    return symbols.length > 0 ? [...new Set(symbols)] : FINNHUB_WS_DEFAULT_SYMBOLS;
+};
+const FINNHUB_WS_SYMBOLS = parseFinnhubSymbols();
 
 const initRealtimeService = (socketIoInstance) => {
     io = socketIoInstance;
     logger.info("Realtime Service Initialized");
 
     startCryptoStream();
+    startStocksStream();
     startTickerInterval();
 };
 
@@ -124,6 +147,13 @@ const startCryptoStream = () => {
             const prices = { [mappedAsset]: ticker.c };
             if (io) {
                 io.to('ticker').emit('cryptoUpdate', prices);
+                io.to('ticker').emit('price_update', {
+                    symbol: symbol,
+                    asset: mappedAsset,
+                    price: Number(ticker.c),
+                    change: Number(ticker.P),
+                    timestamp: new Date().toISOString(),
+                });
             }
         } catch (error) {
             logger.error("WS Parse Error", { error: error.message });
@@ -176,6 +206,180 @@ const startCryptoStream = () => {
     });
 };
 
+const clearStocksReconnectTimer = () => {
+    if (stocksReconnectTimer) {
+        clearTimeout(stocksReconnectTimer);
+        stocksReconnectTimer = null;
+    }
+};
+
+const cleanupStocksSocket = () => {
+    if (!stocksSocket) {
+        return;
+    }
+
+    stocksSocket.removeAllListeners();
+
+    if (stocksSocket.readyState === WebSocket.OPEN || stocksSocket.readyState === WebSocket.CONNECTING) {
+        stocksSocket.terminate();
+    }
+
+    stocksSocket = null;
+};
+
+const scheduleStocksReconnect = () => {
+    if (stocksReconnectTimer) {
+        return;
+    }
+
+    if (!process.env.FINNHUB_API_KEY) {
+        return;
+    }
+
+    const delay = Math.min(
+        CRYPTO_RECONNECT_BASE_DELAY_MS * (2 ** stocksReconnectAttempts),
+        CRYPTO_RECONNECT_MAX_DELAY_MS,
+    );
+    const reconnectLogThrottle =
+        delay >= CRYPTO_RECONNECT_MAX_DELAY_MS
+            ? MAX_BACKOFF_RECONNECT_LOG_THROTTLE_MS
+            : RECONNECT_LOG_THROTTLE_MS;
+    const now = Date.now();
+    const shouldLogReconnect =
+        lastStocksLoggedReconnectDelay !== delay ||
+        now - lastStocksReconnectLogAt >= reconnectLogThrottle;
+
+    if (shouldLogReconnect) {
+        logger.warn(`Finnhub WS disconnected. Reconnecting in ${Math.round(delay / 1000)}s.`);
+        lastStocksReconnectLogAt = now;
+        lastStocksLoggedReconnectDelay = delay;
+    }
+
+    stocksReconnectTimer = setTimeout(() => {
+        stocksReconnectTimer = null;
+        startStocksStream();
+    }, delay);
+};
+
+const subscribeFinnhubSymbols = () => {
+    if (!stocksSocket || stocksSocket.readyState !== WebSocket.OPEN) {
+        return;
+    }
+
+    FINNHUB_WS_SYMBOLS.forEach((symbol) => {
+        stocksSocket.send(JSON.stringify({ type: 'subscribe', symbol }));
+    });
+};
+
+const startStocksStream = () => {
+    if (!process.env.FINNHUB_API_KEY) {
+        logger.info('FINNHUB_API_KEY missing; skipping Finnhub WebSocket stock stream.');
+        return;
+    }
+
+    const wsUrl = `${FINNHUB_WS_URL}?token=${encodeURIComponent(process.env.FINNHUB_API_KEY)}`;
+    clearStocksReconnectTimer();
+    cleanupStocksSocket();
+    stocksSocket = new WebSocket(wsUrl);
+
+    stocksSocket.on('open', () => {
+        stocksConnectedAt = Date.now();
+        lastStocksLoggedReconnectDelay = null;
+        subscribeFinnhubSymbols();
+        if (stocksReconnectAttempts > 0) {
+            logger.info('Reconnected to Finnhub WebSocket');
+        } else {
+            logger.info('Connected to Finnhub WebSocket');
+        }
+    });
+
+    stocksSocket.on('message', (data) => {
+        try {
+            const payload = JSON.parse(data);
+            if (payload?.type !== 'trade' || !Array.isArray(payload.data)) {
+                return;
+            }
+
+            payload.data.forEach((trade) => {
+                const symbol = String(trade?.s || '').toUpperCase();
+                const price = Number(trade?.p);
+                const timestamp = Number(trade?.t);
+                const volume = Number(trade?.v);
+
+                if (!symbol || !Number.isFinite(price)) {
+                    return;
+                }
+
+                const event = {
+                    symbol,
+                    asset: symbol,
+                    price,
+                    change: null,
+                    volume: Number.isFinite(volume) ? volume : null,
+                    source: 'finnhub',
+                    type: 'stocks',
+                    timestamp: Number.isFinite(timestamp)
+                        ? new Date(timestamp).toISOString()
+                        : new Date().toISOString(),
+                };
+
+                if (io) {
+                    io.to('ticker').emit('price_update', event);
+                    io.to(`symbol:${symbol.toLowerCase()}`).emit('price_update', event);
+                }
+            });
+        } catch (error) {
+            logger.warn('Finnhub WS Parse Error', { error: error.message });
+        }
+    });
+
+    stocksSocket.on('close', (code) => {
+        const now = Date.now();
+        const connectionLifetime = stocksConnectedAt ? now - stocksConnectedAt : 0;
+
+        if (connectionLifetime >= STABLE_CONNECTION_THRESHOLD_MS) {
+            stocksReconnectAttempts = 0;
+        } else {
+            stocksReconnectAttempts += 1;
+        }
+        stocksConnectedAt = 0;
+
+        if (code === 1000) {
+            if (now - lastStocksNormalCloseLogAt >= NORMAL_CLOSE_LOG_THROTTLE_MS) {
+                logger.info('Finnhub WS closed normally (code 1000).');
+                lastStocksNormalCloseLogAt = now;
+            }
+        } else {
+            const shouldLogCloseCode =
+                lastStocksCloseCodeLogged !== code ||
+                now - lastStocksCloseCodeLogAt >= CLOSE_CODE_LOG_THROTTLE_MS;
+
+            if (shouldLogCloseCode) {
+                logger.warn(`Finnhub WS closed with code ${code}.`);
+                lastStocksCloseCodeLogged = code;
+                lastStocksCloseCodeLogAt = now;
+            }
+        }
+
+        scheduleStocksReconnect();
+    });
+
+    stocksSocket.on('error', (err) => {
+        const message = err?.message || 'Unknown websocket error';
+        const key = message.toLowerCase();
+        const now = Date.now();
+        const shouldLogError =
+            key !== lastStocksWsErrorKey ||
+            now - lastStocksWsErrorLogAt >= WS_ERROR_LOG_THROTTLE_MS;
+
+        if (shouldLogError) {
+            logger.warn(`Finnhub WS error: ${message}`);
+            lastStocksWsErrorKey = key;
+            lastStocksWsErrorLogAt = now;
+        }
+    });
+};
+
 const startTickerInterval = () => {
     if (tickerInterval) {
         return;
@@ -192,6 +396,17 @@ const startTickerInterval = () => {
         ];
 
         io.to('ticker').emit('indexUpdate', domesticIndices);
+        io.to('ticker').emit('price_update', {
+            type: 'indices',
+            data: domesticIndices,
+            timestamp: new Date().toISOString(),
+        });
+        io.to('system').emit('system_status', {
+            status: 'ok',
+            service: 'realtime',
+            marketFeed: 'active',
+            timestamp: new Date().toISOString(),
+        });
     }, 5000);
 };
 

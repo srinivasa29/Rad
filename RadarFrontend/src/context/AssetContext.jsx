@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 
 const AssetContext = createContext(null);
 const DEFAULT_REGION = String(import.meta.env.VITE_DEFAULT_REGION || 'IN').toUpperCase();

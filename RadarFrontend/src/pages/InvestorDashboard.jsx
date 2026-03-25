@@ -1,19 +1,43 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import YourInvestments from '../components/investor/YourInvestments';
-import MostBoughtStocks from '../components/investor/MostBoughtStocks';
-import SharedTickerTape from '../components/landing/TickerTape';
 
-import { LayoutDashboard, Star, Filter, Newspaper, Search, Bell, CheckCircle, User, Settings, HelpCircle, LogOut } from "lucide-react";
-import { Activity, TrendingUp, TrendingDown } from "lucide-react";
+import {
+    LayoutDashboard,
+    Star,
+    Filter,
+    Newspaper,
+    Search,
+    Bell,
+    CheckCircle,
+    User,
+    Settings,
+    HelpCircle,
+    Activity,
+    TrendingUp,
+    TrendingDown,
+    LogOut,
+} from "lucide-react";
+import {
+    ResponsiveContainer,
+    BarChart,
+    CartesianGrid,
+    XAxis,
+    YAxis,
+    Tooltip,
+    Bar,
+    ReferenceLine,
+    LabelList,
+} from "recharts";
 
 import "./InvestorDashboard.css";
 import { fetchDiscoveryShelves, fetchMarketMood, fetchValuation } from "../api/fundamentalApi";
-import { fetchSectorPerformance, fetchMarketData, fetchTrendingSearches, logSearchQuery } from "../api/marketApi";
+import { fetchSectorPerformance, fetchMarketData, fetchTrendingSearches, logSearchQuery, fetchMarketNews } from "../api/marketApi";
 import { fetchEconomicCalendar } from "../api/calendarApi";
 import { updateUserMode } from "../api/userApi";
 import { useHeaderData } from "../hooks/useHeaderData";
-import { BarChart, Bar, XAxis, CartesianGrid, YAxis, Tooltip, LabelList, ResponsiveContainer, ReferenceLine } from "recharts";
+import SharedTickerTape from "../components/landing/TickerTape";
+import YourInvestments from "../components/investor/YourInvestments";
+import MostBoughtStocks from "../components/investor/MostBoughtStocks";
 
 const formatNotificationTime = (value) => {
     if (!value) return "Now";
@@ -68,14 +92,12 @@ const countryFlag = (code) => {
 
 const displaySymbol = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
 
-const FALLBACK_SECTOR_ROWS = [
-    { sector: 'Financial Services', index: 'NIFTY FIN SERVICE', return: 2.1 },
-    { sector: 'Information Technology', index: 'NIFTY IT', return: 1.6 },
-    { sector: 'Auto', index: 'NIFTY AUTO', return: 1.2 },
-    { sector: 'FMCG', index: 'NIFTY FMCG', return: -0.4 },
-    { sector: 'Realty', index: 'NIFTY REALTY', return: -1.1 },
-    { sector: 'Metal', index: 'NIFTY METAL', return: -1.4 },
-];
+const extractHeadlineSymbol = (value) => {
+    const text = String(value || '').toUpperCase();
+    const matches = text.match(/\b[A-Z]{3,12}\b/g) || [];
+    const blacklist = new Set(['THE', 'AND', 'WITH', 'FROM', 'MARKET', 'STOCK', 'STOCKS', 'NEWS', 'INDEX']);
+    return matches.find((token) => !blacklist.has(token)) || null;
+};
 
 const FALLBACK_THEME_ROWS = {
     rising: [
@@ -219,12 +241,21 @@ export default function InvestorMode({ onToggleMode }) {
         }
     }, [showSearchDropdown, searchQuery, searchResults, trendingSearches, highlightedIndex]);
 
+    const openStockPage = (value) => {
+        const symbol = String(value || '').trim();
+        if (!symbol) {
+            return;
+        }
+        navigate(`/stocks/${encodeURIComponent(symbol.toUpperCase())}`);
+    };
+
     const handleSearchSelect = async (item) => {
         const label = item?.symbol || item?.name || '';
         setSearchQuery(label);
         setShowSearchDropdown(false);
         setHighlightedIndex(-1);
         setActiveModule('WATCHLIST');
+        openStockPage(label);
 
         if (label) {
             await logSearchQuery(label);
@@ -236,6 +267,7 @@ export default function InvestorMode({ onToggleMode }) {
         setShowSearchDropdown(false);
         setHighlightedIndex(-1);
         setActiveModule('WATCHLIST');
+        openStockPage(term);
         await logSearchQuery(term);
     };
 
@@ -814,11 +846,7 @@ const ValuationThermometer = () => {
 };
 
 const GlobalPulse = () => {
-    const [pulse, setPulse] = useState([
-        { name: "S&P 500", val: "4,300", change: "▲ 0.4%", code: "US", spark: "M0 10 Q 15 0, 30 15 T 60 10" },
-        { name: "FTSE", val: "7,620", change: "▲ 0.0%", code: "UK", spark: "M0 15 Q 15 15, 30 15 T 60 15" },
-        { name: "NIKKEI", val: "32,900", change: "▼ 0.2%", code: "JP", spark: "M0 5 Q 15 20, 30 5 T 60 20" }
-    ]);
+    const [pulse, setPulse] = useState([]);
     const [error, setError] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -845,17 +873,25 @@ const GlobalPulse = () => {
                         }
                     }
 
-                    setPulse(unique.map(i => ({
+                    const mapped = unique.map(i => ({
                         name: i.symbol || i.name || 'ASSET',
-                        val: Number(i.price || 0).toLocaleString(),
-                        change: `${Number(i.change_24h || i.change || 0) >= 0 ? '▲' : '▼'} ${Math.abs(Number(i.change_24h || i.change || 0)).toFixed(2)}%`,
+                        val: Number.isFinite(Number(i.price)) && Number(i.price) > 0 ? Number(i.price).toLocaleString() : '--',
+                        change: Number.isFinite(Number(i.change_24h ?? i.change))
+                            ? `${Number(i.change_24h ?? i.change) >= 0 ? '▲' : '▼'} ${Math.abs(Number(i.change_24h ?? i.change)).toFixed(2)}%`
+                            : '--',
+                        changeDirection: Number.isFinite(Number(i.change_24h ?? i.change))
+                            ? (Number(i.change_24h ?? i.change) >= 0 ? 'up' : 'down')
+                            : 'flat',
                         code: inferRegionCode(i),
-                        spark: "M0 10 Q 15 0, 30 15 T 60 10"
-                    })));
+                    }));
+                    setPulse(mapped);
+                } else {
+                    setPulse([]);
                 }
             } catch (e) {
                 console.error("Global Pulse fetch failed", e);
                 setError(true);
+                setPulse([]);
             } finally {
                 setIsLoading(false);
             }
@@ -885,6 +921,9 @@ const GlobalPulse = () => {
                 <h3 className="text-lg font-bold text-slate-800">Global Pulse</h3>
             </div>
             <div className="space-y-6 flex-1">
+                {!isLoading && pulse.length === 0 && !error && (
+                    <div className="text-xs text-slate-500 font-medium">No pulse data available from backend.</div>
+                )}
                 {pulse.map((m, i) => (
                     <div key={i} className="flex justify-between items-center group">
                         <div className="flex items-center gap-3">
@@ -893,20 +932,11 @@ const GlobalPulse = () => {
                             </div>
                             <div>
                                 <div className="font-bold text-sm text-slate-700">{displaySymbol(m.name)}</div>
-                                <div className={`text-[10px] font-bold ${m.change.includes('▲') ? 'text-emerald-500' : 'text-rose-500'}`}>{m.change}</div>
+                                <div className={`text-[10px] font-bold ${m.changeDirection === 'up' ? 'text-emerald-500' : m.changeDirection === 'down' ? 'text-rose-500' : 'text-slate-400'}`}>{m.change}</div>
                             </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                             <div className="font-black text-sm text-slate-800 font-mono tracking-tight">{m.val}</div>
-                            <svg className="w-12 h-4 opacity-30" viewBox="0 0 60 30">
-                                <path
-                                    d={m.spark}
-                                    fill="none"
-                                    stroke={m.change.includes('▲') ? '#10b981' : '#ef4444'}
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
-                                />
-                            </svg>
                         </div>
                     </div>
                 ))}
@@ -1026,6 +1056,72 @@ const SectorLandscape = () => {
     const [data, setData] = useState([]);
     const [error, setError] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [reloadToken, setReloadToken] = useState(0);
+    const chartTheme = {
+        panel: 'from-white via-emerald-50/35 to-white',
+        line: '#cbd5e1',
+        grid: '#e2e8f0',
+        xTick: '#334155',
+        yTick: '#64748b',
+        posLabel: '#059669',
+        negLabel: '#dc2626',
+        posGlow: '#86efac',
+        negGlow: '#fda4af',
+    };
+
+    const formatPercent = (value) => {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '0.0%';
+        return `${numeric > 0 ? '+' : ''}${numeric.toFixed(1)}%`;
+    };
+
+    const mapSectorRows = (rows) => {
+        return rows
+            .map((row) => {
+                const rawReturn = Number(row?.return);
+                if (!Number.isFinite(rawReturn)) return null;
+                return {
+                    name: String(row?.sector || 'Unknown Sector'),
+                    index: String(row?.index || 'Broad Market'),
+                    realValue: Number(rawReturn.toFixed(2)),
+                };
+            })
+            .filter(Boolean);
+    };
+
+    const buildSectorView = (rows) => {
+        const normalized = mapSectorRows(rows);
+        if (!normalized.length) return [];
+
+        const directional = viewType === 'BEST'
+            ? normalized.filter((row) => row.realValue >= 0)
+            : normalized.filter((row) => row.realValue <= 0);
+
+        const source = directional.length > 0 ? directional : normalized;
+        const sorted = [...source].sort((a, b) => viewType === 'BEST' ? b.realValue - a.realValue : a.realValue - b.realValue);
+        return sorted.slice(0, 7);
+    };
+
+    const SectorValueLabel = ({ x, y, width, height, value }) => {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return null;
+
+        const labelX = Number(x) + Number(width) / 2;
+        const labelY = numeric >= 0 ? Number(y) - 10 : Number(y) + Number(height) + 15;
+
+        return (
+            <text
+                x={labelX}
+                y={labelY}
+                textAnchor="middle"
+                fill={numeric >= 0 ? chartTheme.posLabel : chartTheme.negLabel}
+                fontSize={12}
+                fontWeight={800}
+            >
+                {formatPercent(numeric)}
+            </text>
+        );
+    };
 
     useEffect(() => {
         const load = async () => {
@@ -1034,67 +1130,40 @@ const SectorLandscape = () => {
                 setError(false);
                 const tf = timeframe.toLowerCase();
                 const res = await fetchSectorPerformance(tf);
-                const rows = Array.isArray(res?.data) ? res.data : [];
-                if (rows.length > 0) {
-                    const directionalRows = viewType === 'BEST'
-                        ? rows.filter((row) => Number(row.return) >= 0)
-                        : rows.filter((row) => Number(row.return) <= 0);
-
-                    const source = directionalRows.length >= 4 ? directionalRows : rows;
-                    let sorted = [...source];
-                    if (viewType === 'BEST') {
-                        sorted.sort((a, b) => b.return - a.return);
-                    } else {
-                        sorted.sort((a, b) => a.return - b.return);
-                    }
-
-                    setData(sorted.slice(0, 7).map(s => ({
-                        name: s.sector,
-                        index: s.index || 'Broad Market',
-                        realValue: parseFloat(Number(s.return).toFixed(1))
-                    })));
-                } else {
-                    const fallbackDirectional = viewType === 'BEST'
-                        ? FALLBACK_SECTOR_ROWS.filter((row) => Number(row.return) >= 0)
-                        : FALLBACK_SECTOR_ROWS.filter((row) => Number(row.return) <= 0);
-                    const fallbackSource = fallbackDirectional.length ? fallbackDirectional : FALLBACK_SECTOR_ROWS;
-                    const fallbackSorted = [...fallbackSource].sort((a, b) => viewType === 'BEST' ? b.return - a.return : a.return - b.return);
-                    setData(fallbackSorted.slice(0, 7).map(s => ({
-                        name: s.sector,
-                        index: s.index || 'Broad Market',
-                        realValue: parseFloat(Number(s.return).toFixed(1))
-                    })));
-                }
+                const rows = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+                setData(buildSectorView(rows));
             } catch (e) {
                 console.error("Sector Landscape error:", e);
                 setError(true);
-                const fallbackDirectional = viewType === 'BEST'
-                    ? FALLBACK_SECTOR_ROWS.filter((row) => Number(row.return) >= 0)
-                    : FALLBACK_SECTOR_ROWS.filter((row) => Number(row.return) <= 0);
-                const fallbackSource = fallbackDirectional.length ? fallbackDirectional : FALLBACK_SECTOR_ROWS;
-                const fallbackSorted = [...fallbackSource].sort((a, b) => viewType === 'BEST' ? b.return - a.return : a.return - b.return);
-                setData(fallbackSorted.slice(0, 7).map(s => ({
-                    name: s.sector,
-                    index: s.index || 'Broad Market',
-                    realValue: parseFloat(Number(s.return).toFixed(1))
-                })));
+                setData([]);
             } finally {
                 setIsLoading(false);
             }
         }
         load();
-    }, [timeframe, viewType]);
+    }, [timeframe, viewType, reloadToken]);
 
     const yExtent = Math.max(
         1,
         ...data.map((item) => Math.abs(Number(item.realValue) || 0))
     );
-    const yDomain = [-(Math.ceil(yExtent) + 0.5), Math.ceil(yExtent) + 0.5];
+    const yPadding = Math.max(1.5, Number((yExtent * 0.18).toFixed(1)));
+    const yDomain = [-(Math.ceil(yExtent + yPadding)), Math.ceil(yExtent + yPadding)];
+    const breadth = data.reduce((acc, row) => {
+        if (row.realValue > 0) acc.gainers += 1;
+        if (row.realValue < 0) acc.losers += 1;
+        return acc;
+    }, { gainers: 0, losers: 0 });
+    const averageReturn = data.length
+        ? Number((data.reduce((sum, row) => sum + row.realValue, 0) / data.length).toFixed(2))
+        : 0;
 
     return (
-        <div className="investor-card p-6 col-span-2 flex flex-col h-full relative overflow-hidden">
+        <div className={`investor-card p-6 col-span-2 flex flex-col h-full relative overflow-hidden bg-gradient-to-br ${chartTheme.panel} border border-emerald-100/70`}>
+            <div className="pointer-events-none absolute -top-20 -left-20 h-56 w-56 rounded-full bg-emerald-300/20 blur-3xl"></div>
+            <div className="pointer-events-none absolute -bottom-16 -right-20 h-52 w-52 rounded-full bg-amber-200/20 blur-3xl"></div>
             {isLoading && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-white/85 backdrop-blur-sm z-50 flex items-center justify-center">
                     <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
@@ -1103,39 +1172,40 @@ const SectorLandscape = () => {
                 <div className="absolute inset-0 bg-rose-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4">
                     <span className="text-3xl mb-3">📊</span>
                     <span className="text-sm font-bold text-rose-600">Sector Performance Unavailable</span>
-                    <button onClick={() => setTimeframe(timeframe)} className="mt-4 text-xs bg-rose-100 px-4 py-2 rounded text-rose-600 font-bold hover:bg-rose-200 transition-colors">Reload Sectors</button>
+                    <button onClick={() => setReloadToken((value) => value + 1)} className="mt-4 text-xs bg-rose-100 px-4 py-2 rounded text-rose-600 font-bold hover:bg-rose-200 transition-colors">Reload Sectors</button>
                 </div>
             )}
-            <div className="card-header flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div className="card-header relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                 <div className="flex items-center gap-4">
-                    <h3 className="text-lg font-bold text-slate-800">Sector Landscape</h3>
+                    <div>
+                        <h3 className="text-lg font-black tracking-wide text-slate-800">Sector Landscape</h3>
+                        <p className="text-[11px] text-slate-500 font-semibold mt-0.5 uppercase tracking-[0.12em]">Relative performance by sector index</p>
+                    </div>
 
-                    {}
-                    <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
+                    <div className="flex bg-white border border-slate-200 rounded-xl p-1 gap-1 shadow-sm">
                         <button
                             onClick={() => setViewType('BEST')}
-                            className={`p-1.5 rounded-md transition-all ${viewType === 'BEST' ? 'bg-white shadow text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}
+                            className={`px-2.5 py-1.5 rounded-lg transition-all text-xs font-bold tracking-wide ${viewType === 'BEST' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'text-slate-500 hover:text-slate-700'}`}
                             title="Best Performing"
                         >
-                            <TrendingUp size={16} />
+                            <span className="inline-flex items-center gap-1"><TrendingUp size={14} /> Best</span>
                         </button>
                         <button
                             onClick={() => setViewType('WORST')}
-                            className={`p-1.5 rounded-md transition-all ${viewType === 'WORST' ? 'bg-white shadow text-red-500' : 'text-slate-400 hover:text-slate-600'}`}
+                            className={`px-2.5 py-1.5 rounded-lg transition-all text-xs font-bold tracking-wide ${viewType === 'WORST' ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'text-slate-500 hover:text-slate-700'}`}
                             title="Worst Performing"
                         >
-                            <TrendingDown size={16} />
+                            <span className="inline-flex items-center gap-1"><TrendingDown size={14} /> Worst</span>
                         </button>
                     </div>
                 </div>
 
-                {}
                 <div className="flex flex-wrap gap-2">
                     {['1D', '1W', '1M', '3M', '6M', '1Y'].map((tf) => (
                         <button
                             key={tf}
                             onClick={() => setTimeframe(tf)}
-                            className={`text-xs px-2.5 py-1 rounded transition-colors ${timeframe === tf ? 'bg-[#1F3D2B] text-[#FBF7F2] font-bold shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+                            className={`text-xs px-2.5 py-1 rounded-lg transition-colors font-bold ${timeframe === tf ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                         >
                             {tf}
                         </button>
@@ -1143,54 +1213,79 @@ const SectorLandscape = () => {
                 </div>
             </div>
 
-            <div className="w-full mt-2 flex-1 min-h-[340px]">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 8 }} barCategoryGap="14%">
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
-                        <XAxis
-                            dataKey="name"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
-                        />
-                        <YAxis
-                            domain={yDomain}
-                            axisLine={false}
-                            tickLine={false}
-                            width={36}
-                            tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
-                            tickFormatter={(value) => `${value}%`}
-                        />
-                        <Tooltip
-                            cursor={false}
-                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                            itemStyle={{ color: '#1e293b', fontWeight: 'bold' }}
-                            formatter={(_value, _name, props) => [`${props.payload.realValue > 0 ? '+' : ''}${props.payload.realValue}%`, `${props.payload.name} (${props.payload.index})`]}
-                            labelFormatter={() => `${timeframe} performance`}
-                        />
-                        <Bar
-                            dataKey="realValue"
-                            radius={[4, 4, 4, 4]}
-                            fill={viewType === 'BEST' ? '#10b981' : '#ef4444'}
-                        >
-                            <LabelList
-                                dataKey="realValue"
-                                position={viewType === 'BEST' ? 'top' : 'insideBottom'}
-                                fill={viewType === 'BEST' ? '#059669' : '#dc2626'}
-                                fontSize={12}
-                                fontWeight="bold"
-                                formatter={(val) => `${val > 0 ? '+' : ''}${val}%`}
-                            />
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
+            <div className="relative z-10 mb-3 flex flex-wrap gap-2">
+                <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">Avg {timeframe}: {formatPercent(averageReturn)}</span>
+                <span className="text-[11px] font-black text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">Gainers: {breadth.gainers}</span>
+                <span className="text-[11px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full">Losers: {breadth.losers}</span>
             </div>
 
-            <div className="mt-3 text-[11px] text-slate-500 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 pt-3">
-                <span className="font-semibold text-slate-600">Mapped Sector Indices:</span>
+            <div className="relative z-10 w-full mt-2 flex-1 min-h-[340px]">
+                {!isLoading && !error && data.length === 0 ? (
+                    <div className="h-full w-full rounded-xl border border-slate-200 bg-white/70 flex items-center justify-center text-center px-6">
+                        <div>
+                            <p className="text-sm font-bold text-slate-700">No sector data from backend</p>
+                            <p className="text-xs text-slate-500 mt-1">Try a different timeframe or refresh once sector service is available.</p>
+                        </div>
+                    </div>
+                ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data} margin={{ top: 24, right: 18, left: 8, bottom: 20 }} barCategoryGap="14%">
+                            <defs>
+                                <linearGradient id="sectorBestGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#10B981" stopOpacity={0.95} />
+                                    <stop offset="100%" stopColor="#34D399" stopOpacity={0.88} />
+                                </linearGradient>
+                                <linearGradient id="sectorWorstGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#F43F5E" stopOpacity={0.95} />
+                                    <stop offset="100%" stopColor="#FB7185" stopOpacity={0.9} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.grid} />
+                            <ReferenceLine y={0} stroke={chartTheme.line} strokeWidth={1.25} />
+                            <XAxis
+                                dataKey="name"
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fill: chartTheme.xTick, fontSize: 12, fontWeight: 700 }}
+                            />
+                            <YAxis
+                                domain={yDomain}
+                                allowDataOverflow={false}
+                                axisLine={false}
+                                tickLine={false}
+                                width={36}
+                                tick={{ fill: chartTheme.yTick, fontSize: 11, fontWeight: 700 }}
+                                tickFormatter={(value) => `${value}%`}
+                            />
+                            <Tooltip
+                                cursor={false}
+                                contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 12px 30px -20px rgba(15,23,42,0.55)', background: '#FFFFFF' }}
+                                itemStyle={{ color: '#0f172a', fontWeight: 'bold' }}
+                                labelStyle={{ color: '#475569', fontWeight: 700 }}
+                                formatter={(_value, _name, props) => [formatPercent(props.payload.realValue), `${props.payload.name} (${props.payload.index})`]}
+                                labelFormatter={() => `${timeframe} performance`}
+                            />
+                            <Bar
+                                dataKey="realValue"
+                                radius={[4, 4, 4, 4]}
+                                fill={viewType === 'BEST' ? 'url(#sectorBestGradient)' : 'url(#sectorWorstGradient)'}
+                                maxBarSize={72}
+                                style={{ filter: `drop-shadow(0 0 8px ${viewType === 'BEST' ? chartTheme.posGlow : chartTheme.negGlow})` }}
+                            >
+                                <LabelList
+                                    dataKey="realValue"
+                                    content={(props) => <SectorValueLabel {...props} />}
+                                />
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                )}
+            </div>
+
+            <div className="relative z-10 mt-3 text-[11px] text-slate-500 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-200 pt-3">
+                <span className="font-bold text-slate-700">Mapped Sector Indices:</span>
                 {data.slice(0, 4).map((item) => (
-                    <span key={item.name}>{item.name}: <span className="font-semibold text-slate-700">{item.index}</span></span>
+                    <span key={item.name}>{item.name}: <span className="font-bold text-slate-700">{item.index}</span></span>
                 ))}
             </div>
         </div>
@@ -1426,14 +1521,188 @@ const TrendingThemes = () => {
     );
 };
 
+const InvestorNewsFeed = () => {
+    const navigate = useNavigate();
+    const [newsItems, setNewsItems] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
+    const [activeFilter, setActiveFilter] = useState('all');
+
+    useEffect(() => {
+        let timer;
+
+        const loadNews = async () => {
+            try {
+                setIsLoading(true);
+                setHasError(false);
+                const response = await fetchMarketNews();
+                const rows = Array.isArray(response) ? response : (Array.isArray(response?.data) ? response.data : []);
+
+                const normalized = rows
+                    .map((item, index) => ({
+                        id: item.id || `${item.source || 'news'}-${item.publishedAt || index}`,
+                        source: item.source || 'Market Desk',
+                        title: item.title || item.headline || 'Untitled market update',
+                        summary: item.summary || item.description || 'Tap to read full context.',
+                        url: item.url || item.link || null,
+                        symbol: displaySymbol(item.symbol || item.ticker || extractHeadlineSymbol(item.title || item.headline)),
+                        publishedAt: item.publishedAt || item.time || item.date || new Date().toISOString(),
+                    }))
+                    .filter((item) => item.title)
+                    .slice(0, 24);
+
+                setNewsItems(normalized);
+            } catch (error) {
+                console.error('Investor news feed failed:', error);
+                setHasError(true);
+                setNewsItems([]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadNews();
+        timer = setInterval(loadNews, 60000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const toCategory = (item) => {
+        const text = `${item.title} ${item.source} ${item.summary}`.toLowerCase();
+        if (/(inflation|fed|rbi|ecb|policy|gdp|macro|rates)/.test(text)) return 'macro';
+        if (/(results|earnings|guidance|quarter|q1|q2|q3|q4)/.test(text)) return 'earnings';
+        return 'markets';
+    };
+
+    const allItems = newsItems.map((item) => ({ ...item, category: toCategory(item) }));
+    const filteredItems = activeFilter === 'all' ? allItems : allItems.filter((item) => item.category === activeFilter);
+
+    const formatNewsTime = (value) => {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return 'Now';
+        const deltaMinutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
+        if (deltaMinutes < 1) return 'Just now';
+        if (deltaMinutes < 60) return `${deltaMinutes}m ago`;
+        const deltaHours = Math.round(deltaMinutes / 60);
+        if (deltaHours < 24) return `${deltaHours}h ago`;
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    };
+
+    const filters = [
+        { id: 'all', label: 'All' },
+        { id: 'markets', label: 'Markets' },
+        { id: 'earnings', label: 'Earnings' },
+        { id: 'macro', label: 'Macro' },
+    ];
+
+    return (
+        <div className="investor-card p-4 h-full flex flex-col relative overflow-hidden">
+            {isLoading && (
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+            )}
+
+            <div className="card-header mb-3 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800">Investor News Feed</h3>
+                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">Live market headlines with quick categorization</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {filters.map((filter) => (
+                        <button
+                            key={filter.id}
+                            onClick={() => setActiveFilter(filter.id)}
+                            className={`px-2.5 py-1 text-[10px] rounded-full font-black uppercase tracking-wider border transition-colors ${
+                                activeFilter === filter.id
+                                    ? 'bg-emerald-600 text-white border-emerald-600'
+                                    : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-700'
+                            }`}
+                        >
+                            {filter.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {hasError && !isLoading && (
+                <div className="rounded-xl border border-rose-100 bg-rose-50 text-rose-700 text-xs font-semibold p-3 mb-3">
+                    News service is temporarily unavailable. Retrying automatically.
+                </div>
+            )}
+
+            <div className="space-y-2 flex-1 overflow-y-auto pr-1">
+                {!isLoading && filteredItems.length === 0 && (
+                    <div className="text-xs text-slate-500 text-center py-8">No news items available for this filter.</div>
+                )}
+                {filteredItems.map((item) => (
+                    <div
+                        key={item.id}
+                        className="rounded-xl border border-slate-100 bg-white p-3 hover:border-emerald-200 hover:shadow-sm transition-all"
+                    >
+                        <div className="flex items-center justify-between gap-3 mb-1.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">{item.source}</span>
+                            <span className="text-[10px] font-bold text-slate-400">{formatNewsTime(item.publishedAt)}</span>
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-800 leading-snug">{item.title}</h4>
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.summary}</p>
+                        <div className="mt-2 flex items-center gap-2">
+                            {item.url && (
+                                <a
+                                    href={item.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-[10px] font-black uppercase tracking-wider text-emerald-700 hover:text-emerald-800"
+                                >
+                                    Read Source
+                                </a>
+                            )}
+                            {item.symbol && (
+                                <button
+                                    onClick={() => navigate(`/stocks/${encodeURIComponent(item.symbol)}`)}
+                                    className="text-[10px] font-black uppercase tracking-wider text-slate-600 hover:text-slate-800"
+                                >
+                                    View {item.symbol}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 function InvestorView({ activeModule }) {
-    const ComingSoonModule = ({ title }) => (
+    const ModulePreview = ({ title, subtitle, chips, blocks }) => (
         <div className="dashboard-layout fade-in" style={{ backgroundColor: '#FBF7F2' }}>
             <div className="main-content-area transition-all duration-300">
-                <div className="min-h-[60vh] rounded-3xl border border-emerald-100 bg-white/80 flex items-center justify-center">
-                    <div className="text-center px-6">
-                        <h2 className="text-3xl md:text-4xl font-black tracking-tight text-[#1F3D2B]">{title}</h2>
-                        <p className="mt-3 text-sm md:text-base font-semibold text-emerald-700">This section will come soon.</p>
+                <div className="rounded-3xl border border-emerald-100 bg-white/80 p-6 md:p-8">
+                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                        <div>
+                            <h2 className="text-3xl md:text-4xl font-black tracking-tight text-[#1F3D2B]">{title}</h2>
+                            <p className="mt-2 text-sm md:text-base font-semibold text-emerald-700">{subtitle}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {chips.map((chip) => (
+                                <span key={chip} className="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                    {chip}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                        {blocks.map((block) => (
+                            <div key={block.title} className="rounded-2xl border border-slate-100 bg-white p-4">
+                                <div className="text-[11px] font-black uppercase tracking-wider text-slate-400">{block.kicker}</div>
+                                <h3 className="mt-1 text-base font-black text-slate-800">{block.title}</h3>
+                                <p className="mt-2 text-xs text-slate-500 font-medium">{block.description}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-6 text-xs font-bold text-slate-500">
+                        This module is under active build and will come soon.
                     </div>
                 </div>
             </div>
@@ -1441,15 +1710,45 @@ function InvestorView({ activeModule }) {
     );
 
     if (activeModule === 'WATCHLIST') {
-        return <ComingSoonModule title="Watchlist" />;
+        return (
+            <ModulePreview
+                title="Watchlist Lab"
+                subtitle="A dedicated tracking workspace for conviction ideas and alerts."
+                chips={["Coming Soon", "Investor Mode", "Realtime"]}
+                blocks={[
+                    { kicker: 'Planned', title: 'Smart Buckets', description: 'Group stocks by thesis, sector, and risk profile with one-click moves.' },
+                    { kicker: 'Planned', title: 'Alert Ladder', description: 'Layered price and momentum alerts with priority ranking.' },
+                    { kicker: 'Planned', title: 'Quick Notes', description: 'Attach mini trade notes and review tags to each symbol.' },
+                ]}
+            />
+        );
     }
 
     if (activeModule === 'SCREENERS') {
-        return <ComingSoonModule title="Screeners" />;
+        return (
+            <ModulePreview
+                title="Screener Studio"
+                subtitle="Custom scans designed for investors, not day-trader noise."
+                chips={["Coming Soon", "Rule Builder", "Backtest"]}
+                blocks={[
+                    { kicker: 'Planned', title: 'Fundamental Filters', description: 'Screen by valuation, growth quality, and balance-sheet strength.' },
+                    { kicker: 'Planned', title: 'Theme Scans', description: 'Prebuilt scans for AI, capital goods, exports, and defensive sectors.' },
+                    { kicker: 'Planned', title: 'Signal History', description: 'Track hit-rate snapshots of saved scans over rolling periods.' },
+                ]}
+            />
+        );
     }
 
     if (activeModule === 'NEWS') {
-        return <ComingSoonModule title="News" />;
+        return (
+            <div className="dashboard-layout fade-in" style={{ backgroundColor: '#FBF7F2' }}>
+                <div className="main-content-area transition-all duration-300">
+                    <div className="mt-1 mb-4">
+                        <InvestorNewsFeed />
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -1493,4 +1792,3 @@ function InvestorView({ activeModule }) {
         </div>
     );
 }
-

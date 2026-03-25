@@ -1,4 +1,3 @@
-
 export const mockStock = {
     symbol: "BTC",
     name: "Bitcoin",

@@ -4,6 +4,11 @@ const logger = require('../utils/logger');
 
 const QUOTE_CACHE_TTL_MS = Number.parseInt(process.env.STOCK_QUOTES_CACHE_TTL_MS || '20000', 10);
 const PROVIDER_FAILURE_COOLDOWN_MS = Number.parseInt(process.env.STOCK_PROVIDER_FAILURE_COOLDOWN_MS || '180000', 10);
+const WARNING_THROTTLE_MS = Number.parseInt(process.env.STOCK_WARNING_THROTTLE_MS || '60000', 10);
+const WARNING_THROTTLE_MAX_KEYS = Number.parseInt(process.env.STOCK_WARNING_THROTTLE_MAX_KEYS || '500', 10);
+const TIINGO_BASE_URL = 'https://api.tiingo.com/tiingo';
+const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
+const MARKETSTACK_BASE_URL = 'https://api.marketstack.com/v1';
 
 const DEFAULT_MARKET_REGION = String(process.env.DEFAULT_MARKET_REGION || 'IN').toUpperCase();
 const DEFAULT_STOCK_SYMBOLS_BY_REGION = {
@@ -25,9 +30,13 @@ let quotesInFlightPromise = null;
 
 const providerState = {
     yahoo: { blockedUntil: 0, lastError: null },
+    tiingo: { blockedUntil: 0, lastError: null },
+    finnhub: { blockedUntil: 0, lastError: null },
     polygon: { blockedUntil: 0, lastError: null },
+    marketstack: { blockedUntil: 0, lastError: null },
     stooq: { blockedUntil: 0, lastError: null },
 };
+const warningState = new Map();
 
 const isProviderBlocked = (name) => Date.now() < (providerState[name]?.blockedUntil || 0);
 
@@ -41,6 +50,37 @@ const clearProviderFailure = (name) => {
     if (!providerState[name]) return;
     providerState[name].blockedUntil = 0;
     providerState[name].lastError = null;
+};
+
+const pruneWarningState = (now) => {
+    if (warningState.size <= WARNING_THROTTLE_MAX_KEYS) {
+        return;
+    }
+
+    for (const [key, blockedUntil] of warningState) {
+        if (blockedUntil <= now) {
+            warningState.delete(key);
+        }
+    }
+
+    while (warningState.size > WARNING_THROTTLE_MAX_KEYS) {
+        const oldestKey = warningState.keys().next().value;
+        if (!oldestKey) break;
+        warningState.delete(oldestKey);
+    }
+};
+
+const warnThrottled = (key, message, meta = {}) => {
+    const now = Date.now();
+    pruneWarningState(now);
+
+    const blockedUntil = warningState.get(key) || 0;
+    if (now < blockedUntil) {
+        return;
+    }
+
+    warningState.set(key, now + WARNING_THROTTLE_MS);
+    logger.warn(message, meta);
 };
 
 const parseStockSymbols = () => {
@@ -197,6 +237,17 @@ const normalizeStooqSymbol = (stooqSymbol) => {
     return upper;
 };
 
+const toMarketstackSymbol = (symbol) => {
+    const normalized = String(symbol || '').toUpperCase().trim();
+    if (normalized.endsWith('.NS') || normalized.endsWith('.BO')) {
+        return normalized.split('.')[0];
+    }
+    if (normalized.includes('.')) {
+        return normalized.split('.')[0];
+    }
+    return normalized;
+};
+
 const fetchYahooQuotes = async (symbols) => {
     const response = await axios.get('https://query1.finance.yahoo.com/v7/finance/quote', {
         params: { symbols: symbols.join(',') },
@@ -282,6 +333,207 @@ const fetchYahooChartQuotes = async (symbols) => {
     return rows.filter(Boolean);
 };
 
+const fetchTiingoQuotes = async (symbols) => {
+    if (!process.env.TIINGO_API_KEY) {
+        throw new Error('Missing TIINGO_API_KEY');
+    }
+
+    const normalizedSymbols = [...new Set((symbols || []).map((symbol) => String(symbol || '').toUpperCase()))];
+    if (!normalizedSymbols.length) {
+        return [];
+    }
+
+    const requests = normalizedSymbols.map(async (symbol) => {
+        const ticker = symbol.endsWith('.NS') || symbol.endsWith('.BO')
+            ? symbol.split('.')[0]
+            : symbol;
+
+        try {
+            const response = await axios.get(`${TIINGO_BASE_URL}/daily/${encodeURIComponent(ticker)}/prices`, {
+                params: {
+                    token: process.env.TIINGO_API_KEY,
+                    resampleFreq: 'daily',
+                    columns: 'date,close',
+                },
+                timeout: 7000,
+            });
+
+            const rows = Array.isArray(response.data) ? response.data : [];
+            const valid = rows
+                .map((row) => Number(row?.close))
+                .filter((price) => Number.isFinite(price) && price > 0);
+
+            if (!valid.length) {
+                return null;
+            }
+
+            const last = valid[valid.length - 1];
+            const prev = valid.length > 1 ? valid[valid.length - 2] : last;
+            const change = prev > 0 ? Number((((last - prev) / prev) * 100).toFixed(2)) : 0;
+
+            return {
+                symbol,
+                name: fallbackStockMeta[symbol]?.name || symbol,
+                price: Number(last.toFixed(2)),
+                change,
+                type: 'STOCK',
+                details: buildStockDetails(symbol, NaN, fallbackStockMeta[symbol]?.sector, fallbackStockMeta[symbol]?.name, NaN, NaN),
+                financials: null,
+            };
+        } catch (_error) {
+            return null;
+        }
+    });
+
+    const rows = await Promise.all(requests);
+    return rows.filter(Boolean);
+};
+
+const fetchTiingoHistory = async (symbol, interval = '1D') => {
+    if (!process.env.TIINGO_API_KEY) {
+        throw new Error('Missing TIINGO_API_KEY');
+    }
+
+    const normalized = String(symbol || '').toUpperCase();
+    const ticker = normalized.endsWith('.NS') || normalized.endsWith('.BO')
+        ? normalized.split('.')[0]
+        : normalized;
+
+    const daysByInterval = {
+        '5M': 5,
+        '15M': 15,
+        '1H': 30,
+        '1D': 180,
+        '1W': 365,
+        '1M': 365,
+        '3M': 540,
+        '6M': 730,
+        '1Y': 1095,
+    };
+    const lookbackDays = daysByInterval[String(interval || '1D').toUpperCase()] || 180;
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - lookbackDays);
+
+    const response = await axios.get(`${TIINGO_BASE_URL}/daily/${encodeURIComponent(ticker)}/prices`, {
+        params: {
+            token: process.env.TIINGO_API_KEY,
+            startDate: start.toISOString().slice(0, 10),
+            endDate: end.toISOString().slice(0, 10),
+            resampleFreq: 'daily',
+            columns: 'date,close',
+        },
+        timeout: 7000,
+    });
+
+    const rows = Array.isArray(response.data) ? response.data : [];
+    return rows
+        .map((row) => ({
+            date: new Date(row?.date || row?.datetime || Date.now()).toLocaleString(),
+            price: Number(row?.close),
+        }))
+        .filter((item) => Number.isFinite(item.price));
+};
+
+const fetchFinnhubQuotes = async (symbols) => {
+    if (!process.env.FINNHUB_API_KEY) {
+        throw new Error('Missing FINNHUB_API_KEY');
+    }
+
+    const normalizedSymbols = [...new Set((symbols || []).map((symbol) => String(symbol || '').toUpperCase()))];
+    if (!normalizedSymbols.length) {
+        return [];
+    }
+
+    const requests = normalizedSymbols.map(async (symbol) => {
+        const ticker = symbol.endsWith('.NS') || symbol.endsWith('.BO')
+            ? symbol.split('.')[0]
+            : symbol;
+
+        try {
+            const response = await axios.get(`${FINNHUB_BASE_URL}/quote`, {
+                params: {
+                    symbol: ticker,
+                    token: process.env.FINNHUB_API_KEY,
+                },
+                timeout: 6000,
+            });
+
+            const current = Number(response.data?.c);
+            const previousClose = Number(response.data?.pc);
+            if (!Number.isFinite(current) || current <= 0) {
+                return null;
+            }
+
+            const change = Number.isFinite(response.data?.dp)
+                ? Number(response.data.dp)
+                : (Number.isFinite(previousClose) && previousClose > 0
+                    ? Number((((current - previousClose) / previousClose) * 100).toFixed(2))
+                    : 0);
+
+            return {
+                symbol,
+                name: fallbackStockMeta[symbol]?.name || symbol,
+                price: Number(current.toFixed(2)),
+                change,
+                type: 'STOCK',
+                details: buildStockDetails(symbol, NaN, fallbackStockMeta[symbol]?.sector, fallbackStockMeta[symbol]?.name, NaN, NaN),
+                financials: null,
+            };
+        } catch (_error) {
+            return null;
+        }
+    });
+
+    const rows = await Promise.all(requests);
+    return rows.filter(Boolean);
+};
+
+const fetchFinnhubHistory = async (symbol, interval = '1D') => {
+    if (!process.env.FINNHUB_API_KEY) {
+        throw new Error('Missing FINNHUB_API_KEY');
+    }
+
+    const normalized = String(symbol || '').toUpperCase();
+    const ticker = normalized.endsWith('.NS') || normalized.endsWith('.BO')
+        ? normalized.split('.')[0]
+        : normalized;
+    const resolutionMap = {
+        '5M': { resolution: '5', days: 7 },
+        '15M': { resolution: '15', days: 15 },
+        '1H': { resolution: '60', days: 30 },
+        '1D': { resolution: 'D', days: 180 },
+        '1W': { resolution: 'W', days: 365 },
+        '1M': { resolution: 'D', days: 365 },
+        '3M': { resolution: 'D', days: 540 },
+        '6M': { resolution: 'D', days: 730 },
+        '1Y': { resolution: 'D', days: 1095 },
+    };
+    const config = resolutionMap[String(interval || '1D').toUpperCase()] || resolutionMap['1D'];
+    const to = Math.floor(Date.now() / 1000);
+    const from = to - (config.days * 24 * 60 * 60);
+
+    const response = await axios.get(`${FINNHUB_BASE_URL}/stock/candle`, {
+        params: {
+            symbol: ticker,
+            resolution: config.resolution,
+            from,
+            to,
+            token: process.env.FINNHUB_API_KEY,
+        },
+        timeout: 7000,
+    });
+
+    const closes = Array.isArray(response.data?.c) ? response.data.c : [];
+    const timestamps = Array.isArray(response.data?.t) ? response.data.t : [];
+    return closes
+        .map((close, index) => ({
+            date: new Date(Number(timestamps[index]) * 1000).toLocaleString(),
+            price: Number(close),
+        }))
+        .filter((item) => Number.isFinite(item.price));
+};
+
 const toPolygonTicker = (symbol) => {
     const normalized = String(symbol || '').toUpperCase();
     if (normalized.endsWith('.NS') || normalized.endsWith('.BO')) {
@@ -345,8 +597,11 @@ const fetchPolygonHistory = async (symbol, interval = '1D') => {
     }
 
     const intervalMap = {
-        '1D': { multiplier: 15, timespan: 'minute', days: 5 },
-        '1W': { multiplier: 1, timespan: 'hour', days: 30 },
+        '5M': { multiplier: 5, timespan: 'minute', days: 5 },
+        '15M': { multiplier: 15, timespan: 'minute', days: 5 },
+        '1H': { multiplier: 60, timespan: 'minute', days: 30 },
+        '1D': { multiplier: 1, timespan: 'day', days: 120 },
+        '1W': { multiplier: 1, timespan: 'day', days: 180 },
         '1M': { multiplier: 1, timespan: 'day', days: 90 },
         '3M': { multiplier: 1, timespan: 'day', days: 180 },
         '6M': { multiplier: 1, timespan: 'day', days: 365 },
@@ -377,6 +632,114 @@ const fetchPolygonHistory = async (symbol, interval = '1D') => {
             price: Number(row.c),
         }))
         .filter((item) => Number.isFinite(item.price));
+};
+
+const fetchMarketstackQuotes = async (symbols) => {
+    if (!process.env.MARKETSTACK_KEY) {
+        throw new Error('Missing MARKETSTACK_KEY');
+    }
+
+    const normalizedSymbols = [...new Set((symbols || []).map((symbol) => toMarketstackSymbol(symbol)).filter(Boolean))];
+    if (!normalizedSymbols.length) {
+        return [];
+    }
+
+    const response = await axios.get(`${MARKETSTACK_BASE_URL}/eod/latest`, {
+        params: {
+            access_key: process.env.MARKETSTACK_KEY,
+            symbols: normalizedSymbols.join(','),
+            limit: Math.max(20, normalizedSymbols.length * 2),
+        },
+        timeout: 7000,
+    });
+
+    const rows = Array.isArray(response.data?.data) ? response.data.data : [];
+    const latestBySymbol = new Map();
+    for (const row of rows) {
+        const ticker = String(row?.symbol || '').toUpperCase();
+        const close = Number(row?.close ?? row?.adj_close);
+        if (!ticker || !Number.isFinite(close) || close <= 0) {
+            continue;
+        }
+        const timestamp = new Date(row?.date || 0).getTime();
+        const existing = latestBySymbol.get(ticker);
+        if (!existing || timestamp > existing.timestamp) {
+            latestBySymbol.set(ticker, {
+                timestamp: Number.isFinite(timestamp) ? timestamp : 0,
+                close,
+                open: Number(row?.open),
+            });
+        }
+    }
+
+    return (symbols || [])
+        .map((originalSymbol) => {
+            const normalized = String(originalSymbol || '').toUpperCase();
+            const ticker = toMarketstackSymbol(normalized);
+            const latest = latestBySymbol.get(ticker);
+            if (!latest) {
+                return null;
+            }
+
+            const change = Number.isFinite(latest.open) && latest.open > 0
+                ? Number((((latest.close - latest.open) / latest.open) * 100).toFixed(2))
+                : 0;
+
+            return {
+                symbol: normalized,
+                name: fallbackStockMeta[normalized]?.name || normalized,
+                price: Number(latest.close.toFixed(2)),
+                change,
+                type: 'STOCK',
+                details: buildStockDetails(normalized, NaN, fallbackStockMeta[normalized]?.sector, fallbackStockMeta[normalized]?.name, NaN, NaN),
+                financials: null,
+            };
+        })
+        .filter(Boolean);
+};
+
+const fetchMarketstackHistory = async (symbol, interval = '1D') => {
+    if (!process.env.MARKETSTACK_KEY) {
+        throw new Error('Missing MARKETSTACK_KEY');
+    }
+
+    const normalized = String(symbol || '').toUpperCase();
+    const ticker = toMarketstackSymbol(normalized);
+    const daysByInterval = {
+        '5M': 7,
+        '15M': 15,
+        '1H': 30,
+        '1D': 180,
+        '1W': 365,
+        '1M': 365,
+        '3M': 540,
+        '6M': 730,
+        '1Y': 1095,
+    };
+    const lookback = daysByInterval[String(interval || '1D').toUpperCase()] || 180;
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - lookback);
+
+    const response = await axios.get(`${MARKETSTACK_BASE_URL}/eod`, {
+        params: {
+            access_key: process.env.MARKETSTACK_KEY,
+            symbols: ticker,
+            date_from: start.toISOString().slice(0, 10),
+            date_to: end.toISOString().slice(0, 10),
+            sort: 'ASC',
+            limit: 1000,
+        },
+        timeout: 7000,
+    });
+
+    const rows = Array.isArray(response.data?.data) ? response.data.data : [];
+    return rows
+        .map((row) => ({
+            date: new Date(row?.date || Date.now()).toLocaleString(),
+            price: Number(row?.close ?? row?.adj_close),
+        }))
+        .filter((item) => Number.isFinite(item.price) && item.price > 0);
 };
 
 const fetchStooqQuotes = async (symbols) => {
@@ -414,8 +777,11 @@ const fetchStooqQuotes = async (symbols) => {
 const fetchYahooHistory = async (symbol, interval = '1D') => {
     const normalizedSymbol = String(symbol || '').toUpperCase();
     const intervalMap = {
-        '1D': { range: '5d', interval: '15m' },
-        '1W': { range: '1mo', interval: '1h' },
+        '5M': { range: '5d', interval: '5m' },
+        '15M': { range: '5d', interval: '15m' },
+        '1H': { range: '1mo', interval: '60m' },
+        '1D': { range: '6mo', interval: '1d' },
+        '1W': { range: '1y', interval: '1wk' },
         '1M': { range: '3mo', interval: '1d' },
         '3M': { range: '6mo', interval: '1d' },
         '6M': { range: '1y', interval: '1d' },
@@ -499,9 +865,51 @@ const fetchStockData = async () => {
                 data = yahooQuotes;
             } else {
                 if (yahooError) {
-                    logger.warn('Yahoo Finance quote fetch failed, trying Polygon...', { error: yahooError.message });
+                    warnThrottled(
+                        `quotes:yahoo-failed:${yahooError.message}`,
+                        'Yahoo Finance quote fetch failed, trying Tiingo...',
+                        { error: yahooError.message },
+                    );
                 }
                 markProviderFailure('yahoo', yahooError?.message || 'Sparse quote payload');
+            }
+        }
+
+        if (!data && !isProviderBlocked('tiingo')) {
+            try {
+                const tiingoQuotes = await fetchTiingoQuotes(symbols);
+                if (hasEnoughLiveData(tiingoQuotes)) {
+                    clearProviderFailure('tiingo');
+                    data = tiingoQuotes;
+                } else {
+                    markProviderFailure('tiingo', 'Sparse quote payload');
+                }
+            } catch (error) {
+                markProviderFailure('tiingo', error.message);
+                warnThrottled(
+                    `quotes:tiingo-failed:${error.message}`,
+                    'Tiingo quote fetch failed, trying Finnhub...',
+                    { error: error.message },
+                );
+            }
+        }
+
+        if (!data && !isProviderBlocked('finnhub')) {
+            try {
+                const finnhubQuotes = await fetchFinnhubQuotes(symbols);
+                if (hasEnoughLiveData(finnhubQuotes)) {
+                    clearProviderFailure('finnhub');
+                    data = finnhubQuotes;
+                } else {
+                    markProviderFailure('finnhub', 'Sparse quote payload');
+                }
+            } catch (error) {
+                markProviderFailure('finnhub', error.message);
+                warnThrottled(
+                    `quotes:finnhub-failed:${error.message}`,
+                    'Finnhub quote fetch failed, trying Polygon...',
+                    { error: error.message },
+                );
             }
         }
 
@@ -516,7 +924,30 @@ const fetchStockData = async () => {
                 }
             } catch (error) {
                 markProviderFailure('polygon', error.message);
-                logger.warn('Polygon quote fetch failed, trying Stooq...', { error: error.message });
+                warnThrottled(
+                    `quotes:polygon-failed:${error.message}`,
+                    'Polygon quote fetch failed, trying Stooq...',
+                    { error: error.message },
+                );
+            }
+        }
+
+        if (!data && !isProviderBlocked('marketstack')) {
+            try {
+                const marketstackQuotes = await fetchMarketstackQuotes(symbols);
+                if (hasEnoughLiveData(marketstackQuotes)) {
+                    clearProviderFailure('marketstack');
+                    data = marketstackQuotes;
+                } else {
+                    markProviderFailure('marketstack', 'Sparse quote payload');
+                }
+            } catch (error) {
+                markProviderFailure('marketstack', error.message);
+                warnThrottled(
+                    `quotes:marketstack-failed:${error.message}`,
+                    'Marketstack quote fetch failed, trying Stooq...',
+                    { error: error.message },
+                );
             }
         }
 
@@ -531,12 +962,19 @@ const fetchStockData = async () => {
                 }
             } catch (error) {
                 markProviderFailure('stooq', error.message);
-                logger.warn('Stooq quote fetch failed.', { error: error.message });
+                warnThrottled(
+                    `quotes:stooq-failed:${error.message}`,
+                    'Stooq quote fetch failed.',
+                    { error: error.message },
+                );
             }
         }
 
         if (!data) {
-            logger.warn('All quote providers returned sparse/invalid data. Using synthetic fallback quotes.');
+            warnThrottled(
+                'quotes:synthetic-fallback',
+                'All quote providers returned sparse/invalid data. Using synthetic fallback quotes.',
+            );
             data = buildFallbackQuotes(symbols);
         }
 
@@ -555,59 +993,170 @@ const fetchStockData = async () => {
     }
 };
 
-const fetchStockHistory = async (symbol, interval = '1D') => {
-    try {
-        const yahooHistory = await fetchYahooHistory(symbol, interval);
-        if (yahooHistory.length > 0) {
-            return yahooHistory;
+const fetchStockHistory = async (symbol, interval = '1D', options = {}) => {
+    const { allowSynthetic = true } = options;
+    const normalizedSymbol = String(symbol || '').toUpperCase();
+    const normalizedInterval = String(interval || '1D').toUpperCase();
+    const requiresIntraday = ['5M', '15M', '1H'].includes(normalizedInterval);
+
+    if (!isProviderBlocked('yahoo')) {
+        try {
+            const yahooHistory = await fetchYahooHistory(normalizedSymbol, normalizedInterval);
+            if (yahooHistory.length > 0) {
+                clearProviderFailure('yahoo');
+                return yahooHistory;
+            }
+
+            markProviderFailure('yahoo', `Sparse history payload for ${normalizedSymbol}`);
+        } catch (error) {
+            markProviderFailure('yahoo', error.message);
+            warnThrottled(
+                `history:yahoo-failed:${error.message}`,
+                'Yahoo Finance history fetch failed, trying Tiingo...',
+                { error: error.message },
+            );
         }
-    } catch (error) {
-        logger.warn('Yahoo Finance history fetch failed, trying Polygon...', { error: error.message });
     }
 
-    try {
-        const polygonHistory = await fetchPolygonHistory(symbol, interval);
-        if (polygonHistory.length > 0) {
-            return polygonHistory;
+    if (!isProviderBlocked('tiingo')) {
+        try {
+            const tiingoHistory = await fetchTiingoHistory(normalizedSymbol, normalizedInterval);
+            if (tiingoHistory.length > 0) {
+                clearProviderFailure('tiingo');
+                return tiingoHistory;
+            }
+
+            markProviderFailure('tiingo', `Sparse history payload for ${normalizedSymbol}`);
+        } catch (error) {
+            markProviderFailure('tiingo', error.message);
+            warnThrottled(
+                `history:tiingo-failed:${error.message}`,
+                'Tiingo history fetch failed, trying Finnhub...',
+                { error: error.message },
+            );
         }
-    } catch (error) {
-        logger.warn('Polygon history fetch failed, trying Stooq...', { error: error.message });
     }
 
-    try {
-        const normalizedSymbol = String(symbol || '').toUpperCase();
-        const stooqSymbol = toStooqSymbol(normalizedSymbol);
-        const lookback = {
-            '1D': 5,
-            '1W': 30,
-            '1M': 90,
-            '3M': 180,
-            '6M': 365,
-            '1Y': 730,
-        }[String(interval).toUpperCase()] || 120;
-        const stooqUrl = `https://stooq.com/q/d/l/?s=${stooqSymbol}&i=d`;
+    if (!isProviderBlocked('finnhub')) {
+        try {
+            const finnhubHistory = await fetchFinnhubHistory(normalizedSymbol, normalizedInterval);
+            if (finnhubHistory.length > 0) {
+                clearProviderFailure('finnhub');
+                return finnhubHistory;
+            }
 
-        const stooqRes = await axios.get(stooqUrl, { timeout: 5000 });
-        const csvData = stooqRes.data;
-        const lines = csvData.split('\n').slice(1, lookback + 1);
-
-        const history = lines.map(line => {
-            const parts = line.split(',');
-            if (parts.length < 5) return null;
-            const close = parseFloat(parts[4]);
-            if (!Number.isFinite(close)) return null;
-            return {
-                date: new Date(parts[0]).toLocaleDateString(),
-                price: close
-            };
-        }).filter(item => item !== null).reverse();
-
-        if (history.length > 0) return history;
-        throw new Error('Stooq data empty');
-    } catch (stooqError) {
-        logger.warn('Stooq failed, using generated fallback history.', { error: stooqError.message });
-        return generateHistory(150, 0.02, interval);
+            markProviderFailure('finnhub', `Sparse history payload for ${normalizedSymbol}`);
+        } catch (error) {
+            markProviderFailure('finnhub', error.message);
+            warnThrottled(
+                `history:finnhub-failed:${error.message}`,
+                'Finnhub history fetch failed, trying Polygon...',
+                { error: error.message },
+            );
+        }
     }
+
+    if (!isProviderBlocked('polygon')) {
+        const polygonTicker = toPolygonTicker(normalizedSymbol);
+        if (!polygonTicker) {
+            warnThrottled(
+                `history:polygon-unsupported:${normalizedInterval}`,
+                'Skipping Polygon history for unsupported symbol.',
+                { symbol: normalizedSymbol },
+            );
+        } else {
+            try {
+                const polygonHistory = await fetchPolygonHistory(normalizedSymbol, normalizedInterval);
+                if (polygonHistory.length > 0) {
+                    clearProviderFailure('polygon');
+                    return polygonHistory;
+                }
+
+                markProviderFailure('polygon', `Sparse history payload for ${normalizedSymbol}`);
+            } catch (error) {
+                markProviderFailure('polygon', error.message);
+                warnThrottled(
+                    `history:polygon-failed:${error.message}`,
+                    'Polygon history fetch failed, trying Stooq...',
+                    { error: error.message },
+                );
+            }
+        }
+    }
+
+    if (!isProviderBlocked('marketstack')) {
+        try {
+            const marketstackHistory = await fetchMarketstackHistory(normalizedSymbol, normalizedInterval);
+            if (marketstackHistory.length > 0) {
+                clearProviderFailure('marketstack');
+                return marketstackHistory;
+            }
+
+            markProviderFailure('marketstack', `Sparse history payload for ${normalizedSymbol}`);
+        } catch (error) {
+            markProviderFailure('marketstack', error.message);
+            warnThrottled(
+                `history:marketstack-failed:${error.message}`,
+                'Marketstack history fetch failed, trying Stooq...',
+                { error: error.message },
+            );
+        }
+    }
+
+    if (!requiresIntraday && !isProviderBlocked('stooq')) {
+        try {
+            const stooqSymbol = toStooqSymbol(normalizedSymbol);
+            const lookback = {
+                '1D': 5,
+                '1W': 30,
+                '1M': 90,
+                '3M': 180,
+                '6M': 365,
+                '1Y': 730,
+            }[normalizedInterval] || 120;
+            const stooqUrl = `https://stooq.com/q/d/l/?s=${stooqSymbol}&i=d`;
+
+            const stooqRes = await axios.get(stooqUrl, { timeout: 5000 });
+            const csvData = stooqRes.data;
+            const lines = csvData.split('\n').slice(1, lookback + 1);
+
+            const history = lines.map(line => {
+                const parts = line.split(',');
+                if (parts.length < 5) return null;
+                const close = parseFloat(parts[4]);
+                if (!Number.isFinite(close)) return null;
+                return {
+                    date: new Date(parts[0]).toLocaleDateString(),
+                    price: close
+                };
+            }).filter(item => item !== null).reverse();
+
+            if (history.length > 0) {
+                clearProviderFailure('stooq');
+                return history;
+            }
+
+            markProviderFailure('stooq', `Sparse history payload for ${normalizedSymbol}`);
+        } catch (stooqError) {
+            markProviderFailure('stooq', stooqError.message);
+            warnThrottled(
+                `history:stooq-failed:${stooqError.message}`,
+                'Stooq history fetch failed.',
+                { error: stooqError.message },
+            );
+        }
+    }
+
+    if (!allowSynthetic) {
+        throw new Error(`Live history unavailable for ${normalizedSymbol}`);
+    }
+
+    warnThrottled(
+        `history:synthetic-fallback:${normalizedInterval}`,
+        'Using generated synthetic fallback history.',
+        { symbol: normalizedSymbol, interval: normalizedInterval },
+    );
+    return generateHistory(150, 0.02, normalizedInterval);
 };
 
 module.exports = { fetchStockData, fetchStockHistory };

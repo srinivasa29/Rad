@@ -1,6 +1,6 @@
-import { Suspense, lazy, useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { lazy, Suspense, useState, useEffect, useRef } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useNavigate, useLocation } from "react-router-dom";
 
 import {
   LayoutDashboard,
@@ -17,13 +17,16 @@ import {
   TrendingUp,
   LogOut,
 } from "lucide-react";
-import MarketTicker from "../components/dashboard/MarketTicker";
 import { updateUserMode } from "../api/userApi";
+import { fetchMarketData, fetchTrendingSearches, logSearchQuery } from "../api/marketApi";
 import { useHeaderData } from "../hooks/useHeaderData";
+import MarketTicker from "../components/dashboard/MarketTicker";
 import "./Dashboard.css";
 
 const TraderView = lazy(() => import("./TraderDashboard"));
 const InvestorMode = lazy(() => import("./InvestorDashboard"));
+
+const displaySymbol = (value) => String(value || "").replace(/\.(NS|BO)$/i, "");
 
 const formatNotificationTime = (value) => {
   if (!value) return "Now";
@@ -53,6 +56,7 @@ const DashboardLoader = ({ label = "Loading dashboard..." }) => (
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isTraderMode, setIsTraderMode] = useState(
     localStorage.getItem("mode") === "TRADER"
   );
@@ -61,8 +65,15 @@ export default function Dashboard() {
   const [activeModule, setActiveModule] = useState("DASHBOARD");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [traderSearchQuery, setTraderSearchQuery] = useState("");
+  const [traderSearchResults, setTraderSearchResults] = useState([]);
+  const [traderTrendingSearches, setTraderTrendingSearches] = useState([]);
+  const [isTraderSearching, setIsTraderSearching] = useState(false);
+  const [showTraderSearchDropdown, setShowTraderSearchDropdown] = useState(false);
+  const [traderHighlightedIndex, setTraderHighlightedIndex] = useState(-1);
   const notifRef = useRef(null);
   const profileRef = useRef(null);
+  const traderSearchContainerRef = useRef(null);
   const {
     profile,
     userInitial,
@@ -72,6 +83,14 @@ export default function Dashboard() {
     isMarkingNotifications,
     markAllNotificationsRead,
   } = useHeaderData();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const moduleParam = String(params.get("module") || "").toUpperCase();
+    if (["DASHBOARD", "WATCHLIST", "SCREENERS", "NEWS"].includes(moduleParam)) {
+      setActiveModule(moduleParam);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if (!isTraderMode) {
@@ -112,10 +131,110 @@ export default function Dashboard() {
       if (profileRef.current && !profileRef.current.contains(e.target)) {
         setIsProfileOpen(false);
       }
+      if (traderSearchContainerRef.current && !traderSearchContainerRef.current.contains(e.target)) {
+        setShowTraderSearchDropdown(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    if (!isTraderMode) return;
+
+    let isMounted = true;
+    const loadTrending = async () => {
+      const trends = await fetchTrendingSearches();
+      if (isMounted) {
+        setTraderTrendingSearches(Array.isArray(trends) ? trends.slice(0, 6) : []);
+      }
+    };
+
+    loadTrending();
+    return () => {
+      isMounted = false;
+    };
+  }, [isTraderMode]);
+
+  useEffect(() => {
+    if (!isTraderMode) return;
+
+    const query = traderSearchQuery.trim();
+    if (!query) {
+      setTraderSearchResults([]);
+      setIsTraderSearching(false);
+      return;
+    }
+
+    let isMounted = true;
+    const timeout = setTimeout(async () => {
+      try {
+        setIsTraderSearching(true);
+        const response = await fetchMarketData({ search: query });
+        if (isMounted) {
+          setTraderSearchResults(Array.isArray(response) ? response.slice(0, 8) : []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setTraderSearchResults([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsTraderSearching(false);
+        }
+      }
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
+  }, [isTraderMode, traderSearchQuery]);
+
+  useEffect(() => {
+    if (!showTraderSearchDropdown) {
+      setTraderHighlightedIndex(-1);
+      return;
+    }
+
+    const optionsLength = traderSearchQuery.trim().length > 0 ? traderSearchResults.length : traderTrendingSearches.length;
+    if (optionsLength === 0) {
+      setTraderHighlightedIndex(-1);
+      return;
+    }
+
+    if (traderHighlightedIndex >= optionsLength) {
+      setTraderHighlightedIndex(0);
+    }
+  }, [showTraderSearchDropdown, traderSearchQuery, traderSearchResults, traderTrendingSearches, traderHighlightedIndex]);
+
+  const openTraderStockPage = async (value) => {
+    const symbol = String(value || "").trim();
+    if (!symbol) return;
+    navigate(`/stocks/${encodeURIComponent(symbol.toUpperCase())}`);
+    await logSearchQuery(symbol);
+  };
+
+  const handleTraderSearchSelect = async (item) => {
+    const label = item?.symbol || item?.name || "";
+    setTraderSearchQuery(label);
+    setShowTraderSearchDropdown(false);
+    setTraderHighlightedIndex(-1);
+    await openTraderStockPage(label);
+  };
+
+  const handleTraderTrendingSelect = async (term) => {
+    setTraderSearchQuery(term);
+    setShowTraderSearchDropdown(false);
+    setTraderHighlightedIndex(-1);
+    await openTraderStockPage(term);
+  };
+
+  const submitTraderSearch = () => {
+    const query = String(traderSearchQuery || "").trim();
+    if (!query) return;
+    openTraderStockPage(query);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -248,16 +367,119 @@ export default function Dashboard() {
 
               {}
               <div className="flex items-center gap-6">
-                <div className="relative group w-64 hidden xl:block">
+                <div className="relative group w-64 hidden xl:block" ref={traderSearchContainerRef}>
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#00f3ff] transition-colors">
                     <Search size={14} />
                   </div>
                   <input
                     type="text"
-                    placeholder="Search markets..."
-                    className="navbar-search w-full border rounded-full py-2 pl-9 pr-4 text-xs text-white focus:outline-none transition-all placeholder:text-gray-500"
-                    style={{ background: '#141923', borderColor: '#00F3FF', boxShadow: '0 0 8px rgba(0,243,255,0.15)' }}
+                    placeholder="Search symbol and press Enter"
+                    value={traderSearchQuery}
+                    onFocus={() => {
+                      setShowTraderSearchDropdown(true);
+                      setTraderHighlightedIndex(traderSearchQuery.trim().length > 0 ? (traderSearchResults.length > 0 ? 0 : -1) : (traderTrendingSearches.length > 0 ? 0 : -1));
+                    }}
+                    onChange={(e) => {
+                      setTraderSearchQuery(e.target.value);
+                      setShowTraderSearchDropdown(true);
+                      setTraderHighlightedIndex(0);
+                    }}
+                    onKeyDown={async (e) => {
+                      const usingSearchResults = traderSearchQuery.trim().length > 0;
+                      const optionsLength = usingSearchResults ? traderSearchResults.length : traderTrendingSearches.length;
+
+                      if (e.key === "ArrowDown" && optionsLength > 0) {
+                        e.preventDefault();
+                        setShowTraderSearchDropdown(true);
+                        setTraderHighlightedIndex((prev) => (prev + 1 + optionsLength) % optionsLength);
+                        return;
+                      }
+
+                      if (e.key === "ArrowUp" && optionsLength > 0) {
+                        e.preventDefault();
+                        setShowTraderSearchDropdown(true);
+                        setTraderHighlightedIndex((prev) => (prev - 1 + optionsLength) % optionsLength);
+                        return;
+                      }
+
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (usingSearchResults && traderSearchResults.length > 0) {
+                          const selected = traderSearchResults[Math.max(0, traderHighlightedIndex)] || traderSearchResults[0];
+                          await handleTraderSearchSelect(selected);
+                        } else if (!usingSearchResults && traderTrendingSearches.length > 0) {
+                          const selectedTrend = traderTrendingSearches[Math.max(0, traderHighlightedIndex)] || traderTrendingSearches[0];
+                          await handleTraderTrendingSelect(selectedTrend);
+                        } else if (traderSearchQuery.trim()) {
+                          await submitTraderSearch();
+                        }
+                        return;
+                      }
+
+                      if (e.key === "Escape") {
+                        setShowTraderSearchDropdown(false);
+                        setTraderHighlightedIndex(-1);
+                      }
+                    }}
+                    className="navbar-search w-full border rounded-full py-2 pl-9 pr-16 text-xs text-white focus:outline-none transition-all placeholder:text-gray-500"
+                    style={{ background: '#141923', borderColor: '#00F3FF', boxShadow: '0 0 8px rgba(0,243,255,0.15)', color: '#EAF9FF', caretColor: '#00F3FF' }}
                   />
+                  <button
+                    type="button"
+                    onClick={submitTraderSearch}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide text-[#00f3ff] hover:bg-[#00f3ff]/10 transition-colors"
+                  >
+                    Go
+                  </button>
+
+                  {showTraderSearchDropdown && (
+                    <div className="absolute top-11 left-0 right-0 bg-[#0f1622] border border-[#00f3ff]/20 rounded-2xl shadow-xl overflow-hidden z-[120]">
+                      {isTraderSearching && (
+                        <div className="px-4 py-3 text-xs font-semibold text-[#9fb4c8]">Searching market...</div>
+                      )}
+
+                      {!isTraderSearching && traderSearchQuery.trim().length > 0 && traderSearchResults.length === 0 && (
+                        <div className="px-4 py-3 text-xs font-semibold text-[#9fb4c8]">No matching assets found.</div>
+                      )}
+
+                      {!isTraderSearching && traderSearchQuery.trim().length > 0 && traderSearchResults.length > 0 && (
+                        <div className="max-h-72 overflow-y-auto">
+                          {traderSearchResults.map((item) => (
+                            <button
+                              key={`${item.type}-${item.symbol}`}
+                              onClick={() => handleTraderSearchSelect(item)}
+                              className={`w-full text-left px-4 py-3 transition-colors border-b border-[#00f3ff]/10 ${traderHighlightedIndex >= 0 && traderSearchResults[traderHighlightedIndex] === item ? 'bg-[#00f3ff]/10' : 'hover:bg-[#00f3ff]/10'}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-xs font-black text-[#EAF9FF]">{displaySymbol(item.symbol)}</p>
+                                  <p className="text-[11px] text-[#9fb4c8]">{item.name}</p>
+                                </div>
+                                <span className="text-[10px] font-bold text-[#00f3ff]">{item.type}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {!isTraderSearching && traderSearchQuery.trim().length === 0 && (
+                        <div className="px-4 py-3">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-[#8ca3b8] mb-2">Trending</p>
+                          <div className="flex flex-wrap gap-2">
+                            {traderTrendingSearches.map((term) => (
+                              <button
+                                key={term}
+                                onClick={() => handleTraderTrendingSelect(term)}
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-black transition-colors ${traderHighlightedIndex >= 0 && traderTrendingSearches[traderHighlightedIndex] === term ? 'bg-[#00f3ff]/20 text-[#EAF9FF]' : 'bg-[#00f3ff]/10 text-[#9beeff] hover:bg-[#00f3ff]/20'}`}
+                              >
+                                {term}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-4 pl-4 border-l border-white/10">

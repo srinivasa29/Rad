@@ -1,36 +1,22 @@
-const axios = require('axios');
+const { fetchMarketNews } = require('../services/newsService');
+const logger = require('../utils/logger');
 
 const getMarketNews = async (req, res) => {
-    if (!process.env.NEWS_API_KEY) {
-        return res.json([
-            { title: "Market Rally Continues", source: "Demo News", url: "#", image: null, publishedAt: "10:00 AM" },
-            { title: "Fed Holds Rates Steady", source: "Demo News", url: "#", image: null, publishedAt: "9:00 AM" }
-        ]);
-    }
-
     try {
-        const url = 'https://newsapi.org/v2/top-headlines';
-        const params = {
-            apiKey: process.env.NEWS_API_KEY,
-            category: 'business',
-            language: 'en',
-            pageSize: 5
-        };
-
-        const response = await axios.get(url, { params });
-
-        const news = response.data.articles.map(article => ({
-            title: article.title,
-            source: article.source.name,
-            url: article.url,
-            image: article.urlToImage,
-            publishedAt: new Date(article.publishedAt).toLocaleTimeString()
-        }));
-
+        const category = String(req.query.category || 'business');
+        const symbol = String(req.query.symbol || '').trim();
+        const limit = Number.parseInt(req.query.limit || '5', 10);
+        const news = await fetchMarketNews(category, {
+            symbol: symbol || undefined,
+            limit: Number.isFinite(limit) ? limit : 5,
+        });
         res.json(news);
 
     } catch (error) {
-        console.error(error);
+        logger.error('Market news fetch failed', {
+            error: error.message,
+            code: error.code,
+        });
         res.status(500).json({ error: "Failed to fetch news" });
     }
 };

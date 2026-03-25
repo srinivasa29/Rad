@@ -7,6 +7,7 @@ const { searchSymbolRegistry, syncSymbolRegistry } = require('../services/symbol
 
 const cache = new NodeCache({ stdTTL: 60 });
 const DEFAULT_MARKET_REGION = String(process.env.DEFAULT_MARKET_REGION || 'IN').toUpperCase();
+const stripStockSuffix = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
 
 const getMarketData = async (req, res) => {
     const { type, search, minPrice, maxPrice, minChange, sort } = req.query;
@@ -78,14 +79,16 @@ const getCryptoBySymbol = async (req, res) => {
 };
 const getTrendingSearches = (req, res) => {
     const regionalTrending = {
-        IN: ['NIFTY', 'BANKNIFTY', 'RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'BTC', 'USDINR'],
+        IN: ['NIFTY', 'BANKNIFTY', 'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'BTC', 'USDINR'],
         US: ['AAPL', 'NVDA', 'BTC', 'TSLA', 'ETH', 'MSFT', 'AMD', 'SOL'],
-        GLOBAL: ['NIFTY', 'AAPL', 'BTC', 'RELIANCE.NS', 'NVDA', 'ETH', 'TCS.NS', 'EURUSD'],
+        GLOBAL: ['NIFTY', 'AAPL', 'BTC', 'RELIANCE', 'NVDA', 'ETH', 'TCS', 'EURUSD'],
     };
+
+    const trending = (regionalTrending[DEFAULT_MARKET_REGION] || regionalTrending.IN).map(stripStockSuffix);
 
     res.json({
         success: true,
-        trending: regionalTrending[DEFAULT_MARKET_REGION] || regionalTrending.IN,
+        trending,
     });
 };
 const logSearchEndpoint = (req, res) => {

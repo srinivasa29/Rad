@@ -6,6 +6,7 @@ const logger = require('../config/logger');
 
 let traderInterval = null;
 let investorInterval = null;
+let alertEventEmitter = null;
 
 const isDatabaseReady = () => mongoose.connection.readyState === 1;
 
@@ -45,6 +46,15 @@ const checkCondition = (value, condition, threshold) => {
         case 'EPS_GROWTH_ABOVE': return value > threshold;
         case 'MARKET_CAP_BELOW': return value < threshold; 
         default: return false;
+    }
+};
+
+const emitAlertTriggered = (payload) => {
+    if (typeof alertEventEmitter === 'function') {
+        alertEventEmitter('alert_triggered', {
+            ...payload,
+            timestamp: new Date().toISOString(),
+        });
     }
 };
 const checkTraderAlerts = async () => {
@@ -89,6 +99,16 @@ const checkTraderAlerts = async () => {
                     });
                     alert.status = 'TRIGGERED';
                     await alert.save();
+                    emitAlertTriggered({
+                        alertId: String(alert._id),
+                        userId: String(alert.user),
+                        symbol: alert.symbol,
+                        type: alert.type,
+                        condition: alert.condition,
+                        threshold: alert.threshold,
+                        value: Number(valueToCheck || 0),
+                        status: alert.status,
+                    });
                 }
             }
         }
@@ -138,6 +158,16 @@ const checkInvestorAlerts = async () => {
                 });
                 alert.status = 'TRIGGERED';
                 await alert.save();
+                emitAlertTriggered({
+                    alertId: String(alert._id),
+                    userId: String(alert.user),
+                    symbol: alert.symbol,
+                    type: alert.type,
+                    condition: alert.condition,
+                    threshold: alert.threshold,
+                    value: Number(valueToCheck || 0),
+                    status: alert.status,
+                });
             }
         }
     } catch (error) {
@@ -168,4 +198,8 @@ const stopAlertEngine = () => {
     logger.info('Alert Engine stopped');
 };
 
-module.exports = { startAlertEngine, stopAlertEngine, checkTraderAlerts, checkInvestorAlerts };
+const setAlertEventEmitter = (emitter) => {
+    alertEventEmitter = typeof emitter === 'function' ? emitter : null;
+};
+
+module.exports = { startAlertEngine, stopAlertEngine, checkTraderAlerts, checkInvestorAlerts, setAlertEventEmitter };

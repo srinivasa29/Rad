@@ -1,5 +1,7 @@
 const axios = require('axios');
 const { generateHistory } = require('../utils/mockGenerator');
+const logger = require('../utils/logger');
+const TWELVE_DATA_KEY = process.env.TWELVEDATA_API_KEY || process.env.TWELVE_DATA_API_KEY;
 
 const parseForexSymbol = (symbol = '') => {
     const cleaned = String(symbol).toUpperCase().replace(/[^A-Z]/g, '');
@@ -10,6 +12,11 @@ const parseForexSymbol = (symbol = '') => {
     }
 
     return { base: 'EUR', quote: 'USD' };
+};
+
+const toExchangeRatePair = (symbol = '') => {
+    const { base, quote } = parseForexSymbol(symbol);
+    return { base, quote };
 };
 
 const fetchForexData = async () => {
@@ -62,8 +69,55 @@ const fetchForexData = async () => {
             }
         ];
     } catch (error) {
-        console.error("Frankfurter forex fetch failed, trying TwelveData:", error.message);
-        if (!process.env.TWELVEDATA_API_KEY) {
+        logger.warn('Frankfurter forex fetch failed, trying ExchangeRate API...', { error: error.message });
+        if (process.env.EXCHANGERATE_API_KEY) {
+            try {
+                const key = process.env.EXCHANGERATE_API_KEY;
+                const baseResponse = await axios.get(`https://v6.exchangerate-api.com/v6/${key}/latest/USD`, { timeout: 6000 });
+                const rates = baseResponse.data?.conversion_rates || {};
+                const eur = Number(rates.EUR);
+                const gbp = Number(rates.GBP);
+                const jpy = Number(rates.JPY);
+
+                const rows = [
+                    {
+                        ticker: 'EUR/USD',
+                        name: 'Euro / US Dollar',
+                        bid: Number.isFinite(eur) && eur > 0 ? Number((1 / eur).toFixed(4)) : NaN,
+                        ask: Number.isFinite(eur) && eur > 0 ? Number(((1 / eur) + 0.0002).toFixed(4)) : NaN,
+                        change: 0,
+                        type: 'FOREX',
+                        details: { sector: 'Currency', market_cap: 'N/A', about: 'EUR/USD sourced from ExchangeRate API.', yield: 'N/A' }
+                    },
+                    {
+                        ticker: 'GBP/USD',
+                        name: 'British Pound / US Dollar',
+                        bid: Number.isFinite(gbp) && gbp > 0 ? Number((1 / gbp).toFixed(4)) : NaN,
+                        ask: Number.isFinite(gbp) && gbp > 0 ? Number(((1 / gbp) + 0.0002).toFixed(4)) : NaN,
+                        change: 0,
+                        type: 'FOREX',
+                        details: { sector: 'Currency', market_cap: 'N/A', about: 'GBP/USD sourced from ExchangeRate API.', yield: 'N/A' }
+                    },
+                    {
+                        ticker: 'USD/JPY',
+                        name: 'US Dollar / Japanese Yen',
+                        bid: Number.isFinite(jpy) ? Number(jpy.toFixed(2)) : NaN,
+                        ask: Number.isFinite(jpy) ? Number((jpy + 0.04).toFixed(2)) : NaN,
+                        change: 0,
+                        type: 'FOREX',
+                        details: { sector: 'Currency', market_cap: 'N/A', about: 'USD/JPY sourced from ExchangeRate API.', yield: 'N/A' }
+                    }
+                ].filter((row) => Number.isFinite(row.bid) && Number.isFinite(row.ask));
+
+                if (rows.length) {
+                    return rows;
+                }
+            } catch (exError) {
+                logger.warn('ExchangeRate API forex fetch failed, trying TwelveData...', { error: exError.message });
+            }
+        }
+
+        if (!TWELVE_DATA_KEY) {
             return [];
         }
 
@@ -73,7 +127,7 @@ const fetchForexData = async () => {
                 const response = await axios.get('https://api.twelvedata.com/price', {
                     params: {
                         symbol: pair,
-                        apikey: process.env.TWELVEDATA_API_KEY,
+                        apikey: TWELVE_DATA_KEY,
                     },
                     timeout: 6000,
                 });
@@ -106,7 +160,7 @@ const fetchForexData = async () => {
                     }
                 }));
         } catch (fallbackError) {
-            console.error('TwelveData forex fetch failed:', fallbackError.message);
+            logger.warn('TwelveData forex fetch failed.', { error: fallbackError.message });
             return [];
         }
     }
@@ -136,8 +190,36 @@ const fetchForexHistory = async (symbol, interval = '1D') => {
         return history;
 
     } catch (error) {
-        console.error("Frankfurter history failed, trying TwelveData:", error.message);
-        if (process.env.TWELVEDATA_API_KEY) {
+        logger.warn('Frankfurter history failed, trying ExchangeRate API...', { error: error.message });
+        if (process.env.EXCHANGERATE_API_KEY) {
+            try {
+                const key = process.env.EXCHANGERATE_API_KEY;
+                const { base, quote } = toExchangeRatePair(symbol);
+                const end = new Date();
+                const start = new Date();
+                start.setDate(start.getDate() - 90);
+                const response = await axios.get(`https://v6.exchangerate-api.com/v6/${key}/history/${base}/${start.toISOString().slice(0, 10)}/${end.toISOString().slice(0, 10)}`, {
+                    timeout: 7000,
+                });
+
+                const rates = response.data?.conversion_rates || {};
+                const history = Object.entries(rates)
+                    .map(([date, row]) => ({
+                        date,
+                        price: Number(row?.[quote]),
+                    }))
+                    .filter((item) => Number.isFinite(item.price))
+                    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+                if (history.length > 0) {
+                    return history;
+                }
+            } catch (exError) {
+                logger.warn('ExchangeRate API history fetch failed, trying TwelveData...', { error: exError.message });
+            }
+        }
+
+        if (TWELVE_DATA_KEY) {
             try {
                 const { base, quote } = parseForexSymbol(symbol);
                 const pair = `${base}/${quote}`;
@@ -146,7 +228,7 @@ const fetchForexHistory = async (symbol, interval = '1D') => {
                         symbol: pair,
                         interval: '1day',
                         outputsize: 90,
-                        apikey: process.env.TWELVEDATA_API_KEY,
+                        apikey: TWELVE_DATA_KEY,
                     },
                     timeout: 7000,
                 });
@@ -164,11 +246,11 @@ const fetchForexHistory = async (symbol, interval = '1D') => {
                     return history;
                 }
             } catch (fallbackError) {
-                console.error('TwelveData history fetch failed:', fallbackError.message);
+                logger.warn('TwelveData history fetch failed.', { error: fallbackError.message });
             }
         }
 
-        console.error("Forex history unavailable, using Mock");
+        logger.warn('Forex history unavailable, using mock history.');
         return generateHistory(1.08, 0.005, interval);
     }
 };

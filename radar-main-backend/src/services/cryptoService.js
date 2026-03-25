@@ -2,6 +2,7 @@ const axios = require('axios');
 
 const BINANCE_BASE_URL = 'https://api.binance.com';
 const COINGECKO_BASE_URL = 'https://api.coingecko.com/api/v3';
+const COINMARKETCAP_BASE_URL = 'https://pro-api.coinmarketcap.com/v1';
 const DEFAULT_PAIRS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'BNBUSDT'];
 
 const PAIR_META = {
@@ -123,8 +124,54 @@ const fetchCryptoData = async () => {
                 }
             }));
         } catch (fallbackError) {
-            console.error('CoinGecko crypto fetch failed:', fallbackError.message);
-            return [];
+            console.error('CoinGecko crypto fetch failed, trying CoinMarketCap:', fallbackError.message);
+            if (!process.env.COINMARKETCAP_API_KEY) {
+                return [];
+            }
+            try {
+                const response = await axios.get(`${COINMARKETCAP_BASE_URL}/cryptocurrency/quotes/latest`, {
+                    params: {
+                        symbol: 'BTC,ETH,SOL,XRP,BNB',
+                        convert: 'USD',
+                    },
+                    timeout: 7000,
+                    headers: {
+                        'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API_KEY,
+                    },
+                });
+
+                const data = response.data?.data || {};
+                const order = ['BTC', 'ETH', 'SOL', 'XRP', 'BNB'];
+                return order
+                    .map((sym) => {
+                        const row = data[sym];
+                        const quote = row?.quote?.USD;
+                        if (!row || !quote) {
+                            return null;
+                        }
+
+                        return {
+                            id: String(row.slug || sym).toLowerCase(),
+                            symbol: String(row.symbol || sym).toLowerCase(),
+                            name: row.name || sym,
+                            current_price: Number(quote.price) || 0,
+                            price_change_percentage_24h: Number(quote.percent_change_24h) || 0,
+                            market_cap: Number(quote.market_cap) || null,
+                            total_volume: Number(quote.volume_24h) || 0,
+                            image: null,
+                            details: {
+                                sector: 'Blockchain',
+                                market_cap: Number(quote.market_cap) > 0 ? `$${(Number(quote.market_cap) / 1e9).toFixed(2)}B` : 'N/A',
+                                about: `${row.name || sym} market data sourced from CoinMarketCap.`,
+                                volume: Number(quote.volume_24h) > 0 ? `$${(Number(quote.volume_24h) / 1e6).toFixed(2)}M` : 'N/A',
+                            }
+                        };
+                    })
+                    .filter(Boolean);
+            } catch (cmcError) {
+                console.error('CoinMarketCap crypto fetch failed:', cmcError.message);
+                return [];
+            }
         }
     }
 };

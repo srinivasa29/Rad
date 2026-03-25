@@ -3,7 +3,8 @@ const { fetchStockHistory } = require('./stockService');
 const { fetchCryptoHistory } = require('./cryptoService');
 const { fetchForexHistory } = require('./forexService');
 
-const getTechnicalIndicators = async (assetType, symbol, interval = '1D') => {
+const getTechnicalIndicators = async (assetType, symbol, interval = '1D', options = {}) => {
+    const { strictLive = false } = options;
     let history = [];
     const type = assetType?.toLowerCase();
     if (type === 'crypto') {
@@ -11,7 +12,7 @@ const getTechnicalIndicators = async (assetType, symbol, interval = '1D') => {
     } else if (type === 'forex') {
         history = await fetchForexHistory(symbol, interval);
     } else if (type === 'stock') {
-        history = await fetchStockHistory(symbol, interval);
+        history = await fetchStockHistory(symbol, interval, { allowSynthetic: !strictLive });
     } else {
         throw new Error(`Unsupported asset type for indicators: ${assetType}`);
     }
@@ -34,22 +35,34 @@ const getTechnicalIndicators = async (assetType, symbol, interval = '1D') => {
     const ema20 = emaRaw.length > 0 ? parseFloat(emaRaw[emaRaw.length - 1].toFixed(2)) : null;
 
     const volumeStatus = getVolumeStatus(history, 20);
+    const last = history[history.length - 1] || null;
+    const previous = history[history.length - 2] || null;
+    const lastPrice = Number(last?.price);
+    const previousPrice = Number(previous?.price);
+    const lastChangePercent = Number.isFinite(lastPrice) && Number.isFinite(previousPrice) && previousPrice > 0
+        ? Number((((lastPrice - previousPrice) / previousPrice) * 100).toFixed(2))
+        : null;
+    const lastUpdatedAt = last?.date || null;
 
     return {
         rsi,
         macd,
         ema20,
-        volumeStatus
+        volumeStatus,
+        lastPrice: Number.isFinite(lastPrice) ? lastPrice : null,
+        previousPrice: Number.isFinite(previousPrice) ? previousPrice : null,
+        lastChangePercent,
+        lastUpdatedAt,
     };
 };
 
-const getTrendMatrix = async (assetType, symbol) => {
+const getTrendMatrix = async (assetType, symbol, options = {}) => {
     const timeframes = ['5M', '15M', '1H', '1D'];
     const trendMatrix = {};
 
     for (const tf of timeframes) {
         try {
-            const data = await getTechnicalIndicators(assetType, symbol, tf);
+            const data = await getTechnicalIndicators(assetType, symbol, tf, options);
             let bias = 'neutral';
 
             if (data.rsi && data.ema20) {

@@ -1,22 +1,19 @@
 import { useState, useEffect } from "react";
+import { Activity, Maximize2, TrendingDown, TrendingUp } from "lucide-react";
+import { motion } from "framer-motion";
 import {
+  ResponsiveContainer,
   AreaChart,
   Area,
+  CartesianGrid,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
 } from "recharts";
-import {
-  Maximize2,
-  Activity,
-  TrendingUp,
-  TrendingDown,
-} from "lucide-react";
-import { motion } from "framer-motion";
-import SharedMultiChartGrid from "../components/trader/MultiChartGrid";
-import SharedAdvancedWatchlist from "../components/trader/AdvancedWatchlist";
+
+
+
+
 import { fetchPulse, fetchHeatmap } from "../api/analyticsApi";
 import { fetchTechnicalSummary, fetchBreakoutAlerts, fetchIndicatorSignals, fetchQuickOrderData, fetchWatchlistTechnicals } from "../api/technicalApi";
 import { fetchEconomicCalendar } from "../api/calendarApi";
@@ -24,6 +21,9 @@ import { fetchPortfolio, executeTrade } from "../api/portfolioApi";
 import { fetchFnoDashboard } from "../api/fnoApi";
 import { fetchMarketHistory, fetchMarketNews } from "../api/marketApi";
 import { useAsset } from "../context/AssetContext";
+import SharedMultiChartGrid from "../components/trader/MultiChartGrid";
+import SharedAdvancedWatchlist from "../components/trader/AdvancedWatchlist";
+import AdvancedScreener from "../components/trader/AdvancedScreener";
 import "./TraderDashboard.css";
 
 const BACKEND_SYMBOL_MAP = {
@@ -31,8 +31,17 @@ const BACKEND_SYMBOL_MAP = {
   HDFCBANK: "HDFCBANK.NS",
   INFY: "INFY.NS",
   TCS: "TCS.NS",
+  ICICIBANK: "ICICIBANK.NS",
+  SBIN: "SBIN.NS",
+  ITC: "ITC.NS",
+  LT: "LT.NS",
   "NIFTY 50": "^NSEI",
   BANKNIFTY: "^NSEBANK",
+  SENSEX: "^BSESN",
+  "NIFTY IT": "^CNXIT",
+  "NIFTY AUTO": "^CNXAUTO",
+  "NIFTY INFRA": "^CNXINFRA",
+  "NIFTY FIN SERVICE": "NIFTY_FIN_SERVICE.NS",
 };
 
 const BACKEND_INTERVAL_MAP = {
@@ -56,6 +65,8 @@ const RESEARCH_UNIVERSE = [
   "ITC",
   "LT",
 ];
+
+const SUMMARY_INDEX_UNIVERSE = ["NIFTY 50", "BANKNIFTY", "SENSEX", "NIFTY IT", "NIFTY AUTO", "NIFTY FIN SERVICE", "NIFTY INFRA"];
 
 const FALLBACK_HEATMAP = [
   { name: "BANKING", change: 1.8 },
@@ -83,6 +94,55 @@ const FALLBACK_PULSE = {
     { symbol: "ITC", shock: "1.7x" },
   ],
 };
+
+const FALLBACK_RESEARCH_INSIGHTS = [
+  {
+    key: "fallback-summary-reliance",
+    title: "RELIANCE",
+    badge: "Setup Watch",
+    badgeColor: "#42C0A5",
+    kind: "summary",
+    rankScore: 71,
+    timeframe: "Fallback scan",
+    details: [
+      { name: "Bias", value: "Bullish", note: "Score 71", color: "#42C0A5" },
+      { name: "RSI", value: "61.2", note: "Momentum", color: "#42C0A5" },
+      { name: "MACD Δ", value: "0.82", note: "Signal spread", color: "#42C0A5" },
+      { name: "Volume", value: "Above Average", note: "Participation", color: "#42C0A5" },
+    ],
+    note: "Fallback research view while backend insight scan is unavailable.",
+  },
+  {
+    key: "fallback-summary-hdfcbank",
+    title: "HDFCBANK",
+    badge: "Support Retest",
+    badgeColor: "#f0b429",
+    kind: "summary",
+    rankScore: 63,
+    timeframe: "Fallback scan",
+    details: [
+      { name: "Bias", value: "Neutral", note: "Score 63", color: "#f0b429" },
+      { name: "RSI", value: "53.8", note: "Momentum", color: "#f0b429" },
+      { name: "MACD Δ", value: "0.18", note: "Signal spread", color: "#42C0A5" },
+      { name: "Volume", value: "Average", note: "Participation", color: "#8b909a" },
+    ],
+    note: "Fallback insight card. Confirm with live backend feed before execution.",
+  },
+  {
+    key: "fallback-alert-nifty",
+    title: "NIFTY 50",
+    badge: "Resistance Test",
+    badgeColor: "#ed5750",
+    kind: "alert",
+    rankScore: 55,
+    timeframe: "Fallback alert",
+    details: [
+      { name: "Trigger", value: "Resistance Test", note: "Technical alert", color: "#ed5750" },
+      { name: "Price", value: "18,536", note: "Spot price", color: "#d1d4dc" },
+    ],
+    note: "Fallback alert generated while backend alert stream is unavailable.",
+  },
+];
 
 const FALLBACK_SUMMARY = {
   score: { score: 67, bias: "bullish" },
@@ -166,7 +226,18 @@ const normalizeDisplaySymbol = (value) => {
   const upper = raw.toUpperCase();
   if (upper === "^NSEI" || upper === "NIFTY" || upper === "NIFTY50") return "NIFTY 50";
   if (upper === "^NSEBANK" || upper === "BANKNIFTY") return "BANKNIFTY";
+  if (upper === "^BSESN" || upper === "SENSEX") return "SENSEX";
+  if (upper === "^CNXIT" || upper === "NIFTY IT" || upper === "NIFTYIT") return "NIFTY IT";
+  if (upper === "^CNXAUTO" || upper === "NIFTY AUTO" || upper === "NIFTYAUTO") return "NIFTY AUTO";
+  if (upper === "^CNXINFRA" || upper === "NIFTY INFRA" || upper === "NIFTYINFRA") return "NIFTY INFRA";
+  if (upper === "NIFTY_FIN_SERVICE.NS" || upper === "NIFTY_FIN_SERVICE" || upper === "NIFTY FIN SERVICE") return "NIFTY FIN SERVICE";
   return upper.replace(/\.(NS|BO)$/i, "");
+};
+
+const resolveBackendSymbol = (value) => {
+  const normalized = normalizeDisplaySymbol(value);
+  if (!normalized) return "";
+  return BACKEND_SYMBOL_MAP[normalized] || normalized;
 };
 
 const resolveTrendBias = (value) => {
@@ -206,8 +277,9 @@ const normalizeVolumeShockers = (rows = []) => (
 );
 
 const usePreMarketPulse = () => {
-  const [pulse, setPulse] = useState(FALLBACK_PULSE);
+  const [pulse, setPulse] = useState({ gapUp: [], gapDown: [], volumeShockers: [] });
   const [isLoading, setIsLoading] = useState(true);
+  const [isFallback, setIsFallback] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -222,17 +294,20 @@ const usePreMarketPulse = () => {
           const gapUp = normalizePulseRows(response?.gapUp);
           const gapDown = normalizePulseRows(response?.gapDown);
           const volumeShockers = normalizeVolumeShockers(response?.volumeShockers);
-
-          setPulse({
-            gapUp: gapUp.length ? gapUp : FALLBACK_PULSE.gapUp,
-            gapDown: gapDown.length ? gapDown : FALLBACK_PULSE.gapDown,
-            volumeShockers: volumeShockers.length ? volumeShockers : FALLBACK_PULSE.volumeShockers,
-          });
+          const shouldFallback = gapUp.length === 0 && gapDown.length === 0 && volumeShockers.length === 0;
+          if (shouldFallback) {
+            setPulse(FALLBACK_PULSE);
+            setIsFallback(true);
+          } else {
+            setPulse({ gapUp, gapDown, volumeShockers });
+            setIsFallback(false);
+          }
         }
       } catch (error) {
         console.error("Failed to load pre-market pulse:", error);
         if (isMounted) {
           setPulse(FALLBACK_PULSE);
+          setIsFallback(true);
         }
       } finally {
         if (isMounted && !silent) {
@@ -252,7 +327,7 @@ const usePreMarketPulse = () => {
     };
   }, []);
 
-  return { pulse, isLoading };
+  return { pulse, isLoading, isFallback };
 };
 
 const SectorHeatmap = () => {
@@ -360,6 +435,7 @@ const SectorHeatmap = () => {
 const TrendStrengthPanel = () => {
   const [rows, setRows] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -371,37 +447,54 @@ const TrendStrengthPanel = () => {
         if (!silent) {
           setIsLoading(true);
         }
+        setHasError(false);
 
         const responses = await Promise.allSettled(
           symbols.map(async (symbol) => {
-            const backendSymbol = BACKEND_SYMBOL_MAP[symbol] || symbol;
+            const backendSymbol = resolveBackendSymbol(symbol);
             const summary = await fetchTechnicalSummary("stock", backendSymbol);
             const matrix = summary?.trendMatrix || {};
+            const mapTrendState = (value) => {
+              if (value === undefined || value === null || String(value).trim() === "") {
+                return null;
+              }
+              return resolveTrendBias(value);
+            };
+
+            const mappedMatrix = {
+              "5m": mapTrendState(matrix["5m"]),
+              "15m": mapTrendState(matrix["15m"]),
+              "1h": mapTrendState(matrix["1h"]),
+              "4h": mapTrendState(matrix["4h"] ?? matrix["1h"]),
+              "1d": mapTrendState(matrix["1d"]),
+            };
+
+            if (!Object.values(mappedMatrix).some(Boolean)) {
+              return null;
+            }
 
             return {
               symbol,
-              matrix: {
-                "5m": resolveTrendBias(matrix["5m"]),
-                "15m": resolveTrendBias(matrix["15m"]),
-                "1h": resolveTrendBias(matrix["1h"]),
-                "4h": resolveTrendBias(matrix["4h"] || matrix["1h"]),
-                "1d": resolveTrendBias(matrix["1d"]),
-              },
+              matrix: mappedMatrix,
             };
           })
         );
 
         const nextRows = responses
           .filter((response) => response.status === "fulfilled")
-          .map((response) => response.value);
+          .map((response) => response.value)
+          .filter(Boolean);
+        const allRejected = responses.every((response) => response.status === "rejected");
 
         if (isMounted) {
-          setRows(nextRows.length ? nextRows : []);
+          setRows(nextRows);
+          setHasError(allRejected);
         }
       } catch (error) {
         console.error("Failed to load trend matrix:", error);
         if (isMounted) {
           setRows([]);
+          setHasError(true);
         }
       } finally {
         if (isMounted && !silent) {
@@ -421,14 +514,7 @@ const TrendStrengthPanel = () => {
     };
   }, []);
 
-  const fallbackRows = [
-    { symbol: "NIFTY 50", matrix: { "5m": "bullish", "15m": "bullish", "1h": "neutral", "4h": "bullish", "1d": "bullish" } },
-    { symbol: "BANKNIFTY", matrix: { "5m": "neutral", "15m": "bullish", "1h": "bullish", "4h": "bullish", "1d": "neutral" } },
-    { symbol: "RELIANCE", matrix: { "5m": "bullish", "15m": "neutral", "1h": "bullish", "4h": "bullish", "1d": "bullish" } },
-    { symbol: "HDFCBANK", matrix: { "5m": "neutral", "15m": "neutral", "1h": "bullish", "4h": "bullish", "1d": "bullish" } },
-  ];
-
-  const matrixRows = rows.length ? rows : fallbackRows;
+  const matrixRows = rows;
   const biasScore = matrixRows.reduce((acc, row) => {
     const values = Object.values(row.matrix);
     values.forEach((value) => {
@@ -444,6 +530,7 @@ const TrendStrengthPanel = () => {
     bullish: "↑",
     bearish: "↓",
     neutral: "→",
+    unknown: "-",
   };
 
   return (
@@ -459,10 +546,22 @@ const TrendStrengthPanel = () => {
             <p className="text-[9px] text-[#5d606b] mt-0.5">Backend summary trend alignment</p>
           </div>
         </div>
-        <span className="text-[9px] text-[#42C0A5] bg-[#42C0A5]/10 px-2 py-0.5 rounded border border-[#42C0A5]/20 font-bold">● LIVE</span>
+        {hasError ? (
+          <span className="text-[9px] text-[#f0b429] bg-[#f0b429]/10 px-2 py-0.5 rounded border border-[#f0b429]/20 font-bold">BACKEND OFFLINE</span>
+        ) : matrixRows.length > 0 ? (
+          <span className="text-[9px] text-[#42C0A5] bg-[#42C0A5]/10 px-2 py-0.5 rounded border border-[#42C0A5]/20 font-bold">● LIVE</span>
+        ) : (
+          <span className="text-[9px] text-[#8b909a] bg-white/5 px-2 py-0.5 rounded border border-white/10 font-bold">NO DATA</span>
+        )}
       </div>
 
       <div className="flex-1 px-2 pb-2 pt-1 overflow-y-auto custom-scrollbar" style={{ scrollbarColor: "#2a2e39 transparent" }}>
+        {!isLoading && hasError && (
+          <div className="text-[10px] text-[#f0b429] font-mono uppercase tracking-wider px-1 py-2">Unable to load trend matrix from backend.</div>
+        )}
+        {!isLoading && !hasError && matrixRows.length === 0 && (
+          <div className="text-[10px] text-[#5d606b] font-mono uppercase tracking-wider px-1 py-2">No trend matrix data from backend.</div>
+        )}
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr style={{ background: "rgba(255,255,255,0.03)" }}>
@@ -500,9 +599,15 @@ const TrendStrengthPanel = () => {
                     </div>
                   </td>
                   {values.map((state, i) => {
-                    const glyph = stateToGlyph[state] || stateToGlyph.neutral;
-                    const color = state === "bullish" ? "#42C0A5" : state === "bearish" ? "#ed5750" : "#8b909a";
-                    const bg = state === "bullish" ? "rgba(61,178,107,0.2)" : state === "bearish" ? "rgba(237,87,80,0.2)" : "rgba(255,255,255,0.08)";
+                    const glyph = stateToGlyph[state] || stateToGlyph.unknown;
+                    const color = state === "bullish" ? "#42C0A5" : state === "bearish" ? "#ed5750" : state === "neutral" ? "#8b909a" : "#5d606b";
+                    const bg = state === "bullish"
+                      ? "rgba(61,178,107,0.2)"
+                      : state === "bearish"
+                        ? "rgba(237,87,80,0.2)"
+                        : state === "neutral"
+                          ? "rgba(255,255,255,0.08)"
+                          : "rgba(255,255,255,0.03)";
 
                     return (
                       <td key={i} className="py-2 text-center">
@@ -547,7 +652,7 @@ const TrendStrengthPanel = () => {
 
 const GapLists = () => {
   const [activeTab, setActiveTab] = useState("GAINERS");
-  const { pulse, isLoading } = usePreMarketPulse();
+  const { pulse, isLoading, isFallback } = usePreMarketPulse();
 
   const rows = activeTab === "GAINERS"
     ? pulse.gapUp
@@ -593,6 +698,9 @@ const GapLists = () => {
         {isLoading && (
           <div className="text-[10px] text-[#5d606b] font-mono uppercase tracking-wider">Refreshing pulse...</div>
         )}
+        {!isLoading && isFallback && (
+          <div className="text-[10px] text-[#f0b429] font-mono uppercase tracking-wider">Fallback pulse data active.</div>
+        )}
         {!isLoading && rows.length === 0 && (
           <div className="text-[10px] text-[#5d606b] font-mono uppercase tracking-wider">No backend pulse rows.</div>
         )}
@@ -621,7 +729,7 @@ const GapLists = () => {
 };
 
 const VolumeShockers = () => {
-  const { pulse, isLoading } = usePreMarketPulse();
+  const { pulse, isLoading, isFallback } = usePreMarketPulse();
   const items = pulse.volumeShockers.map((item, index) => ({
     symbol: normalizeDisplaySymbol(item.symbol),
     shock: item.shock,
@@ -646,6 +754,9 @@ const VolumeShockers = () => {
     <div className="flex-1 space-y-1.5 overflow-y-auto pr-1 custom-scrollbar p-2">
       {isLoading && (
         <div className="text-[10px] text-[#5d606b] font-mono uppercase tracking-wider">Refreshing volume spikes...</div>
+      )}
+      {!isLoading && isFallback && (
+        <div className="text-[10px] text-[#f0b429] font-mono uppercase tracking-wider">Fallback volume shockers active.</div>
       )}
       {!isLoading && items.length === 0 && (
         <div className="text-[10px] text-[#5d606b] font-mono uppercase tracking-wider">No backend volume spikes.</div>
@@ -677,9 +788,46 @@ const VolumeShockers = () => {
 };
 
 const KeyLevelsPanel = () => {
-  const { activeSymbol, activeType } = useAsset();
+  const [selectedIndex, setSelectedIndex] = useState(SUMMARY_INDEX_UNIVERSE[0]);
   const [levels, setLevels] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [indexStatus, setIndexStatus] = useState(() => (
+    Object.fromEntries(SUMMARY_INDEX_UNIVERSE.map((symbol) => [symbol, "loading"]))
+  ));
+  const [isStatusLoading, setIsStatusLoading] = useState(true);
+
+  const pickFinite = (...values) => {
+    for (const candidate of values) {
+      const numeric = Number(candidate);
+      if (Number.isFinite(numeric) && numeric > 0) {
+        return numeric;
+      }
+    }
+    return null;
+  };
+
+  const buildLevelsFromPayload = (summary, depth = null) => {
+    const indicators = summary?.indicators || {};
+    const bid = Number(depth?.bids?.[0]?.price);
+    const ask = Number(depth?.asks?.[0]?.price);
+    const midpoint = Number.isFinite(bid) && bid > 0 && Number.isFinite(ask) && ask > 0
+      ? (bid + ask) / 2
+      : null;
+
+    return {
+      current: pickFinite(midpoint, bid, ask, indicators?.lastPrice, indicators?.current, summary?.price, summary?.ltp),
+      ema20: pickFinite(indicators?.ema20, indicators?.vwap),
+      support: pickFinite(indicators?.support, indicators?.support1, indicators?.s1),
+      resistance: pickFinite(indicators?.resistance, indicators?.resistance1, indicators?.r1),
+      weeklyHigh: pickFinite(indicators?.weeklyHigh, indicators?.high52w, indicators?.dayHigh),
+      weeklyLow: pickFinite(indicators?.weeklyLow, indicators?.low52w, indicators?.dayLow),
+    };
+  };
+
+  const hasAnyLiveLevel = (candidateLevels) => (
+    Object.values(candidateLevels || {}).some((value) => Number.isFinite(value) && value > 0)
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -689,50 +837,28 @@ const KeyLevelsPanel = () => {
         if (!silent) {
           setIsLoading(true);
         }
+        setHasError(false);
+        const backendSymbol = resolveBackendSymbol(selectedIndex);
         const [summaryResponse, depthResponse] = await Promise.allSettled([
-          fetchTechnicalSummary(activeType, activeSymbol),
-          fetchQuickOrderData(activeSymbol),
+          fetchTechnicalSummary("stock", backendSymbol, { strictLive: true }),
+          fetchQuickOrderData(backendSymbol),
         ]);
 
         const summary = summaryResponse.status === "fulfilled" ? summaryResponse.value : null;
         const depth = depthResponse.status === "fulfilled" ? depthResponse.value : null;
-        const bid = Number(depth?.bids?.[0]?.price || 0);
-        const ask = Number(depth?.asks?.[0]?.price || 0);
-        const summaryEma = Number(summary?.indicators?.ema20 || 0);
-        const current = bid && ask ? (bid + ask) / 2 : bid || ask || summaryEma;
-        if (!Number.isFinite(current) || current <= 0) {
-          if (isMounted) {
-            setLevels(null);
-          }
-          return;
-        }
-
-        const ema20 = Number.isFinite(summaryEma) && summaryEma > 0 ? summaryEma : current * 0.995;
-        const support = Math.min(bid || current * 0.992, ema20);
-        const resistance = Math.max(ask || current * 1.008, ema20 * 1.01);
+        const nextLevels = buildLevelsFromPayload(summary, depth);
+        const hasAnyLevel = hasAnyLiveLevel(nextLevels);
+        const allRejected = summaryResponse.status === "rejected" && depthResponse.status === "rejected";
 
         if (isMounted) {
-          setLevels({
-            current,
-            ema20,
-            support,
-            resistance,
-            weeklyHigh: Math.max(resistance, current * 1.025),
-            weeklyLow: Math.min(support, current * 0.975),
-          });
+          setLevels(hasAnyLevel ? nextLevels : null);
+          setHasError(allRejected);
         }
       } catch (error) {
         console.error("Failed to load key levels:", error);
         if (isMounted) {
-          const fallbackIndicators = FALLBACK_SUMMARY.indicators;
-          setLevels({
-            resistance: fallbackIndicators.resistance,
-            ema20: fallbackIndicators.ema20,
-            current: fallbackIndicators.current,
-            support: fallbackIndicators.support,
-            weeklyHigh: fallbackIndicators.resistance * 1.02,
-            weeklyLow: fallbackIndicators.support * 0.98,
-          });
+          setLevels(null);
+          setHasError(true);
         }
       } finally {
         if (isMounted && !silent) {
@@ -750,25 +876,72 @@ const KeyLevelsPanel = () => {
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [activeSymbol, activeType]);
+  }, [selectedIndex]);
 
-  const derivedLevels = levels || {
-    resistance: FALLBACK_SUMMARY.indicators.resistance,
-    ema20: FALLBACK_SUMMARY.indicators.ema20,
-    current: FALLBACK_SUMMARY.indicators.current,
-    support: FALLBACK_SUMMARY.indicators.support,
-    weeklyHigh: FALLBACK_SUMMARY.indicators.resistance * 1.02,
-    weeklyLow: FALLBACK_SUMMARY.indicators.support * 0.98,
-  };
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadIndexStatus = async (silent = false) => {
+      if (!silent) {
+        setIsStatusLoading(true);
+      }
+
+      try {
+        const settled = await Promise.allSettled(
+          SUMMARY_INDEX_UNIVERSE.map(async (symbol) => {
+            const backendSymbol = resolveBackendSymbol(symbol);
+            const summary = await fetchTechnicalSummary("stock", backendSymbol, { strictLive: true });
+            const previewLevels = buildLevelsFromPayload(summary, null);
+            return {
+              symbol,
+              hasLive: hasAnyLiveLevel(previewLevels),
+            };
+          })
+        );
+
+        if (isMounted) {
+          const nextStatus = {};
+          settled.forEach((entry, index) => {
+            const symbol = SUMMARY_INDEX_UNIVERSE[index];
+            if (entry.status === "fulfilled") {
+              nextStatus[symbol] = entry.value.hasLive ? "live" : "no-data";
+            } else {
+              nextStatus[symbol] = "offline";
+            }
+          });
+          setIndexStatus(nextStatus);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setIndexStatus(Object.fromEntries(SUMMARY_INDEX_UNIVERSE.map((symbol) => [symbol, "offline"])));
+        }
+      } finally {
+        if (isMounted && !silent) {
+          setIsStatusLoading(false);
+        }
+      }
+    };
+
+    loadIndexStatus(false);
+    const intervalId = setInterval(() => {
+      loadIndexStatus(true);
+    }, 60000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, []);
 
   const rows = [
-    { label: "Resistance", value: derivedLevels.resistance, color: "text-[#ed5750]", icon: "R", bg: "bg-[#ed5750]/10" },
-    { label: "VWAP", value: derivedLevels.ema20, color: "text-[#8b909a]", icon: "V", bg: "bg-white/5" },
-    { label: "Current", value: derivedLevels.current, color: "text-[#d1d4dc]", icon: "C", bg: "bg-blue-500/10" },
-    { label: "Support", value: derivedLevels.support, color: "text-[#42C0A5]", icon: "S", bg: "bg-[#42C0A5]/10" },
-    { label: "Weekly High", value: derivedLevels.weeklyHigh, color: "text-[#8b909a]", icon: "H", bg: "bg-white/5" },
-    { label: "Weekly Low", value: derivedLevels.weeklyLow, color: "text-[#8b909a]", icon: "L", bg: "bg-white/5" },
+    { label: "Resistance", value: levels?.resistance, color: "text-[#ed5750]", icon: "R", bg: "bg-[#ed5750]/10" },
+    { label: "VWAP", value: levels?.ema20, color: "text-[#8b909a]", icon: "V", bg: "bg-white/5" },
+    { label: "Current", value: levels?.current, color: "text-[#d1d4dc]", icon: "C", bg: "bg-blue-500/10" },
+    { label: "Support", value: levels?.support, color: "text-[#42C0A5]", icon: "S", bg: "bg-[#42C0A5]/10" },
+    { label: "Weekly High", value: levels?.weeklyHigh, color: "text-[#8b909a]", icon: "H", bg: "bg-white/5" },
+    { label: "Weekly Low", value: levels?.weeklyLow, color: "text-[#8b909a]", icon: "L", bg: "bg-white/5" },
   ];
+  const hasLiveLevels = rows.some((row) => Number.isFinite(row.value) && row.value > 0);
 
   return (
   <div className="trader-card flex flex-col h-full bg-gradient-to-br from-[#131722] to-[#1a1e2e] border border-white/10 relative">
@@ -782,16 +955,76 @@ const KeyLevelsPanel = () => {
           KEY LEVELS
         </h3>
       </div>
-      <span className="text-[10px] text-[#5d606b] bg-white/5 px-2 py-1 rounded">{activeSymbol}</span>
+      <div className="flex flex-col items-end gap-1">
+        <select
+          value={selectedIndex}
+          onChange={(event) => setSelectedIndex(event.target.value)}
+          className="text-[10px] font-semibold px-2 py-1 rounded-md outline-none"
+          style={{
+            background: "rgba(17, 24, 39, 0.9)",
+            color: "#d1d4dc",
+            border: "1px solid rgba(255,255,255,0.12)",
+            minWidth: "128px",
+          }}
+        >
+          {SUMMARY_INDEX_UNIVERSE.map((symbol) => (
+            <option key={symbol} value={symbol}>{symbol}</option>
+          ))}
+        </select>
+        <div className="flex items-center gap-1.5">
+          {SUMMARY_INDEX_UNIVERSE.map((symbol) => {
+            const status = isStatusLoading ? "loading" : (indexStatus[symbol] || "no-data");
+            const isSelected = symbol === selectedIndex;
+            const dotColor = status === "live"
+              ? "#42C0A5"
+              : status === "offline"
+                ? "#f0b429"
+                : status === "loading"
+                  ? "#5d606b"
+                  : "#8b909a";
+            const statusLabel = status === "live"
+              ? "LIVE"
+              : status === "offline"
+                ? "OFFLINE"
+                : status === "loading"
+                  ? "CHECKING"
+                  : "NO DATA";
+
+            return (
+              <button
+                key={symbol}
+                type="button"
+                onClick={() => setSelectedIndex(symbol)}
+                title={`${symbol}: ${statusLabel}`}
+                className="w-2.5 h-2.5 rounded-full border transition-transform"
+                style={{
+                  background: dotColor,
+                  borderColor: isSelected ? "rgba(209,212,220,0.95)" : "rgba(255,255,255,0.18)",
+                  transform: isSelected ? "scale(1.2)" : "scale(1)",
+                }}
+              />
+            );
+          })}
+          <span className={`text-[9px] px-2 py-0.5 rounded border font-bold ${hasError ? "text-[#f0b429] bg-[#f0b429]/10 border-[#f0b429]/20" : hasLiveLevels ? "text-[#42C0A5] bg-[#42C0A5]/10 border-[#42C0A5]/20" : "text-[#8b909a] bg-white/5 border-white/10"}`}>{hasError ? "BACKEND OFFLINE" : hasLiveLevels ? "LIVE" : "NO DATA"}</span>
+        </div>
+      </div>
     </div>
     <div className="flex-1 px-2.5 pb-2.5 space-y-2">
+      {!isLoading && hasError && (
+        <div className="text-[10px] text-[#f0b429] font-mono uppercase tracking-wider text-center py-2">Unable to load key levels from backend.</div>
+      )}
+      {!isLoading && !hasError && !hasLiveLevels && (
+        <div className="text-[10px] text-[#5d606b] font-mono uppercase tracking-wider text-center py-2">No backend key levels available.</div>
+      )}
       {rows.map((row, idx) => (
         <div key={idx} className={`flex justify-between items-center text-xs ${row.bg} rounded-lg p-2 hover:scale-[1.02] transition-transform`}>
           <div className="flex items-center gap-2">
             <span className="w-5 h-5 rounded-md inline-flex items-center justify-center text-[10px] font-bold text-[#cfd3df] bg-white/10 border border-white/10">{row.icon}</span>
             <span className="text-[#8b909a] uppercase text-[10px] tracking-wider font-semibold">{row.label}</span>
           </div>
-          <span className={`font-mono font-bold text-sm ${row.color}`}>{Number(row.value).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+          <span className={`font-mono font-bold text-sm ${Number.isFinite(row.value) && row.value > 0 ? row.color : "text-[#8b909a]"}`}>
+            {Number.isFinite(row.value) && row.value > 0 ? Number(row.value).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "--"}
+          </span>
         </div>
       ))}
     </div>
@@ -800,8 +1033,12 @@ const KeyLevelsPanel = () => {
 };
 
 const InstrumentSummaryPanel = () => {
-  const { activeSymbol, activeType } = useAsset();
-  const [summary, setSummary] = useState(FALLBACK_SUMMARY);
+  const { activeType } = useAsset();
+  const [summary, setSummary] = useState(null);
+  const [hasVerifiedSummary, setHasVerifiedSummary] = useState(false);
+  const [hasSummaryError, setHasSummaryError] = useState(false);
+  const [indexSnapshots, setIndexSnapshots] = useState([]);
+  const [summarySymbol, setSummarySymbol] = useState(SUMMARY_INDEX_UNIVERSE[0]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -812,14 +1049,57 @@ const InstrumentSummaryPanel = () => {
         if (!silent) {
           setIsLoading(true);
         }
-        const response = await fetchTechnicalSummary(activeType, activeSymbol);
+        setHasSummaryError(false);
+        const settled = await Promise.allSettled(
+          SUMMARY_INDEX_UNIVERSE.map(async (symbol) => {
+            const backendSymbol = resolveBackendSymbol(symbol);
+            const response = await fetchTechnicalSummary(activeType, backendSymbol, { strictLive: true });
+            const verified = Boolean(response?.indicators || response?.score);
+            return {
+              symbol,
+              summary: verified ? response : null,
+              verified,
+            };
+          })
+        );
+
         if (isMounted) {
-          setSummary(response?.indicators || response?.score ? response : FALLBACK_SUMMARY);
+          const snapshots = settled
+            .map((entry, index) => {
+              if (entry.status === "fulfilled") {
+                return entry.value;
+              }
+              return {
+                symbol: SUMMARY_INDEX_UNIVERSE[index],
+                summary: null,
+                verified: false,
+              };
+            });
+
+          setIndexSnapshots(snapshots);
+
+          const current = snapshots.find((item) => item.symbol === summarySymbol && item.verified);
+          const firstVerified = snapshots.find((item) => item.verified);
+          const selected = current || firstVerified || snapshots[0] || null;
+
+          setSummarySymbol(selected?.symbol || SUMMARY_INDEX_UNIVERSE[0]);
+          setSummary(selected?.summary || null);
+          setHasVerifiedSummary(Boolean(selected?.verified));
+          setHasSummaryError(snapshots.every((item) => !item.verified));
         }
       } catch (error) {
         console.error("Failed to load technical summary:", error);
         if (isMounted) {
-          setSummary(FALLBACK_SUMMARY);
+          setSummary(null);
+          setHasVerifiedSummary(false);
+          setIndexSnapshots(
+            SUMMARY_INDEX_UNIVERSE.map((symbol) => ({
+              symbol,
+              summary: null,
+              verified: false,
+            }))
+          );
+          setHasSummaryError(true);
         }
       } finally {
         if (isMounted && !silent) {
@@ -837,22 +1117,46 @@ const InstrumentSummaryPanel = () => {
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [activeSymbol, activeType]);
+  }, [activeType, summarySymbol]);
 
   const score = Number(summary?.score?.score || 0);
   const biasMeta = getBiasMeta(summary?.score?.bias || "neutral");
   const indicators = summary?.indicators || {};
+  const sessionChange = Number(indicators?.lastChangePercent);
+  const sessionChangeText = Number.isFinite(sessionChange) ? formatSignedPercent(sessionChange) : "--";
+  const sessionChangeColor = Number.isFinite(sessionChange)
+    ? (sessionChange > 0 ? "#42C0A5" : sessionChange < 0 ? "#ed5750" : "#8b909a")
+    : "#8b909a";
+  const lastUpdatedText = indicators?.lastUpdatedAt
+    ? new Date(indicators.lastUpdatedAt).toLocaleString()
+    : "No timestamp";
   const trendMatrix = summary?.trendMatrix || {};
   const patterns = summary?.patterns?.length ? summary.patterns : [];
   const bullishCount = Object.values(trendMatrix).filter((value) => value === "bullish").length;
   const macdDiff = indicators?.macd ? indicators.macd.value - indicators.macd.signal : 0;
+  const summaryOptions = indexSnapshots.length
+    ? indexSnapshots
+    : SUMMARY_INDEX_UNIVERSE.map((symbol) => ({
+      symbol,
+      summary: null,
+      verified: false,
+    }));
+  const selectedSnapshot = summaryOptions.find((item) => item.symbol === summarySymbol) || summaryOptions[0] || null;
+
+  const handleSummarySymbolChange = (nextSymbol) => {
+    setSummarySymbol(nextSymbol);
+    const nextSnapshot = summaryOptions.find((item) => item.symbol === nextSymbol) || null;
+    setSummary(nextSnapshot?.summary || null);
+    setHasVerifiedSummary(Boolean(nextSnapshot?.verified));
+  };
 
   const metrics = [
-    { label: "Trend", value: biasMeta.label, color: biasMeta.color, icon: "TR", progress: Math.max(0, bullishCount * 25), sub: `${bullishCount}/4 timeframes aligned` },
-    { label: "Momentum", value: `RSI ${Number(indicators?.rsi || 0).toFixed(1)}`, color: indicators?.rsi >= 60 ? "#42C0A5" : indicators?.rsi <= 40 ? "#ed5750" : "#f0b429", icon: "MO", progress: Math.min(100, Math.round(Number(indicators?.rsi || 50))), sub: macdDiff >= 0 ? "MACD crossover positive" : "MACD pressure negative" },
-    { label: "Volume", value: formatVolumeStatus(indicators?.volumeStatus), color: "#42C0A5", icon: "VO", progress: { high_volume: 95, above_average: 78, average: 55, below_average: 35, low_volume: 20 }[indicators?.volumeStatus] || 55, sub: "20-period participation" },
-    { label: "Pattern", value: patterns[0]?.pattern || "No backend pattern", color: "#f0b429", icon: "PT", progress: patterns[0]?.confidence || 0, sub: patterns[0]?.description || "No pattern payload from backend" },
-    { label: "Strength Score", value: `${score} / 100`, color: biasMeta.color, icon: "SC", progress: score, sub: `Composite bias: ${biasMeta.label}` },
+    { label: "Trend", value: hasVerifiedSummary ? biasMeta.label : "--", color: hasVerifiedSummary ? biasMeta.color : "#8b909a", icon: "TR", progress: hasVerifiedSummary ? Math.max(0, bullishCount * 25) : 0, sub: hasVerifiedSummary ? `${bullishCount}/4 timeframes aligned` : "No verified trend matrix" },
+    { label: "Momentum", value: hasVerifiedSummary && Number.isFinite(Number(indicators?.rsi)) ? `RSI ${Number(indicators.rsi).toFixed(1)}` : "--", color: hasVerifiedSummary ? (indicators?.rsi >= 60 ? "#42C0A5" : indicators?.rsi <= 40 ? "#ed5750" : "#f0b429") : "#8b909a", icon: "MO", progress: hasVerifiedSummary && Number.isFinite(Number(indicators?.rsi)) ? Math.min(100, Math.round(Number(indicators.rsi))) : 0, sub: hasVerifiedSummary ? (macdDiff >= 0 ? "MACD crossover positive" : "MACD pressure negative") : "No verified momentum" },
+    { label: "Volume", value: hasVerifiedSummary ? formatVolumeStatus(indicators?.volumeStatus) : "--", color: hasVerifiedSummary ? "#42C0A5" : "#8b909a", icon: "VO", progress: hasVerifiedSummary ? ({ high_volume: 95, above_average: 78, average: 55, below_average: 35, low_volume: 20 }[indicators?.volumeStatus] || 55) : 0, sub: hasVerifiedSummary ? "20-period participation" : "No verified volume status" },
+    { label: "Pattern", value: hasVerifiedSummary ? (patterns[0]?.pattern || "No verified pattern") : "--", color: hasVerifiedSummary ? "#f0b429" : "#8b909a", icon: "PT", progress: hasVerifiedSummary ? (patterns[0]?.confidence || 0) : 0, sub: hasVerifiedSummary ? (patterns[0]?.description || "No pattern payload from backend") : "No verified pattern payload" },
+    { label: "Session Change", value: hasVerifiedSummary ? sessionChangeText : "--", color: hasVerifiedSummary ? sessionChangeColor : "#8b909a", icon: "CH", progress: hasVerifiedSummary && Number.isFinite(sessionChange) ? Math.min(100, Math.abs(sessionChange) * 20) : 0, sub: hasVerifiedSummary ? "Last closed bar vs prior bar" : "No verified session change" },
+    { label: "Strength Score", value: hasVerifiedSummary ? `${score} / 100` : "--", color: hasVerifiedSummary ? biasMeta.color : "#8b909a", icon: "SC", progress: hasVerifiedSummary ? score : 0, sub: hasVerifiedSummary ? `Composite bias: ${biasMeta.label}` : "No verified composite score" },
   ];
 
   return (
@@ -864,39 +1168,76 @@ const InstrumentSummaryPanel = () => {
     }}
   >
     {isLoading && (
-      <div className="absolute inset-0 bg-[#0b0f17]/70 backdrop-blur-sm z-20 flex items-center justify-center text-[10px] font-mono text-[#9194a2] uppercase tracking-wider">Syncing summary...</div>
+      <div className="absolute inset-0 bg-[#0b0f17]/70 backdrop-blur-sm z-20 flex items-center justify-center text-[11px] font-mono text-[#9194a2] uppercase tracking-wider">Syncing summary...</div>
     )}
     {}
     <div className="card-header flex justify-between items-center px-2.5 py-1.5 border-b border-white/10" style={{ background: 'rgba(255,255,255,0.03)' }}>
       <div className="flex items-center gap-2">
         <div className="w-1.5 h-1.5 bg-[#42C0A5] rounded-full animate-pulse"></div>
         <div>
-          <h3 className="text-[#9194a2] font-bold text-xs tracking-wider">INSTRUMENT SUMMARY</h3>
-          <p className="text-[9px] text-[#5d606b] mt-0.5">Technical health of {activeSymbol}</p>
+          <h3 className="text-[#9194a2] font-bold text-sm tracking-wider">INSTRUMENT SUMMARY</h3>
+          <p className="text-[11px] text-[#5d606b] mt-0.5">Technical health across key indices</p>
         </div>
       </div>
-      <div className="flex flex-col items-center">
-        <span className="text-[18px] font-black" style={{ color: biasMeta.color }}>{score}</span>
-        <span className="text-[8px] text-[#5d606b] uppercase tracking-wider">Score</span>
+      <div className="flex flex-col items-end">
+        <span className="text-[22px] font-black" style={{ color: hasVerifiedSummary ? biasMeta.color : "#8b909a" }}>{hasVerifiedSummary ? score : "--"}</span>
+        <span className="text-[10px] text-[#5d606b] uppercase tracking-wider">Score</span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${hasVerifiedSummary ? "text-[#42C0A5] bg-[#42C0A5]/15" : "text-[#f0b429] bg-[#f0b429]/15"}`}>{hasVerifiedSummary ? "VERIFIED" : "NO VERIFIED FEED"}</span>
       </div>
     </div>
 
     {}
     <div className="flex-1 px-2.5 pb-2 pt-1.5 space-y-1.5 overflow-y-auto custom-scrollbar">
-      {metrics.map((row, idx) => (
-        <div key={idx} className="rounded-lg p-2.5 transition-all" style={{ background: 'rgba(255,255,255,0.06)', borderTop: '1px solid rgba(255,255,255,0.07)', borderRight: '1px solid rgba(255,255,255,0.07)', borderBottom: '1px solid rgba(255,255,255,0.07)', borderLeft: '1px solid rgba(255,255,255,0.07)' }}
-          onMouseEnter={e => e.currentTarget.style.background = '#1f2540'}
-          onMouseLeave={e => e.currentTarget.style.background = '#1a1f2e'}
+      <div className="rounded-lg p-2.5 border" style={{ background: "#131722", borderColor: "rgba(255,255,255,0.08)" }}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] text-[#7f8591] uppercase tracking-wider font-semibold">Select Index</span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${selectedSnapshot?.verified ? "text-[#42C0A5] bg-[#42C0A5]/15" : "text-[#f0b429] bg-[#f0b429]/15"}`}>
+            {selectedSnapshot?.verified ? "VERIFIED" : "NO FEED"}
+          </span>
+        </div>
+        <select
+          value={summarySymbol}
+          onChange={(event) => handleSummarySymbolChange(event.target.value)}
+          className="w-full mt-1.5 rounded-lg px-2.5 py-2 text-[12px] font-semibold outline-none"
+          style={{
+            background: "rgba(17, 24, 39, 0.9)",
+            color: "#d1d4dc",
+            border: "1px solid rgba(255,255,255,0.12)",
+          }}
         >
+          {summaryOptions.map((item) => (
+            <option key={item.symbol} value={item.symbol}>
+              {item.symbol}{item.verified ? " - VERIFIED" : " - NO FEED"}
+            </option>
+          ))}
+        </select>
+        <div className="flex justify-between items-center mt-2">
+          <span className="text-[11px]" style={{ color: selectedSnapshot?.verified ? getBiasMeta(selectedSnapshot?.summary?.score?.bias || "neutral").color : "#8b909a" }}>
+            {selectedSnapshot?.verified ? getBiasMeta(selectedSnapshot?.summary?.score?.bias || "neutral").label : "--"}
+          </span>
+          <span className="text-[13px] font-mono font-bold" style={{ color: selectedSnapshot?.verified ? getBiasMeta(selectedSnapshot?.summary?.score?.bias || "neutral").color : "#8b909a" }}>
+            {selectedSnapshot?.verified ? Number(selectedSnapshot?.summary?.score?.score || 0) : "--"}
+          </span>
+        </div>
+      </div>
+
+      {!isLoading && hasSummaryError && (
+        <div className="text-[12px] text-[#f0b429] font-mono uppercase tracking-wider text-center py-2">Unable to load verified summary from backend.</div>
+      )}
+      {!isLoading && !hasSummaryError && !hasVerifiedSummary && (
+        <div className="text-[12px] text-[#5d606b] font-mono uppercase tracking-wider text-center py-2">No verified technical summary available.</div>
+      )}
+      {metrics.map((row, idx) => (
+        <div key={idx} className="rounded-lg p-2.5 transition-all" style={{ background: '#131722', borderTop: '1px solid rgba(255,255,255,0.07)', borderRight: '1px solid rgba(255,255,255,0.07)', borderBottom: '1px solid rgba(255,255,255,0.07)', borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="flex justify-between items-center mb-1.5">
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-md inline-flex items-center justify-center text-[10px] font-bold text-[#d1d4dc] bg-white/10 border border-white/10">{row.icon}</span>
+              <span className="w-7 h-7 rounded-md inline-flex items-center justify-center text-[11px] font-bold text-[#d1d4dc] bg-white/10 border border-white/10">{row.icon}</span>
               <div>
-                <span className="text-[#9ca3af] uppercase text-[9px] tracking-wider font-semibold">{row.label}</span>
-                <div className="text-[9px] text-[#4b5563] mt-0.5">{row.sub}</div>
+                <span className="text-[#9ca3af] uppercase text-[11px] tracking-wider font-semibold">{row.label}</span>
+                <div className="text-[10px] text-[#4b5563] mt-0.5">{row.sub}</div>
               </div>
             </div>
-            <span className="font-bold text-[11px] font-mono" style={{ color: row.color }}>{row.value}</span>
+            <span className="font-bold text-[14px] font-mono" style={{ color: row.color }}>{row.value}</span>
           </div>
           <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
             <div
@@ -918,8 +1259,8 @@ const InstrumentSummaryPanel = () => {
 
     {}
     <div className="px-2.5 py-1.5 border-t border-white/10 flex justify-between items-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
-      <span className="text-[9px] text-[#5d606b]">Source: technical summary API</span>
-      <span className="text-[9px] font-bold" style={{ color: biasMeta.color }}>Overall: {biasMeta.label} {biasMeta.symbol}</span>
+      <span className="text-[10px] text-[#5d606b]">Source: technical summary API (verified feed) | Updated: {hasVerifiedSummary ? lastUpdatedText : "--"}</span>
+      <span className="text-[11px] font-bold" style={{ color: hasVerifiedSummary ? biasMeta.color : "#8b909a" }}>Overall: {hasVerifiedSummary ? `${biasMeta.label} ${biasMeta.symbol}` : "--"}</span>
     </div>
   </div>
   );
@@ -930,6 +1271,7 @@ const SignalEnginePanel = () => {
   const { activeSymbol, activeType } = useAsset();
   const [insights, setInsights] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFallback, setIsFallback] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -973,7 +1315,7 @@ const SignalEnginePanel = () => {
 
         const summaryResponses = await Promise.allSettled(
           symbolsToScan.map(async (symbol) => {
-            const backendSymbol = BACKEND_SYMBOL_MAP[symbol] || symbol;
+            const backendSymbol = resolveBackendSymbol(symbol);
             const summary = await fetchTechnicalSummary("stock", backendSymbol);
 
             return {
@@ -1078,45 +1420,17 @@ const SignalEnginePanel = () => {
 
           if (prioritized.length > 0) {
             setInsights(prioritized.slice(0, 12));
+            setIsFallback(false);
           } else {
-            setInsights([
-              {
-                key: "fallback-overview",
-                title: normalizeDisplaySymbol(activeSymbol),
-                badge: "Fallback Snapshot",
-                badgeColor: "#8b909a",
-                kind: "summary",
-                rankScore: 10,
-                timeframe: "Reference",
-                details: [
-                  { name: "Bias", value: "Neutral", note: "Reference", color: "#8b909a" },
-                  { name: "RSI", value: "50.0", note: "Balanced", color: "#f0b429" },
-                  { name: "Volume", value: "Average", note: "Normal", color: "#42C0A5" },
-                ],
-                note: "Fallback insight is shown when backend insight streams are temporarily unavailable.",
-              },
-            ]);
+            setInsights(FALLBACK_RESEARCH_INSIGHTS);
+            setIsFallback(true);
           }
         }
       } catch (error) {
         console.error("Failed to load research insights:", error);
         if (isMounted) {
-          setInsights([
-            {
-              key: "fallback-unavailable",
-              title: "Research Feed",
-              badge: "Fallback",
-              badgeColor: "#8b909a",
-              kind: "summary",
-              rankScore: 0,
-              timeframe: "Reference",
-              details: [
-                { name: "Status", value: "Unavailable", note: "Backend", color: "#ed5750" },
-                { name: "Action", value: "Retry", note: "Auto refresh", color: "#42C0A5" },
-              ],
-              note: "Backend scan is currently unavailable. Fallback content keeps the panel informative.",
-            },
-          ]);
+          setInsights(FALLBACK_RESEARCH_INSIGHTS);
+          setIsFallback(true);
         }
       } finally {
         if (isMounted && !silent) {
@@ -1154,11 +1468,20 @@ const SignalEnginePanel = () => {
       </div>
       <div className="flex items-center gap-2">
         <span className="text-[10px] text-[#8b909a] italic">For informational use only</span>
-        <span className="text-[10px] text-[#42C0A5] bg-[#42C0A5]/15 px-2 py-0.5 rounded-full border border-[#42C0A5]/30 font-bold">● LIVE</span>
+        {isFallback ? (
+          <span className="text-[10px] text-[#f0b429] bg-[#f0b429]/15 px-2 py-0.5 rounded-full border border-[#f0b429]/30 font-bold">FALLBACK DATA</span>
+        ) : (
+          <span className="text-[10px] text-[#42C0A5] bg-[#42C0A5]/15 px-2 py-0.5 rounded-full border border-[#42C0A5]/30 font-bold">● LIVE</span>
+        )}
       </div>
     </div>
 
     <div className="flex-1 px-2.5 pb-2 pt-1.5 space-y-2 overflow-y-auto custom-scrollbar">
+      {!isLoading && isFallback && (
+        <div className="text-[10px] text-[#f0b429] font-mono uppercase tracking-wider">
+          Fallback research insights active.
+        </div>
+      )}
       {insights.map((item) => (
         <div
           key={item.key}
@@ -1218,7 +1541,9 @@ const SignalEnginePanel = () => {
 
 const CatalystPanel = () => {
   const [events, setEvents] = useState([]);
+  const [eventsSource, setEventsSource] = useState("none");
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -1228,14 +1553,27 @@ const CatalystPanel = () => {
         if (!silent) {
           setIsLoading(true);
         }
+        setHasError(false);
         const response = await fetchEconomicCalendar();
         if (isMounted) {
-          setEvents(Array.isArray(response) ? response.slice(0, 6) : []);
+          const sourceEvents = Array.isArray(response) ? response : [];
+          const validEvents = sourceEvents.filter((item) => item?.event && item?.date);
+          const verifiedEvents = validEvents.filter((item) => item?.factual === true || String(item?.source || "").toLowerCase().includes("tradingeconomics"));
+
+          if (verifiedEvents.length > 0) {
+            setEvents(verifiedEvents.slice(0, 6));
+            setEventsSource("verified");
+          } else {
+            setEvents([]);
+            setEventsSource("none");
+          }
         }
       } catch (error) {
         console.error("Failed to load catalyst events:", error);
         if (isMounted) {
           setEvents([]);
+          setEventsSource("none");
+          setHasError(true);
         }
       } finally {
         if (isMounted && !silent) {
@@ -1261,51 +1599,75 @@ const CatalystPanel = () => {
       <div className="absolute inset-0 bg-[#0b0f17]/70 backdrop-blur-sm z-20 flex items-center justify-center text-[10px] font-mono text-[#9194a2] uppercase tracking-wider">Loading catalysts...</div>
     )}
     {}
-    <div className="card-header flex justify-between items-center px-2.5 py-1.5 border-b border-white/10" style={{ background: 'rgba(255,255,255,0.04)' }}>
-      <div className="flex items-center gap-2">
-        <div className="w-1.5 h-1.5 bg-[#42C0A5] rounded-full animate-pulse"></div>
-        <div>
-          <h3 className="text-[#9194a2] font-bold text-xs tracking-wider">MARKET CATALYSTS</h3>
-          <p className="text-[9px] text-[#5d606b] mt-0.5">Events that may drive price action today</p>
+      <div className="card-header flex justify-between items-center px-2.5 py-1.5 border-b border-white/10" style={{ background: 'rgba(255,255,255,0.04)' }}>
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 bg-[#42C0A5] rounded-full animate-pulse"></div>
+          <div>
+            <h3 className="text-[#9194a2] font-bold text-base tracking-wider">MARKET CATALYSTS</h3>
+            <p className="text-[11px] text-[#5d606b] mt-0.5">Verified macro events from provider feed</p>
+          </div>
         </div>
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-[#f0b429] bg-[#f0b429]/10 px-2 py-0.5 rounded border border-[#f0b429]/20 font-bold">{events.length ? formatCalendarDate(events[0]?.date) : "NO VERIFIED FEED"}</span>
       </div>
-      <span className="text-[9px] text-[#f0b429] bg-[#f0b429]/10 px-2 py-0.5 rounded border border-[#f0b429]/20 font-bold">{formatCalendarDate(events[0]?.date)}</span>
     </div>
 
     {}
     <div className="flex-1 px-2.5 pb-1.5 pt-1.5 space-y-1.5 overflow-y-auto custom-scrollbar">
+      {!isLoading && hasError && (
+        <div className="text-[12px] text-[#f0b429] font-mono uppercase tracking-wider">Unable to load verified catalyst events from backend.</div>
+      )}
+      {!isLoading && !hasError && events.length === 0 && (
+        <div className="text-[12px] text-[#5d606b] font-mono uppercase tracking-wider">No verified catalyst events available.</div>
+      )}
       {events.map((item, idx) => {
         const impactColor = getImpactColor(item.impact);
+        const metadata = [
+          item?.country ? String(item.country).toUpperCase() : null,
+          item?.actual && item.actual !== "-" ? `Actual ${item.actual}` : null,
+          item?.forecast && item.forecast !== "-" ? `Forecast ${item.forecast}` : null,
+          item?.previous && item.previous !== "-" ? `Prev ${item.previous}` : null,
+        ].filter(Boolean).join(" · ");
         return (
         <div
           key={idx}
           className="rounded-lg p-2.5 transition-all cursor-pointer"
           style={{
-            background: 'rgba(255,255,255,0.05)',
+            background: '#131722',
             borderTop: `1px solid ${impactColor}30`,
             borderRight: `1px solid ${impactColor}30`,
             borderBottom: `1px solid ${impactColor}30`,
             borderLeft: `3px solid ${impactColor}`,
           }}
-          onMouseEnter={e => e.currentTarget.style.background = '#1a1f2e'}
-          onMouseLeave={e => e.currentTarget.style.background = '#131722'}
         >
           <div className="flex items-start gap-2">
-            <span className="text-base mt-0.5 flex-shrink-0">{String(item.impact).toLowerCase().includes("high") ? "âš ï¸" : String(item.impact).toLowerCase().includes("med") ? "ðŸ•’" : "ðŸ“Œ"}</span>
+            <span className="text-base mt-0.5 flex-shrink-0">{String(item.impact).toLowerCase().includes("high") ? "⚠️" : String(item.impact).toLowerCase().includes("med") ? "🕒" : "📌"}</span>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start gap-1">
-                <span className="text-[11px] text-white font-semibold leading-tight">{item.event}</span>
+                <span className="text-[15px] text-white font-semibold leading-tight">{item.event}</span>
                 <span
-                  className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
                   style={{ color: impactColor, background: `${impactColor}18` }}
                 >
                   {item.impact}
                 </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 text-[#42C0A5] bg-[#42C0A5]/15">
+                  VERIFIED
+                </span>
               </div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[9px] font-mono text-[#5d606b]">{formatCalendarDate(item.date)}</span>
-                <span className="text-[#2a2e39]">Â·</span>
-                <span className="text-[9px] text-[#5d606b]">Forecast {item.forecast || "-"} Â· Prev {item.previous || "-"}</span>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-[11px] font-mono text-[#7b8190]">{formatCalendarDate(item.date)}</span>
+                {metadata ? (
+                  <>
+                    <span className="text-[#2a2e39]">·</span>
+                    <span className="text-[11px] text-[#7b8190]">{metadata}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[#2a2e39]">·</span>
+                    <span className="text-[11px] text-[#7b8190]">Verified event schedule</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1315,8 +1677,8 @@ const CatalystPanel = () => {
 
     {}
     <div className="px-2.5 py-1.5 border-t border-white/10 flex justify-between items-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
-      <span className="text-[9px] text-[#5d606b]">{events.length} events loaded</span>
-      <div className="flex items-center gap-2 text-[9px]">
+      <span className="text-[11px] text-[#5d606b]">{events.length} {eventsSource === "verified" ? "verified" : "loaded"} events</span>
+      <div className="flex items-center gap-2 text-[11px]">
         <span className="text-[#ed5750] font-bold">{events.filter((event) => String(event.impact).toLowerCase().includes("high")).length} HIGH</span>
         <span className="text-[#f0b429] font-bold">{events.filter((event) => String(event.impact).toLowerCase().includes("med")).length} MED</span>
         <span className="text-[#5d606b]">{events.filter((event) => !String(event.impact).toLowerCase().includes("high") && !String(event.impact).toLowerCase().includes("med")).length} LOW</span>
@@ -1332,15 +1694,8 @@ const TechnicalScreeners = () => {
   const [breakoutAlerts, setBreakoutAlerts] = useState([]);
   const [indicatorSignals, setIndicatorSignals] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const fallbackBreakouts = [
-    { time: "09:31", symbol: "RELIANCE", type: "Resistance Break", price: 2845 },
-    { time: "09:42", symbol: "INFY", type: "VWAP Reclaim", price: 1512 },
-    { time: "09:50", symbol: "HDFCBANK", type: "Support Break", price: 1712 },
-  ];
-  const fallbackSignals = [
-    { symbol: "RSI > 60", value: "Momentum", stocks: ["RELIANCE", "INFY"] },
-    { symbol: "MACD Cross", value: "Bullish", stocks: ["HDFCBANK", "ICICIBANK"] },
-  ];
+  const [hasBreakoutError, setHasBreakoutError] = useState(false);
+  const [hasSignalsError, setHasSignalsError] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -1350,28 +1705,88 @@ const TechnicalScreeners = () => {
         if (!silent) {
           setIsLoading(true);
         }
+        setHasBreakoutError(false);
+        setHasSignalsError(false);
         const [alertsResponse, signalsResponse] = await Promise.allSettled([
           fetchBreakoutAlerts(),
           fetchIndicatorSignals(),
         ]);
 
+        const normalizeBreakouts = (payload) => {
+          const source = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : Array.isArray(payload?.alerts)
+                ? payload.alerts
+                : [];
+
+          return source
+            .map((item) => {
+              const symbol = normalizeDisplaySymbol(item?.symbol || item?.ticker || item?.name);
+              if (!symbol) return null;
+
+              const rawPrice = Number(item?.price ?? item?.ltp ?? item?.value);
+
+              return {
+                symbol,
+                type: String(item?.type || item?.signal || item?.pattern || "Signal"),
+                price: Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : null,
+                time: item?.time || item?.timestamp || item?.date || null,
+              };
+            })
+            .filter(Boolean);
+        };
+
+        const normalizeSignals = (payload) => {
+          const source = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : Array.isArray(payload?.signals)
+                ? payload.signals
+                : [];
+
+          return source
+            .map((item) => {
+              const label = String(item?.symbol || item?.name || item?.signal || "").trim();
+              if (!label) return null;
+
+              const stocks = Array.isArray(item?.stocks)
+                ? item.stocks.map((stock) => normalizeDisplaySymbol(stock)).filter(Boolean)
+                : item?.stock
+                  ? [normalizeDisplaySymbol(item.stock)].filter(Boolean)
+                  : [];
+
+              return {
+                symbol: label,
+                value: String(item?.value || item?.type || item?.description || "Signal"),
+                stocks,
+              };
+            })
+            .filter(Boolean);
+        };
+
         if (isMounted) {
-          setBreakoutAlerts(
-            alertsResponse.status === "fulfilled" && alertsResponse.value?.length
-              ? alertsResponse.value
-              : fallbackBreakouts
-          );
-          setIndicatorSignals(
-            signalsResponse.status === "fulfilled" && signalsResponse.value?.length
-              ? signalsResponse.value
-              : fallbackSignals
-          );
+          const nextBreakouts = alertsResponse.status === "fulfilled"
+            ? normalizeBreakouts(alertsResponse.value)
+            : [];
+          const nextSignals = signalsResponse.status === "fulfilled"
+            ? normalizeSignals(signalsResponse.value)
+            : [];
+
+          setBreakoutAlerts(nextBreakouts);
+          setIndicatorSignals(nextSignals);
+          setHasBreakoutError(alertsResponse.status === "rejected");
+          setHasSignalsError(signalsResponse.status === "rejected");
         }
       } catch (error) {
         console.error("Failed to load technical screeners:", error);
         if (isMounted) {
-          setBreakoutAlerts(fallbackBreakouts);
-          setIndicatorSignals(fallbackSignals);
+          setBreakoutAlerts([]);
+          setIndicatorSignals([]);
+          setHasBreakoutError(true);
+          setHasSignalsError(true);
         }
       } finally {
         if (isMounted && !silent) {
@@ -1420,6 +1835,9 @@ const TechnicalScreeners = () => {
             {isLoading && (
               <div className="text-[#9194a2] text-sm text-center py-4">Loading live breakout alerts...</div>
             )}
+            {!isLoading && breakoutAlerts.length === 0 && (
+              <div className="text-[#9194a2] text-sm text-center py-4">{hasBreakoutError ? "Unable to load breakout alerts." : "No breakout alerts from backend."}</div>
+            )}
             {breakoutAlerts.map((item, k) => (
               <div
                 key={k}
@@ -1427,7 +1845,7 @@ const TechnicalScreeners = () => {
               >
                 <div className="flex items-center gap-2">
                   <span className="text-[#5d606b] font-mono text-xs">
-                    {item.time}
+                    {item.time || "--"}
                   </span>
                   <span className="font-bold text-[#e2e8f0] text-sm w-24">
                     {item.symbol}
@@ -1437,7 +1855,7 @@ const TechnicalScreeners = () => {
                   </span>
                 </div>
                 <span className={`font-mono font-bold text-sm ${(item.type || "").toLowerCase().includes("support") ? "text-[#ed5750]" : "text-[#42C0A5]"}`}>
-                  {Number(item.price || 0).toLocaleString()}
+                  {Number.isFinite(item.price) ? Number(item.price).toLocaleString() : "--"}
                 </span>
               </div>
             ))}
@@ -1450,9 +1868,10 @@ const TechnicalScreeners = () => {
               </div>
             ) : (
               indicatorSignals.length === 0 ? (
-                <div className="text-[#9194a2] text-sm text-center py-4">No indicator signals.</div>
+                <div className="text-[#9194a2] text-sm text-center py-4">{hasSignalsError ? "Unable to load indicator signals." : "No indicator signals from backend."}</div>
               ) : (
-              indicatorSignals.map((item, index) => (
+              <>
+              {indicatorSignals.map((item, index) => (
                 <div
                   key={`${item.symbol}-${index}`}
                   className="flex justify-between items-center p-2.5 rounded hover:bg-white/10/50 text-xs border-b border-white/10/30"
@@ -1466,10 +1885,11 @@ const TechnicalScreeners = () => {
                     </span>
                   </div>
                   <span className="text-[#42C0A5] font-mono font-bold text-xs text-right">
-                    {(item.stocks || []).join(", ")}
+                    {(item.stocks || []).length ? (item.stocks || []).join(", ") : "--"}
                   </span>
                 </div>
-              ))
+              ))}
+              </>
               )
             )}
           </div>
@@ -2062,11 +2482,11 @@ const QuickTradePanel = () => {
         <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
           <div className="flex justify-between text-[10px] text-[#5d606b] mb-1">
             <span>Margin Required</span>
-            <span className="text-[#d1d4dc] font-mono">â‚¹{marginRequired.toLocaleString()}</span>
+            <span className="text-[#d1d4dc] font-mono">₹{marginRequired.toLocaleString()}</span>
           </div>
           <div className="flex justify-between text-[10px] text-[#5d606b]">
             <span>Available Margin</span>
-            <span className="text-[#42C0A5] font-mono">â‚¹{availableMargin.toLocaleString()}</span>
+            <span className="text-[#42C0A5] font-mono">₹{availableMargin.toLocaleString()}</span>
           </div>
           <div className="flex justify-between text-[10px] text-[#5d606b] mt-1">
             <span>Current Holding</span>
@@ -2086,7 +2506,7 @@ const QuickTradePanel = () => {
             ? "bg-[#42C0A5]/20 text-[#42C0A5] border border-[#42C0A5]/30"
             : "bg-[#ed5750]/20 text-[#ed5750] border border-[#ed5750]/30"
             }`}>
-            âœ“ {lastAction.side} {lastAction.qty} @ {lastAction.price} â€” {lastAction.time}
+            ✓ {lastAction.side} {lastAction.qty} @ {lastAction.price} — {lastAction.time}
           </div>
         )}
       </div>
@@ -2113,7 +2533,7 @@ function TraderView({ activeModule }) {
       }
 
       try {
-        const backendSymbol = BACKEND_SYMBOL_MAP[expandedChart] || expandedChart;
+        const backendSymbol = resolveBackendSymbol(expandedChart);
         const backendInterval = BACKEND_INTERVAL_MAP[timeframe] || "1D";
         const response = await fetchMarketHistory(backendSymbol, "STOCK", backendInterval);
         const points = Array.isArray(response?.data) ? response.data : [];
@@ -2146,21 +2566,9 @@ function TraderView({ activeModule }) {
     return (
       <div className="dashboard-layout flex flex-col w-full">
         <div className="flex-1 overflow-y-auto main-content-area">
-          <div className="max-w-[1920px] mx-auto px-1.5 pt-1.5 pb-3 grid grid-cols-1 xl:grid-cols-12 gap-1.5">
-            <section className="bento-card xl:col-span-5" style={{ animationDelay: '0.1s' }}>
+          <div className="max-w-[1920px] mx-auto px-1.5 pt-1.5 pb-3 grid grid-cols-1 xl:grid-cols-12 gap-1.5 h-[calc(100vh-80px)]">
+            <section className="bento-card xl:col-span-12 p-1.5 h-full" style={{ animationDelay: '0.1s' }}>
               <SharedAdvancedWatchlist />
-            </section>
-            <section className="bento-card xl:col-span-7 p-1.5" style={{ animationDelay: '0.15s' }}>
-              <QuickTradePanel />
-            </section>
-            <section className="bento-card xl:col-span-6 p-1.5" style={{ animationDelay: '0.2s' }}>
-              <InstrumentSummaryPanel />
-            </section>
-            <section className="bento-card xl:col-span-6 p-1.5" style={{ animationDelay: '0.25s' }}>
-              <TrendStrengthPanel />
-            </section>
-            <section className="bento-card xl:col-span-12 p-1.5" style={{ animationDelay: '0.3s' }}>
-              <NewsFlash />
             </section>
           </div>
         </div>
@@ -2172,21 +2580,9 @@ function TraderView({ activeModule }) {
     return (
       <div className="dashboard-layout flex flex-col w-full">
         <div className="flex-1 overflow-y-auto main-content-area">
-          <div className="max-w-[1920px] mx-auto px-1.5 pt-1.5 pb-3 grid grid-cols-1 xl:grid-cols-12 gap-1.5">
-            <section className="bento-card xl:col-span-8 p-1.5" style={{ animationDelay: '0.1s' }}>
-              <TechnicalScreeners />
-            </section>
-            <section className="bento-card xl:col-span-4 p-1.5" style={{ animationDelay: '0.15s' }}>
-              <SignalEnginePanel />
-            </section>
-            <section className="bento-card xl:col-span-6 p-1.5" style={{ animationDelay: '0.2s' }}>
-              <SectorHeatmap />
-            </section>
-            <section className="bento-card xl:col-span-6 p-1.5" style={{ animationDelay: '0.25s' }}>
-              <GapLists />
-            </section>
-            <section className="bento-card xl:col-span-12 p-1.5" style={{ animationDelay: '0.3s' }}>
-              <FODashboard />
+          <div className="max-w-[1920px] mx-auto px-1.5 pt-1.5 pb-3 grid grid-cols-1 xl:grid-cols-12 gap-1.5 h-[calc(100vh-80px)]">
+            <section className="bento-card xl:col-span-12 p-1.5 h-full" style={{ animationDelay: '0.1s' }}>
+              <AdvancedScreener />
             </section>
           </div>
         </div>
@@ -2198,21 +2594,9 @@ function TraderView({ activeModule }) {
     return (
       <div className="dashboard-layout flex flex-col w-full">
         <div className="flex-1 overflow-y-auto main-content-area">
-          <div className="max-w-[1920px] mx-auto px-1.5 pt-1.5 pb-3 grid grid-cols-1 xl:grid-cols-12 gap-1.5">
-            <section className="bento-card xl:col-span-8 p-1.5" style={{ animationDelay: '0.1s' }}>
+          <div className="max-w-[1920px] mx-auto px-1.5 pt-1.5 pb-3 grid grid-cols-1 xl:grid-cols-12 gap-1.5 h-[calc(100vh-80px)]">
+            <section className="bento-card xl:col-span-12 p-1.5 h-full" style={{ animationDelay: '0.1s' }}>
               <NewsFlash />
-            </section>
-            <section className="bento-card xl:col-span-4 p-1.5" style={{ animationDelay: '0.15s' }}>
-              <CatalystPanel />
-            </section>
-            <section className="bento-card xl:col-span-4 p-1.5" style={{ animationDelay: '0.2s' }}>
-              <VolumeShockers />
-            </section>
-            <section className="bento-card xl:col-span-4 p-1.5" style={{ animationDelay: '0.25s' }}>
-              <MarketSentiment />
-            </section>
-            <section className="bento-card xl:col-span-4 p-1.5" style={{ animationDelay: '0.3s' }}>
-              <MarketBreadth />
             </section>
           </div>
         </div>
@@ -2347,13 +2731,13 @@ function TraderView({ activeModule }) {
           <div className="chart-modal-panel">
             <div className="chart-modal-header">
               <div className="chart-modal-title">
-                {expandedChart} â€” Full Screen
+                {expandedChart} — Full Screen
               </div>
               <button
                 className="chart-modal-close"
                 onClick={() => setExpandedChart(null)}
               >
-                âœ• Close
+                ✕ Close
               </button>
             </div>
             <div className="chart-modal-body">

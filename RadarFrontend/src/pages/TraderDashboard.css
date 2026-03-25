@@ -251,7 +251,8 @@
   grid-column: 1;
   grid-row: 2;
   min-height: 300px;
-  max-height: none;
+  height: clamp(320px, 44vh, 520px);
+  max-height: clamp(320px, 44vh, 520px);
 }
 
 
@@ -278,7 +279,8 @@
   grid-column: 2;
   grid-row: 2;
   min-height: 300px;
-  max-height: none;
+  height: clamp(320px, 44vh, 520px);
+  max-height: clamp(320px, 44vh, 520px);
 }
 
 .dashboard-container.trader-theme .bento-wide,
@@ -558,6 +560,8 @@
   .bento-side,
   .bento-full {
     min-height: 320px;
+    height: auto;
+    max-height: none;
   }
 }
 
@@ -591,5 +595,7 @@
   .bento-side,
   .bento-full {
     min-height: 280px;
+    height: auto;
+    max-height: none;
   }
 }

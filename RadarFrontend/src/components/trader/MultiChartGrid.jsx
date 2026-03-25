@@ -37,7 +37,7 @@ const normalizeChartSymbol = (value) => {
   return upper.replace(/\.(NS|BO)$/i, "");
 };
 
-export const calculateMA = (data, period) => {
+const calculateMA = (data, period) => {
   if (!data || data.length === 0) return [];
   return data.map((point, index) => {
     if (index < period - 1) return null;
@@ -75,6 +75,7 @@ const MultiChartGrid = ({ className, onOpenChart, timeframe = "15m", showIndicat
   };
 
   const chartsToShow = getChartsToShow();
+  const chartsToShowKey = chartsToShow.join(",");
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -108,7 +109,7 @@ const MultiChartGrid = ({ className, onOpenChart, timeframe = "15m", showIndicat
       setIsLoading(false);
     };
     fetchAll();
-  }, [chartsToShow.join(','), timeframe]);
+  }, [chartsToShowKey, timeframe]);
   const getGridClass = () => {
     switch (layout) {
       case "1-grid": return "grid-cols-1 grid-rows-1";

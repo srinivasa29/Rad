@@ -1,5 +1,24 @@
 import api from './api';
 
+const stripStockSuffix = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
+
+const sanitizeMarketRow = (row) => {
+    if (!row || typeof row !== 'object') {
+        return row;
+    }
+
+    const isStock = String(row.type || '').toUpperCase() === 'STOCK';
+    if (!isStock) {
+        return row;
+    }
+
+    return {
+        ...row,
+        symbol: stripStockSuffix(row.symbol),
+        id: stripStockSuffix(row.id),
+    };
+};
+
 export const fetchSectorPerformance = async (period = '1y') => {
     try {
         const response = await api.get(`/sectors/performance?period=${period}`);
@@ -14,17 +33,23 @@ export const fetchMarketData = async (params = {}) => {
     try {
         const response = await api.get('/market', { params });
         const payload = response.data?.data ?? response.data;
-        return Array.isArray(payload) ? payload : [];
+        return Array.isArray(payload) ? payload.map(sanitizeMarketRow) : [];
     } catch (error) {
         console.error("Error fetching market data:", error);
         throw error;
     }
 };
 
-export const fetchMarketHistory = async (symbol, type = 'STOCK', interval = '1D') => {
+export const fetchMarketHistory = async (symbol, type = 'STOCK', interval = '1D', options = {}) => {
     try {
+        const { strictLive = false } = options;
+        const params = { symbol, type, interval };
+        if (strictLive) {
+            params.strictLive = true;
+        }
+
         const response = await api.get('/market/history', {
-            params: { symbol, type, interval }
+            params
         });
 
         const payload = response.data?.data ?? response.data;
@@ -82,7 +107,7 @@ export const fetchTrendingSearches = async () => {
     try {
         const response = await api.get('/market/search/trending');
         const payload = response.data?.trending ?? response.data?.data ?? [];
-        return Array.isArray(payload) ? payload : [];
+        return Array.isArray(payload) ? payload.map(stripStockSuffix) : [];
     } catch (error) {
         console.error('Error fetching trending searches:', error);
         return [];

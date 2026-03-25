@@ -1,4 +1,3 @@
-import React from 'react';
 import HeroSection from '../components/landing/HeroSection';
 import GlobalAssetSection from '../components/landing/GlobalAssetSection';
 import TraderModeSection from '../components/landing/TraderModeSection';

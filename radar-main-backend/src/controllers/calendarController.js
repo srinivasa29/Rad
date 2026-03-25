@@ -166,6 +166,15 @@ const mergeEvents = (primary, fallback, limit = 8) => {
         .slice(0, limit);
 };
 
+const toModeledEvent = (event) => ({
+    ...event,
+    forecast: null,
+    previous: null,
+    actual: null,
+    source: 'modeled_schedule',
+    factual: false,
+});
+
 const DEFAULT_MARKET_REGION = String(process.env.DEFAULT_MARKET_REGION || 'IN').toUpperCase();
 
 const getCorporateActions = (req, res) => {
@@ -200,8 +209,10 @@ const getEconomicEvents = async (req, res) => {
             { date: toIsoDate(nextUsRetailSalesDate()), country: 'US', event: 'US Retail Sales', impact: 'Medium', forecast: '0.4%', previous: '0.2%' },
         ];
 
+        const modeledUsEvents = usEvents.map(toModeledEvent);
+
         const liveEvents = await fetchLiveEconomicEvents({ region, limit: 12 });
-        const merged = mergeEvents(liveEvents, usEvents, 8);
+        const merged = mergeEvents(liveEvents, modeledUsEvents, 8);
         return res.json(merged);
     }
 
@@ -216,8 +227,10 @@ const getEconomicEvents = async (req, res) => {
         { date: toIsoDate(nextBojOutlookDate()), country: 'JP', event: 'BoJ Outlook Report', impact: 'Medium', forecast: '-', previous: '-' },
     ];
 
+    const modeledInEvents = inEvents.map(toModeledEvent);
+
     const liveEvents = await fetchLiveEconomicEvents({ region, limit: 12 });
-    const merged = mergeEvents(liveEvents, inEvents, 8);
+    const merged = mergeEvents(liveEvents, modeledInEvents, 8);
     res.json(merged);
 };
 

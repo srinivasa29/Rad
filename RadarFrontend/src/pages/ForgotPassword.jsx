@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
+import AuthLayout from '../components/auth/AuthLayout';
 
 export default function ForgotPassword() {
     const [email, setEmail] = useState('');
