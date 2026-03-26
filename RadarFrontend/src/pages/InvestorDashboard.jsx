@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import YourInvestments from '../components/investor/YourInvestments';
+import MostBoughtStocks from '../components/investor/MostBoughtStocks';
+import SharedTickerTape from '../components/landing/TickerTape';
+import Watchlist from '../components/investor/Watchlist';
+import Screeners from '../components/investor/Screeners';
 
 import {
     LayoutDashboard,
@@ -16,6 +21,7 @@ import {
     TrendingUp,
     TrendingDown,
     LogOut,
+    Menu,
 } from "lucide-react";
 import {
     ResponsiveContainer,
@@ -35,9 +41,6 @@ import { fetchSectorPerformance, fetchMarketData, fetchTrendingSearches, logSear
 import { fetchEconomicCalendar } from "../api/calendarApi";
 import { updateUserMode } from "../api/userApi";
 import { useHeaderData } from "../hooks/useHeaderData";
-import SharedTickerTape from "../components/landing/TickerTape";
-import YourInvestments from "../components/investor/YourInvestments";
-import MostBoughtStocks from "../components/investor/MostBoughtStocks";
 
 const formatNotificationTime = (value) => {
     if (!value) return "Now";
@@ -112,7 +115,30 @@ const FALLBACK_THEME_ROWS = {
     ],
 };
 
-export default function InvestorMode({ onToggleMode }) {
+const themes = {
+    blue: {
+        dot: '#3b82f6',
+        gradient: `linear-gradient(180deg, #f0f9ff 0%, #e1effe 100%)`
+    },
+    emerald: {
+        dot: '#10b981',
+        gradient: `linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%)`
+    },
+    purple: {
+        dot: '#8b5cf6',
+        gradient: `linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%)`
+    },
+    rose: {
+        dot: '#f43f5e',
+        gradient: `linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%)`
+    },
+    slate: {
+        dot: '#64748b',
+        gradient: `linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)`
+    }
+};
+
+const InvestorMode = ({ onToggleMode }) => {
     const navigate = useNavigate();
     const {
         profile,
@@ -124,11 +150,28 @@ export default function InvestorMode({ onToggleMode }) {
         markAllNotificationsRead,
     } = useHeaderData();
     useEffect(() => {
-        document.body.style.backgroundColor = '#FBF7F2';
-        document.body.style.backgroundImage = 'none';
+        const currentTheme = 'blue';
+        const fullBackground = themes[currentTheme].gradient;
+
+        // Apply global background properties
+        document.documentElement.style.setProperty('--investor-bg', fullBackground);
+        
+        // 1:1 EXACT "Minimalist Sky" linear gradient from latest Step 3759 reference image
+        document.body.style.backgroundColor = '#f0f9ff'; 
+        document.body.style.backgroundImage = fullBackground;
+        document.body.style.backgroundAttachment = 'fixed';
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.color = '#1e293b';
+        document.documentElement.style.setProperty('transition', 'background 0.5s ease-in-out');
+
         return () => {
+            document.documentElement.style.removeProperty('--investor-bg');
+            document.documentElement.style.removeProperty('transition');
             document.body.style.backgroundColor = '';
             document.body.style.backgroundImage = '';
+            document.body.style.backgroundAttachment = '';
+            document.body.style.backgroundSize = '';
+            document.body.style.color = '';
         };
     }, []);
 
@@ -272,21 +315,21 @@ export default function InvestorMode({ onToggleMode }) {
     };
 
     return (
-        <div className="dashboard-container investor-theme">
-            <header className="navbar">
+        <div className="dashboard-container investor-theme pt-6">
+            <header className="navbar rounded-2xl mx-6 lg:mx-10 border border-blue-100 shadow-sm relative z-[110]">
                 <div className="flex items-center gap-4 shrink-0">
-                    <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 overflow-hidden shadow-inner">
+                    <div className="w-12 h-12 rounded-full bg-[#3E84F6]/10 flex items-center justify-center border border-[#3E84F6]/20 overflow-hidden shadow-inner">
                         <img
                             src="/radar-logo-final.jpg"
                             alt="Radar Logo"
                             className="w-full h-full object-cover scale-100"
                         />
                     </div>
-                    <span className="brand-name font-black tracking-tighter text-2xl" style={{ color: '#10B981' }}>RADAR</span>
+                    <span className="brand-name font-black tracking-tighter text-2xl" style={{ color: '#3E84F6' }}>RADAR</span>
                 </div>
 
-                {}
-                <div className="hidden lg:flex items-center gap-10 ml-12">
+                {/* Main Navigation */}
+                <div className="hidden lg:flex items-center gap-6 xl:gap-10 ml-8 xl:ml-12">
                     {[
                         { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard },
                         { id: 'WATCHLIST', label: 'Watchlist', icon: Star },
@@ -300,7 +343,7 @@ export default function InvestorMode({ onToggleMode }) {
                                 ? 'scale-105'
                                 : 'hover:scale-105'
                                 }`}
-                            style={{ color: '#10B981' }}
+                            style={{ color: '#3E84F6' }}
                         >
                             <item.icon size={18} strokeWidth={2.5} />
                             {item.label}
@@ -308,10 +351,10 @@ export default function InvestorMode({ onToggleMode }) {
                     ))}
                 </div>
 
-                {}
-                <div className="hidden xl:flex ml-auto mr-8 relative group" ref={searchContainerRef}>
-                    <div className="relative w-80">
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'rgba(16, 185, 129, 0.5)' }}>
+                {/* Search Bar */}
+                <div className="hidden md:flex ml-auto mr-4 lg:mr-8 relative group" ref={searchContainerRef}>
+                    <div className="relative w-48 lg:w-72 xl:w-80">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'rgba(62, 132, 246, 0.5)' }}>
                             <Search size={18} />
                         </div>
                         <input
@@ -364,11 +407,11 @@ export default function InvestorMode({ onToggleMode }) {
                                     setHighlightedIndex(-1);
                                 }
                             }}
-                            className="w-full rounded-full py-2.5 pl-12 pr-4 text-xs font-semibold focus:outline-none transition-all bg-white border border-emerald-100/50 text-emerald-900 focus:border-emerald-500 focus:shadow-sm placeholder:text-emerald-300"
+                            className="w-full rounded-full py-2.5 pl-12 pr-4 text-xs font-semibold focus:outline-none transition-all bg-white border border-blue-100/50 text-blue-900 focus:border-[#3E84F6] focus:shadow-sm placeholder:text-blue-300"
                         />
 
                         {showSearchDropdown && (
-                            <div className="absolute top-12 left-0 right-0 bg-white border border-emerald-100 rounded-2xl shadow-xl overflow-hidden z-[120]">
+                            <div className="absolute top-12 left-0 right-0 bg-white border border-blue-100 rounded-2xl shadow-xl overflow-hidden z-[120]">
                                 {isSearching && (
                                     <div className="px-4 py-3 text-xs font-semibold text-slate-500">Searching market...</div>
                                 )}
@@ -383,14 +426,14 @@ export default function InvestorMode({ onToggleMode }) {
                                             <button
                                                 key={`${item.type}-${item.symbol}`}
                                                 onClick={() => handleSearchSelect(item)}
-                                                className={`w-full text-left px-4 py-3 transition-colors border-b border-emerald-50 ${highlightedIndex >= 0 && searchResults[highlightedIndex] === item ? 'bg-emerald-50' : 'hover:bg-emerald-50'}`}
+                                                className={`w-full text-left px-4 py-3 transition-colors border-b border-blue-50 ${highlightedIndex >= 0 && searchResults[highlightedIndex] === item ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div>
                                                         <p className="text-xs font-black text-slate-800">{displaySymbol(item.symbol)}</p>
                                                         <p className="text-[11px] text-slate-500">{item.name}</p>
                                                     </div>
-                                                    <span className="text-[10px] font-bold text-emerald-600">{item.type}</span>
+                                                    <span className="text-[10px] font-bold text-[#3E84F6]">{item.type}</span>
                                                 </div>
                                             </button>
                                         ))}
@@ -405,7 +448,7 @@ export default function InvestorMode({ onToggleMode }) {
                                                 <button
                                                     key={term}
                                                     onClick={() => handleTrendingSelect(term)}
-                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-black transition-colors ${highlightedIndex >= 0 && trendingSearches[highlightedIndex] === term ? 'bg-emerald-200 text-emerald-800' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-black transition-colors ${highlightedIndex >= 0 && trendingSearches[highlightedIndex] === term ? 'bg-blue-200 text-blue-800' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
                                                 >
                                                     {term}
                                                 </button>
@@ -418,18 +461,18 @@ export default function InvestorMode({ onToggleMode }) {
                     </div>
                 </div>
 
-                {}
+                {/* Right-side buttons (Notifications, Profile) */}
 
                 <div className="nav-buttons flex items-center gap-5 mr-2">
-                    {}
+                    {/* Notifications */}
                     <div
                         className="relative"
                         onMouseEnter={() => setIsNotificationsOpen(true)}
                         onMouseLeave={() => setIsNotificationsOpen(false)}
                     >
                         <button
-                            className="transition-all duration-200 relative w-10 h-10 flex items-center justify-center hover:bg-emerald-50 rounded-full"
-                            style={{ color: '#10B981' }}
+                            className="transition-all duration-200 relative w-10 h-10 flex items-center justify-center hover:bg-blue-50 rounded-full"
+                            style={{ color: '#3E84F6' }}
                         >
                             <Bell size={22} strokeWidth={2} />
                             {unreadCount > 0 && (
@@ -447,7 +490,7 @@ export default function InvestorMode({ onToggleMode }) {
                                     <button
                                         onClick={markAllNotificationsRead}
                                         disabled={isMarkingNotifications || unreadCount === 0}
-                                        className="text-xs text-[#10B981] disabled:text-gray-400 hover:text-emerald-700 transition-colors"
+                                        className="text-xs text-[#3E84F6] disabled:text-gray-400 hover:text-blue-700 transition-colors"
                                     >
                                         {isMarkingNotifications ? 'Saving...' : 'Mark read'}
                                     </button>
@@ -458,7 +501,7 @@ export default function InvestorMode({ onToggleMode }) {
                                     ) : notifications.length > 0 ? (
                                         notifications.map((notification) => (
                                             <div key={notification._id || notification.id} className="px-4 py-3 border-b border-gray-700/30 hover:bg-gray-50 cursor-pointer flex gap-3">
-                                                <div className="mt-1"><CheckCircle size={14} className={notification.read ? "text-gray-400" : "text-[#10B981]"} /></div>
+                                                <div className="mt-1"><CheckCircle size={14} className={notification.read ? "text-gray-400" : "text-[#3E84F6]"} /></div>
                                                 <div>
                                                     <p className="text-xs font-semibold text-[#1F3D2B]">{notification.title || notification.message}</p>
                                                     {notification.message && notification.title && (
@@ -472,26 +515,26 @@ export default function InvestorMode({ onToggleMode }) {
                                         <div className="px-4 py-6 text-xs text-gray-500 text-center">No notifications yet.</div>
                                     )}
                                 </div>
-                                <div className="px-4 py-2 text-center text-xs text-gray-500 cursor-pointer hover:text-[#10B981] transition-colors">View all activity</div>
+                                <div className="px-4 py-2 text-center text-xs text-gray-500 cursor-pointer hover:text-[#3E84F6] transition-colors">View all activity</div>
                             </div>
                         )}
                     </div>
 
-                    {}
+                    {/* Profile Dropdown */}
                     <div className="relative">
                         <div
                             onClick={() => setIsProfileOpen(!isProfileOpen)}
-                            className="profile-avatar shadow-emerald-500/20 hover:scale-105 transition-transform"
+                            className="profile-avatar shadow-[#3E84F6]/20 hover:scale-105 transition-transform"
                         >
                             {userInitial}
                         </div>
 
 
-                        {}
+                        {/* Profile Dropdown Content */}
                         {isProfileOpen && (
                             <div className="absolute right-0 top-12 w-72 rounded-xl shadow-2xl border py-2 backdrop-blur-xl z-[100] transform origin-top-right transition-all bg-white border-[#1F3D2B]/10">
 
-                                {}
+                                {/* User Info */}
                                 <div className="px-4 py-4 border-b border-gray-700/50 flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-base font-bold text-white">
                                         {userInitial}
@@ -502,7 +545,7 @@ export default function InvestorMode({ onToggleMode }) {
                                     </div>
                                 </div>
 
-                                {}
+                                {/* Navigation Links */}
                                 <div className="py-2">
                                     <button className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-[#1F3D2B] hover:bg-[#1F3D2B]/5">
                                         <User size={16} /> My Profile
@@ -516,7 +559,7 @@ export default function InvestorMode({ onToggleMode }) {
                                     </button>
                                 </div>
 
-                                {}
+                                {/* Mode Switcher */}
                                 <div className="border-t border-b border-gray-700/50 py-3 px-4">
                                     <div className="text-[10px] font-bold uppercase tracking-wider mb-3 text-center text-[#1F3D2B]/60">
                                         Choose Your Interface
@@ -532,19 +575,19 @@ export default function InvestorMode({ onToggleMode }) {
                                             onToggleMode();
                                         }}
                                     >
-                                        {}
+                                        {/* Active Indicator */}
                                         <div
                                             className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full shadow-lg transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform translate-x-0 bg-white border border-[#1F3D2B]/10 shadow-sm"
                                         >
                                         </div>
 
-                                        {}
+                                        {/* Investor Mode */}
                                         <div className="w-1/2 flex items-center justify-center relative z-10 gap-2 h-full">
                                             <Activity size={16} className="text-[#1F3D2B] scale-110 drop-shadow-sm" />
                                             <span className="text-xs font-bold text-[#1F3D2B]">Investor</span>
                                         </div>
 
-                                        {}
+                                        {/* Trader Mode */}
                                         <div className="w-1/2 flex items-center justify-center relative z-10 gap-2 h-full opacity-60 hover:opacity-100 transition-opacity">
                                             <TrendingUp size={16} className="text-gray-400 group-hover:text-gray-600" />
                                             <span className="text-xs font-bold text-gray-400 group-hover:text-gray-600">Trader</span>
@@ -552,11 +595,11 @@ export default function InvestorMode({ onToggleMode }) {
                                     </div>
                                 </div>
 
-                                {}
+                                {/* Logout */}
                                 <div className="pt-2 pb-1">
                                     <button
                                         onClick={() => { setIsProfileOpen(false); setShowLogoutModal(true); }}
-                                        className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-[#18bc79] hover:bg-[#18bc79]/10"
+                                        className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-blue-600 hover:bg-blue-50/50"
                                     >
                                         <LogOut size={16} /> Sign Out
                                     </button>
@@ -564,11 +607,16 @@ export default function InvestorMode({ onToggleMode }) {
                             </div>
                         )}
                     </div>
+
+                    {/* Mobile Hamburger Menu */}
+                    <div className="lg:hidden flex items-center ml-2 border-l border-slate-100 pl-4">
+                        <Menu size={24} className="text-[#3E84F6] cursor-pointer hover:text-blue-700" />
+                    </div>
                 </div>
             </header>
 
             {activeModule === "DASHBOARD" && (
-                <div className="px-4 mb-1">
+                <div className="my-6">
                     <SharedTickerTape variant="investor" />
                 </div>
             )}
@@ -577,7 +625,7 @@ export default function InvestorMode({ onToggleMode }) {
                 <InvestorView activeModule={activeModule} />
             </main>
 
-            {}
+            {/* Logout Confirmation Modal */}
             {showLogoutModal && (
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 fade-in">
                     <div className="w-full max-w-[420px] rounded-3xl p-8 shadow-[0_20px_50px_rgba(0,0,0,0.1)] transform transition-all scale-100 bg-[#FCFBF8] border-none">
@@ -609,9 +657,9 @@ export default function InvestorMode({ onToggleMode }) {
             )}
         </div>
     );
-}
+};
 
-
+export default InvestorMode;
 
 const MarketMoodGauge = () => {
     const [score, setScore] = useState(50);
@@ -648,20 +696,20 @@ const MarketMoodGauge = () => {
 
     return (
         <div className="investor-card p-6 h-full flex flex-col justify-between relative overflow-hidden group">
-            {}
+            {/* Background blur */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -z-10 group-hover:bg-blue-500/10 transition-all duration-500"></div>
 
             {isLoading && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
 
             {error && (
-                <div className="absolute inset-0 bg-rose-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4">
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
                     <span className="text-xl mb-2">📡</span>
                     <span className="text-xs font-bold text-rose-600">Mood Sensor Offline</span>
-                    <button onClick={() => window.location.reload()} className="mt-3 text-[10px] bg-rose-100 px-3 py-1 rounded text-rose-600 font-bold hover:bg-rose-200">RETRY</button>
+                    <button onClick={() => window.location.reload()} className="mt-3 text-[10px] bg-white/5 border border-current px-4 py-1.5 rounded-lg text-rose-600 font-black hover:bg-rose-50 hover:border-rose-300 shadow-sm transition-all uppercase tracking-wider">RETRY</button>
                 </div>
             )}
 
@@ -676,14 +724,14 @@ const MarketMoodGauge = () => {
             </div>
 
             <div className="gauge-chart-wrapper relative flex flex-col items-center justify-end h-32 mt-2">
-                {}
+                {/* Gauge SVG */}
                 <svg viewBox="0 0 200 110" className="w-full h-full">
-                    {}
+                    {/* Gradient and Filter Definitions */}
                     <defs>
                         <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="#ef4444" /> {}
-                            <stop offset="50%" stopColor="#eab308" /> {}
-                            <stop offset="100%" stopColor="#22c55e" /> {}
+                            <stop offset="0%" stopColor="#ef4444" /> {/* Red for Fear */}
+                            <stop offset="50%" stopColor="#eab308" /> {/* Yellow for Neutral */}
+                            <stop offset="100%" stopColor="#22c55e" /> {/* Green for Greed */}
                         </linearGradient>
                         <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
                             <feGaussianBlur stdDeviation="3" result="blur" />
@@ -691,13 +739,13 @@ const MarketMoodGauge = () => {
                         </filter>
                     </defs>
 
-                    {}
+                    {/* Background Arc */}
                     <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#f1f5f9" strokeWidth="20" strokeLinecap="round" />
 
-                    {}
+                    {/* Foreground Arc (Gradient) */}
                     <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gaugeGradient)" strokeWidth="20" strokeLinecap="round" strokeDasharray="251.2" strokeDashoffset="0" filter="url(#glow)" />
 
-                    {}
+                    {/* Ticks */}
                     {[0, 25, 50, 75, 100].map((tick, i) => {
                         const angle = (tick / 100) * 180 - 180;
                         const rad = (angle * Math.PI) / 180;
@@ -709,7 +757,7 @@ const MarketMoodGauge = () => {
                     })}
                 </svg>
 
-                {}
+                {/* Needle */}
                 <div
                     className="absolute bottom-2 left-1/2 w-1 h-24 bg-slate-800 origin-bottom rounded-full transition-transform duration-1000 ease-out z-10"
                     style={{ transform: `translateX(-50%) rotate(${needleRotation}deg)` }}
@@ -717,10 +765,10 @@ const MarketMoodGauge = () => {
                     <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-800 rounded-full"></div>
                 </div>
 
-                {}
+                {/* Needle Base */}
                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-8 h-8 bg-slate-800 rounded-full border-4 border-white shadow-lg z-20"></div>
 
-                {}
+                {/* Score Display */}
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-center z-0">
                     <span className="text-3xl font-black text-slate-800 tracking-tighter">{score}</span>
                     <span className="text-xs text-slate-400 block -mt-1">Score</span>
@@ -733,6 +781,7 @@ const MarketMoodGauge = () => {
                 <span>Ext. Greed</span>
             </div>
         </div>
+
     );
 };
 
@@ -780,14 +829,14 @@ const ValuationThermometer = () => {
     return (
         <div className="investor-card p-6 h-full flex flex-col relative overflow-hidden">
             {isLoading && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
 
             {error && (
-                <div className="absolute inset-0 bg-rose-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4">
-                    <span className="text-xl mb-2">📉</span>
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
+                    <span className="text-xl mb-2">📈</span>
                     <span className="text-xs font-bold text-rose-600">Valuation Data Unavailable</span>
                 </div>
             )}
@@ -797,7 +846,7 @@ const ValuationThermometer = () => {
             </div>
 
             <div className="space-y-8 flex-1">
-                {}
+                {/* P/E Ratio */}
                 <div>
                     <div className="flex justify-between items-end mb-2">
                         <div>
@@ -811,20 +860,20 @@ const ValuationThermometer = () => {
                     </div>
                     <div className="relative h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
                         <div className="absolute inset-0 w-full h-full flex">
-                            <div className="w-[35%] bg-emerald-400/80"></div>
+                            <div className="w-[35%] bg-blue-400/80"></div>
                             <div className="w-[40%] bg-amber-400/80"></div>
                             <div className="w-[25%] bg-rose-400/80"></div>
                         </div>
                         <div className="absolute top-0 bottom-0 w-1.5 bg-slate-900 z-10 rounded-full ring-2 ring-white" style={{ left: getPos(valData.pe, valData.avgPe) }}></div>
                     </div>
                     <div className="flex justify-between text-[10px] font-bold mt-2 px-0.5">
-                        <span className="text-emerald-600">Cheap</span>
+                        <span className="text-blue-600">Cheap</span>
                         <span className="text-amber-600">Fair</span>
                         <span className="text-rose-600">Exp.</span>
                     </div>
                 </div>
 
-                {}
+                {/* P/B Ratio */}
                 <div>
                     <div className="flex justify-between items-end mb-2">
                         <div>
@@ -836,7 +885,7 @@ const ValuationThermometer = () => {
                         <span className="text-[10px] font-bold text-slate-400">Avg: {valData.avgPb}</span>
                     </div>
                     <div className="relative h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500 opacity-80"></div>
+                        <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-blue-400 via-amber-400 to-rose-500 opacity-80"></div>
                         <div className="absolute top-0 bottom-0 w-1.5 bg-slate-900 z-10 rounded-full ring-2 ring-white" style={{ left: getPos(valData.pb, valData.avgPb) }}></div>
                     </div>
                 </div>
@@ -906,13 +955,13 @@ const GlobalPulse = () => {
     return (
         <div className="investor-card p-6 h-full flex flex-col relative overflow-hidden">
             {isLoading && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-primary-500 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
 
             {error && (
-                <div className="absolute inset-0 bg-rose-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4">
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
                     <span className="text-xl mb-2">🌍</span>
                     <span className="text-xs font-bold text-rose-600">Global Markets Offline</span>
                 </div>
@@ -932,11 +981,20 @@ const GlobalPulse = () => {
                             </div>
                             <div>
                                 <div className="font-bold text-sm text-slate-700">{displaySymbol(m.name)}</div>
-                                <div className={`text-[10px] font-bold ${m.changeDirection === 'up' ? 'text-emerald-500' : m.changeDirection === 'down' ? 'text-rose-500' : 'text-slate-400'}`}>{m.change}</div>
+                                <div className={`text-[10px] font-bold ${m.change.includes('▲') ? 'text-blue-500' : 'text-rose-500'}`}>{m.change}</div>
                             </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                             <div className="font-black text-sm text-slate-800 font-mono tracking-tight">{m.val}</div>
+                            <svg className="w-12 h-4 opacity-30" viewBox="0 0 60 30">
+                                <path
+                                    d={m.spark}
+                                    fill="none"
+                                    stroke={m.change.includes('▲') ? '#3E84F6' : '#ef4444'}
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                />
+                            </svg>
                         </div>
                     </div>
                 ))}
@@ -997,13 +1055,13 @@ const DiscoveryShelves = () => {
     return (
         <div className="investor-card p-6 h-full relative overflow-hidden">
             {isLoading && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
 
             {error && (
-                <div className="absolute inset-0 bg-rose-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4">
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
                     <span className="text-xl mb-2">🧭</span>
                     <span className="text-xs font-bold text-rose-600">Discovery feed unavailable</span>
                 </div>
@@ -1018,19 +1076,19 @@ const DiscoveryShelves = () => {
                     <div className="text-xs text-slate-500 font-medium">No discovery ideas available right now.</div>
                 )}
                 {items.map((item, i) => (
-                    <div key={i} className="feature-item group hover:bg-slate-50 p-4 rounded-xl cursor-pointer transition-all border border-transparent hover:border-slate-200 hover:shadow-sm">
+                    <div key={i} className="feature-item group hover:bg-blue-500/10 p-4 rounded-xl cursor-pointer transition-all border border-transparent hover:border-slate-200 hover:shadow-sm">
                         <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-3">
-                                <div className="feature-icon bg-slate-100 group-hover:bg-white p-2 rounded-lg w-12 h-12 flex items-center justify-center text-2xl shadow-sm">{item.icon}</div>
+                                <div className="feature-icon bg-slate-500/10 group-hover:bg-white/10 p-2 rounded-lg w-12 h-12 flex items-center justify-center text-2xl shadow-sm">{item.icon}</div>
                                 <div>
-                                    <div className="font-bold text-base text-slate-800 group-hover:text-[#18bc79] transition-colors">{item.title}</div>
+                                    <div className="font-bold text-base text-slate-800 group-hover:text-blue-600 transition-colors">{item.title}</div>
                                     <div className="text-xs text-slate-500">{item.desc}</div>
                                 </div>
                             </div>
-                            <span className="text-gray-300 group-hover:text-[#18bc79] transition-colors">›</span>
+                            <span className="text-gray-300 group-hover:text-blue-600 transition-colors">›</span>
                         </div>
 
-                        <div className="bg-slate-100/50 rounded-lg p-2.5 flex items-center gap-3">
+                        <div className="bg-slate-500/10 rounded-lg p-2.5 flex items-center gap-3">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Picks</span>
                             <div className="h-4 w-px bg-slate-200"></div>
                             <div className="flex -space-x-2">
@@ -1163,16 +1221,16 @@ const SectorLandscape = () => {
             <div className="pointer-events-none absolute -top-20 -left-20 h-56 w-56 rounded-full bg-emerald-300/20 blur-3xl"></div>
             <div className="pointer-events-none absolute -bottom-16 -right-20 h-52 w-52 rounded-full bg-amber-200/20 blur-3xl"></div>
             {isLoading && (
-                <div className="absolute inset-0 bg-white/85 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 bg-white/40 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
 
             {error && (
-                <div className="absolute inset-0 bg-rose-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4">
+                <div className="absolute inset-0 bg-white/40 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
                     <span className="text-3xl mb-3">📊</span>
                     <span className="text-sm font-bold text-rose-600">Sector Performance Unavailable</span>
-                    <button onClick={() => setReloadToken((value) => value + 1)} className="mt-4 text-xs bg-rose-100 px-4 py-2 rounded text-rose-600 font-bold hover:bg-rose-200 transition-colors">Reload Sectors</button>
+                    <button onClick={() => setTimeframe(timeframe)} className="mt-4 text-xs bg-white/60 border border-current px-4 py-2 rounded-lg text-rose-600 font-bold hover:bg-rose-50 transition-colors uppercase tracking-wider">Reload Sectors</button>
                 </div>
             )}
             <div className="card-header relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
@@ -1205,7 +1263,7 @@ const SectorLandscape = () => {
                         <button
                             key={tf}
                             onClick={() => setTimeframe(tf)}
-                            className={`text-xs px-2.5 py-1 rounded-lg transition-colors font-bold ${timeframe === tf ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                            className={`text-xs px-2.5 py-1 rounded-lg transition-colors font-bold ${timeframe === tf ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white/10 border border-slate-200/50 text-slate-600 hover:bg-slate-500/10'}`}
                         >
                             {tf}
                         </button>
@@ -1214,14 +1272,14 @@ const SectorLandscape = () => {
             </div>
 
             <div className="relative z-10 mb-3 flex flex-wrap gap-2">
-                <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">Avg {timeframe}: {formatPercent(averageReturn)}</span>
-                <span className="text-[11px] font-black text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">Gainers: {breadth.gainers}</span>
-                <span className="text-[11px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full">Losers: {breadth.losers}</span>
+                <span className="text-[11px] font-black text-emerald-700 bg-emerald-500/10 border border-emerald-200 px-2.5 py-1 rounded-full">Avg {timeframe}: {formatPercent(averageReturn)}</span>
+                <span className="text-[11px] font-black text-slate-700 bg-slate-500/10 border border-slate-200 px-2.5 py-1 rounded-full">Gainers: {breadth.gainers}</span>
+                <span className="text-[11px] font-black text-rose-700 bg-rose-500/10 border border-rose-200 px-2.5 py-1 rounded-full">Losers: {breadth.losers}</span>
             </div>
 
             <div className="relative z-10 w-full mt-2 flex-1 min-h-[340px]">
                 {!isLoading && !error && data.length === 0 ? (
-                    <div className="h-full w-full rounded-xl border border-slate-200 bg-white/70 flex items-center justify-center text-center px-6">
+                    <div className="h-full w-full rounded-xl border border-slate-200 bg-white/10 flex items-center justify-center text-center px-6">
                         <div>
                             <p className="text-sm font-bold text-slate-700">No sector data from backend</p>
                             <p className="text-xs text-slate-500 mt-1">Try a different timeframe or refresh once sector service is available.</p>
@@ -1350,7 +1408,7 @@ const EconomicCalendar = () => {
         const value = String(impact || '').toLowerCase();
         if (value === 'high') return 'text-rose-600 bg-rose-50 border-rose-100';
         if (value === 'medium') return 'text-amber-600 bg-amber-50 border-amber-100';
-        return 'text-emerald-600 bg-emerald-50 border-emerald-100';
+        return 'text-blue-600 bg-blue-50 border-blue-100';
     };
 
     const eventCountryFlag = (code) => {
@@ -1365,13 +1423,13 @@ const EconomicCalendar = () => {
     return (
         <div className="investor-card p-4 h-full flex flex-col relative overflow-hidden">
             {isLoading && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
 
             {error && (
-                <div className="absolute inset-0 bg-rose-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4">
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
                     <span className="text-xl mb-2">📅</span>
                     <span className="text-xs font-bold text-rose-600">Calendar Error</span>
                 </div>
@@ -1385,9 +1443,9 @@ const EconomicCalendar = () => {
             </div>
             <div className="space-y-2 flex-1 overflow-y-auto pr-1">
                 {events.map((e) => (
-                    <div key={e.id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:border-emerald-200 transition-colors">
+                    <div key={e.id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-500/10 border border-slate-100 hover:border-blue-200 transition-colors">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-sm font-bold" title={e.country}>
+                            <div className="w-8 h-8 rounded-full bg-white/10 border border-slate-200 flex items-center justify-center text-sm font-bold" title={e.country}>
                                 {eventCountryFlag(e.country)}
                             </div>
                             <div>
@@ -1464,28 +1522,28 @@ const TrendingThemes = () => {
         <div className="investor-card p-4 h-full flex flex-col">
             <div className="card-header mb-3 flex justify-between items-center">
                 <h3 className="text-lg font-bold text-slate-800">Trending Themes</h3>
-                <TrendingUp size={16} className="text-emerald-500" />
+                <TrendingUp size={16} className="text-blue-500" />
             </div>
             <div className="space-y-3 flex-1 overflow-y-auto pr-1">
-                <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-white p-3">
+                <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white p-3">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                            <TrendingUp size={14} className="text-emerald-600" />
-                            <span className="text-[11px] font-black text-emerald-700 uppercase tracking-wider">Rising Themes</span>
+                            <TrendingUp size={14} className="text-blue-600" />
+                            <span className="text-[11px] font-black text-blue-700 uppercase tracking-wider">Rising Themes</span>
                         </div>
-                        <span className="text-[10px] text-emerald-600 font-bold">Top Gainers</span>
+                        <span className="text-[10px] text-blue-600 font-bold">Top Gainers</span>
                     </div>
                     <div className="space-y-1.5">
                         {risingThemes.length === 0 && <div className="text-xs text-slate-500">No rising themes right now.</div>}
                         {risingThemes.map((theme, i) => (
                             <div key={`${theme.name}-${i}`} className="group relative flex items-center justify-between rounded-lg px-2 py-1.5 pl-3 hover:bg-white/70 transition-colors">
-                                <span className="absolute left-0 top-1/2 h-0 w-1 -translate-y-1/2 rounded-full bg-emerald-500 opacity-0 transition-all duration-200 group-hover:h-4 group-hover:opacity-100"></span>
+                                <span className="absolute left-0 top-1/2 h-0 w-1 -translate-y-1/2 rounded-full bg-blue-500 opacity-0 transition-all duration-200 group-hover:h-4 group-hover:opacity-100"></span>
                                 <div className="flex items-center gap-2.5">
                                     <span className="text-base">{theme.icon}</span>
                                     <span className="text-xs font-bold text-slate-700">{theme.name}</span>
                                 </div>
                                 <div className="flex items-center gap-2.5">
-                                    <span className="text-[11px] font-black text-emerald-600">{theme.trend}</span>
+                                    <span className="text-[11px] font-black text-blue-600">{theme.trend}</span>
                                 </div>
                             </div>
                         ))}
@@ -1521,240 +1579,90 @@ const TrendingThemes = () => {
     );
 };
 
+// News Tab has been extracted to InvestorNewsDashboard component
+
+// News Tab logic has been moved to src/components/investor/InvestorNewsDashboard.jsx
+
+
+// Helper components for the dashboard
+
 const InvestorNewsFeed = () => {
-    const navigate = useNavigate();
-    const [newsItems, setNewsItems] = useState([]);
+    const [news, setNews] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [hasError, setHasError] = useState(false);
-    const [activeFilter, setActiveFilter] = useState('all');
 
     useEffect(() => {
-        let timer;
-
-        const loadNews = async () => {
+        const load = async () => {
             try {
                 setIsLoading(true);
-                setHasError(false);
-                const response = await fetchMarketNews();
-                const rows = Array.isArray(response) ? response : (Array.isArray(response?.data) ? response.data : []);
-
-                const normalized = rows
-                    .map((item, index) => ({
-                        id: item.id || `${item.source || 'news'}-${item.publishedAt || index}`,
-                        source: item.source || 'Market Desk',
-                        title: item.title || item.headline || 'Untitled market update',
-                        summary: item.summary || item.description || 'Tap to read full context.',
-                        url: item.url || item.link || null,
-                        symbol: displaySymbol(item.symbol || item.ticker || extractHeadlineSymbol(item.title || item.headline)),
-                        publishedAt: item.publishedAt || item.time || item.date || new Date().toISOString(),
-                    }))
-                    .filter((item) => item.title)
-                    .slice(0, 24);
-
-                setNewsItems(normalized);
-            } catch (error) {
-                console.error('Investor news feed failed:', error);
-                setHasError(true);
-                setNewsItems([]);
+                const data = await fetchMarketNews();
+                setNews(Array.isArray(data) ? data : []);
+            } catch (err) {
+                console.error("News load failed:", err);
             } finally {
                 setIsLoading(false);
             }
         };
-
-        loadNews();
-        timer = setInterval(loadNews, 60000);
-        return () => clearInterval(timer);
+        load();
     }, []);
 
-    const toCategory = (item) => {
-        const text = `${item.title} ${item.source} ${item.summary}`.toLowerCase();
-        if (/(inflation|fed|rbi|ecb|policy|gdp|macro|rates)/.test(text)) return 'macro';
-        if (/(results|earnings|guidance|quarter|q1|q2|q3|q4)/.test(text)) return 'earnings';
-        return 'markets';
-    };
-
-    const allItems = newsItems.map((item) => ({ ...item, category: toCategory(item) }));
-    const filteredItems = activeFilter === 'all' ? allItems : allItems.filter((item) => item.category === activeFilter);
-
-    const formatNewsTime = (value) => {
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return 'Now';
-        const deltaMinutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
-        if (deltaMinutes < 1) return 'Just now';
-        if (deltaMinutes < 60) return `${deltaMinutes}m ago`;
-        const deltaHours = Math.round(deltaMinutes / 60);
-        if (deltaHours < 24) return `${deltaHours}h ago`;
-        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    };
-
-    const filters = [
-        { id: 'all', label: 'All' },
-        { id: 'markets', label: 'Markets' },
-        { id: 'earnings', label: 'Earnings' },
-        { id: 'macro', label: 'Macro' },
-    ];
-
     return (
-        <div className="investor-card p-4 h-full flex flex-col relative overflow-hidden">
-            {isLoading && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="dashboard-layout fade-in bg-transparent w-full px-4 md:px-10 py-6">
+            <div className="main-content-area transition-all duration-300 w-full mb-10">
+                <div className="mb-8">
+                    <h1 className="text-[34px] font-black text-[#1e293b] tracking-tight mb-2">Market News</h1>
+                    <p className="text-[#64748b] font-semibold text-[15px]">The latest financial updates and market-moving headlines.</p>
                 </div>
-            )}
 
-            <div className="card-header mb-3 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-                <div>
-                    <h3 className="text-lg font-bold text-slate-800">Investor News Feed</h3>
-                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">Live market headlines with quick categorization</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    {filters.map((filter) => (
-                        <button
-                            key={filter.id}
-                            onClick={() => setActiveFilter(filter.id)}
-                            className={`px-2.5 py-1 text-[10px] rounded-full font-black uppercase tracking-wider border transition-colors ${
-                                activeFilter === filter.id
-                                    ? 'bg-emerald-600 text-white border-emerald-600'
-                                    : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-700'
-                            }`}
-                        >
-                            {filter.label}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {hasError && !isLoading && (
-                <div className="rounded-xl border border-rose-100 bg-rose-50 text-rose-700 text-xs font-semibold p-3 mb-3">
-                    News service is temporarily unavailable. Retrying automatically.
-                </div>
-            )}
-
-            <div className="space-y-2 flex-1 overflow-y-auto pr-1">
-                {!isLoading && filteredItems.length === 0 && (
-                    <div className="text-xs text-slate-500 text-center py-8">No news items available for this filter.</div>
-                )}
-                {filteredItems.map((item) => (
-                    <div
-                        key={item.id}
-                        className="rounded-xl border border-slate-100 bg-white p-3 hover:border-emerald-200 hover:shadow-sm transition-all"
-                    >
-                        <div className="flex items-center justify-between gap-3 mb-1.5">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">{item.source}</span>
-                            <span className="text-[10px] font-bold text-slate-400">{formatNewsTime(item.publishedAt)}</span>
+                <div className="space-y-4 max-w-5xl">
+                    {isLoading ? (
+                        <div className="flex items-center justify-center p-20">
+                            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                         </div>
-                        <h4 className="text-sm font-bold text-slate-800 leading-snug">{item.title}</h4>
-                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.summary}</p>
-                        <div className="mt-2 flex items-center gap-2">
-                            {item.url && (
-                                <a
-                                    href={item.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-[10px] font-black uppercase tracking-wider text-emerald-700 hover:text-emerald-800"
-                                >
-                                    Read Source
-                                </a>
-                            )}
-                            {item.symbol && (
-                                <button
-                                    onClick={() => navigate(`/stocks/${encodeURIComponent(item.symbol)}`)}
-                                    className="text-[10px] font-black uppercase tracking-wider text-slate-600 hover:text-slate-800"
-                                >
-                                    View {item.symbol}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                ))}
+                    ) : news.length > 0 ? (
+                        news.map((item, i) => (
+                            <div key={i} className="investor-card p-6 flex flex-col gap-2 hover:shadow-md transition-shadow cursor-pointer">
+                                <div className="flex justify-between items-start">
+                                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{item.source || 'Market News'}</span>
+                                    <span className="text-[10px] font-bold text-slate-400">{item.time || 'Today'}</span>
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-800 leading-tight">{item.headline || item.title}</h3>
+                                {item.summary && <p className="text-sm text-slate-500 line-clamp-2">{item.summary}</p>}
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center p-20 text-slate-400 font-bold">No news available at the moment.</div>
+                    )}
+                </div>
             </div>
         </div>
     );
 };
 
+// Helper components for the dashboard
+
 function InvestorView({ activeModule }) {
-    const ModulePreview = ({ title, subtitle, chips, blocks }) => (
-        <div className="dashboard-layout fade-in" style={{ backgroundColor: '#FBF7F2' }}>
-            <div className="main-content-area transition-all duration-300">
-                <div className="rounded-3xl border border-emerald-100 bg-white/80 p-6 md:p-8">
-                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-                        <div>
-                            <h2 className="text-3xl md:text-4xl font-black tracking-tight text-[#1F3D2B]">{title}</h2>
-                            <p className="mt-2 text-sm md:text-base font-semibold text-emerald-700">{subtitle}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {chips.map((chip) => (
-                                <span key={chip} className="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                    {chip}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                        {blocks.map((block) => (
-                            <div key={block.title} className="rounded-2xl border border-slate-100 bg-white p-4">
-                                <div className="text-[11px] font-black uppercase tracking-wider text-slate-400">{block.kicker}</div>
-                                <h3 className="mt-1 text-base font-black text-slate-800">{block.title}</h3>
-                                <p className="mt-2 text-xs text-slate-500 font-medium">{block.description}</p>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="mt-6 text-xs font-bold text-slate-500">
-                        This module is under active build and will come soon.
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
     if (activeModule === 'WATCHLIST') {
-        return (
-            <ModulePreview
-                title="Watchlist Lab"
-                subtitle="A dedicated tracking workspace for conviction ideas and alerts."
-                chips={["Coming Soon", "Investor Mode", "Realtime"]}
-                blocks={[
-                    { kicker: 'Planned', title: 'Smart Buckets', description: 'Group stocks by thesis, sector, and risk profile with one-click moves.' },
-                    { kicker: 'Planned', title: 'Alert Ladder', description: 'Layered price and momentum alerts with priority ranking.' },
-                    { kicker: 'Planned', title: 'Quick Notes', description: 'Attach mini trade notes and review tags to each symbol.' },
-                ]}
-            />
-        );
+        return <Watchlist />;
     }
 
     if (activeModule === 'SCREENERS') {
-        return (
-            <ModulePreview
-                title="Screener Studio"
-                subtitle="Custom scans designed for investors, not day-trader noise."
-                chips={["Coming Soon", "Rule Builder", "Backtest"]}
-                blocks={[
-                    { kicker: 'Planned', title: 'Fundamental Filters', description: 'Screen by valuation, growth quality, and balance-sheet strength.' },
-                    { kicker: 'Planned', title: 'Theme Scans', description: 'Prebuilt scans for AI, capital goods, exports, and defensive sectors.' },
-                    { kicker: 'Planned', title: 'Signal History', description: 'Track hit-rate snapshots of saved scans over rolling periods.' },
-                ]}
-            />
-        );
+        return <Screeners />;
     }
 
     if (activeModule === 'NEWS') {
-        return (
-            <div className="dashboard-layout fade-in" style={{ backgroundColor: '#FBF7F2' }}>
-                <div className="main-content-area transition-all duration-300">
-                    <div className="mt-1 mb-4">
-                        <InvestorNewsFeed />
-                    </div>
-                </div>
-            </div>
-        );
+        return <InvestorNewsFeed />;
     }
 
+    // Default: DASHBOARD
     return (
-        <div className="dashboard-layout fade-in" style={{ backgroundColor: '#FBF7F2' }}>
-            <div className="main-content-area transition-all duration-300">
-                {}
+        <div className="dashboard-layout fade-in bg-transparent transition-all duration-500 py-4 w-full px-4 md:px-10">
+            <div className="main-content-area transition-all duration-300 w-full">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 className="text-[34px] font-black text-[#1e293b] tracking-tight drop-shadow-sm">Welcome back, Captain.</h1>
+                        <p className="text-[#64748b] font-semibold text-[15px]">At a glance overview of your portfolio and the global market pulse.</p>
+                    </div>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-1 mb-4">
                     <MarketMoodGauge />

@@ -55,10 +55,10 @@ const YourInvestments = () => {
     }, [portfolio]);
 
     return (
-        <div className="investor-card p-6 flex flex-col items-center justify-between text-center h-full min-h-[320px] border border-slate-100/50 relative overflow-hidden bg-white">
+        <div className="investor-card p-6 flex flex-col items-center justify-between text-center h-full min-h-[320px] relative overflow-hidden">
             {isLoading && (
-                <div className="absolute inset-0 bg-white/75 backdrop-blur-sm z-20 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-sm z-20 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
 
@@ -69,8 +69,8 @@ const YourInvestments = () => {
             {summary.holdings.length > 0 ? (
                 <div className="flex flex-col justify-between flex-1 w-full z-10 py-2 text-left">
                     <div className="grid grid-cols-2 gap-3 mb-5">
-                        <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
-                            <div className="flex items-center gap-2 text-emerald-700 mb-2">
+                        <div className="rounded-2xl bg-blue-500/10 border border-blue-100/50 p-4">
+                            <div className="flex items-center gap-2 text-blue-700 mb-2">
                                 <Wallet size={15} />
                                 <span className="text-[10px] font-black uppercase tracking-wider">Portfolio Value</span>
                             </div>
@@ -78,17 +78,17 @@ const YourInvestments = () => {
                             <p className="text-[11px] text-slate-500 mt-1">{summary.holdings.length} active holdings</p>
                         </div>
 
-                        <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+                        <div className="rounded-2xl bg-slate-500/10 border border-slate-100/50 p-4">
                             <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Cash Balance</div>
                             <div className="text-2xl font-black text-slate-800">₹{summary.cashBalance.toLocaleString()}</div>
                             <p className="text-[11px] text-slate-500 mt-1">{summary.totalTrades} trades executed</p>
                         </div>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+                    <div className="rounded-2xl border border-slate-100/30 bg-slate-500/5 p-4">
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-black text-slate-800">Top Holdings</h4>
-                            <span className="text-[10px] font-bold text-emerald-600">Live portfolio sync</span>
+                            <span className="text-[10px] font-bold text-blue-600">Live portfolio sync</span>
                         </div>
 
                         <div className="space-y-3">
@@ -98,7 +98,7 @@ const YourInvestments = () => {
                                     : 0;
 
                                 return (
-                                    <div key={holding.symbol} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 border border-slate-100">
+                                    <div key={holding.symbol} className="flex items-center justify-between gap-3 rounded-xl bg-white/10 px-3 py-2.5 border border-slate-100/50 space-y-3">
                                         <div>
                                             <div className="text-sm font-black text-slate-800">{displaySymbol(holding.symbol)}</div>
                                             <div className="text-[11px] text-slate-500">
@@ -107,7 +107,7 @@ const YourInvestments = () => {
                                         </div>
                                         <div className="text-right">
                                             <div className="text-sm font-black text-slate-800">₹{holding.invested.toLocaleString()}</div>
-                                            <div className="text-[11px] font-bold text-emerald-600">{allocation}% allocation</div>
+                                            <div className="text-[11px] font-bold text-blue-600">{allocation}% allocation</div>
                                         </div>
                                     </div>
                                 );
@@ -117,12 +117,10 @@ const YourInvestments = () => {
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center flex-1 w-full z-10 py-4">
-                    <div className="w-20 h-20 mb-6 bg-emerald-50 rounded-full flex items-center justify-center relative shadow-inner">
-                        <div className="absolute inset-0 bg-emerald-100/30 blur-xl"></div>
-                        <PieChart size={32} className="text-emerald-500/40 relative z-10" />
-
-                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-white border border-emerald-100 rounded-lg flex items-center justify-center shadow-sm">
-                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <div className="w-20 h-20 mb-6 bg-blue-500/10 border border-blue-100/30 rounded-full flex items-center justify-center relative shadow-[inset_0_2px_10px_rgba(59,130,246,0.05)]">
+                        <PieChart size={32} className="text-blue-500/50 relative z-10" />
+                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-white border border-blue-100 rounded-lg flex items-center justify-center shadow-sm">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                         </div>
                     </div>
 
@@ -135,7 +133,7 @@ const YourInvestments = () => {
                             : 'Place your first trade to populate holdings, balances, and allocation insights here.'}
                     </p>
 
-                    <button className="px-8 py-2.5 bg-emerald-500 text-white text-[11px] font-black rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/25 hover:scale-105 active:scale-95 uppercase tracking-wider inline-flex items-center gap-2">
+                    <button className="px-8 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-[11px] font-black rounded-xl hover:shadow-[0_8px_20px_rgba(59,130,246,0.3)] hover:-translate-y-0.5 transition-all shadow-md active:scale-95 uppercase tracking-wider inline-flex items-center gap-2">
                         <ArrowUpRight size={14} />
                         Start Investing
                     </button>

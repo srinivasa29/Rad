@@ -14,7 +14,7 @@ const fallbackTickers = [
 ];
 
 const investorClasses = {
-    container: "w-full relative overflow-hidden py-3 select-none",
+    container: "w-full relative overflow-hidden py-3 select-none bg-transparent",
     content: "flex gap-16 w-max animate-marquee hover:[animation-play-state:paused] items-center",
     symbol: "text-[10px] font-bold text-[#1F3D2B]/60 tracking-widest",
     value: "text-sm font-black text-[#1F3D2B] font-mono",

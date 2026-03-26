@@ -77,8 +77,8 @@ const MostBoughtStocks = () => {
     return (
         <div className="investor-card p-6 h-full flex flex-col relative overflow-hidden">
             {isLoading && (
-                <div className="absolute inset-0 bg-white/75 backdrop-blur-sm z-20 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 bg-white/5 backdrop-blur-sm z-20 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-primary-500 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
 
@@ -87,7 +87,7 @@ const MostBoughtStocks = () => {
                     <h3 className="text-lg font-bold text-slate-800">Pre-Market Pulse</h3>
                     <p className="text-[11px] text-slate-400 mt-1">Gap movers and volume shockers from the analytics feed</p>
                 </div>
-                <div className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded inline-flex items-center gap-1">
+                <div className="text-[10px] font-bold text-blue-600 bg-blue-50/70 px-2 py-1 rounded inline-flex items-center gap-1 border border-blue-100/50">
                     <Activity size={11} />
                     {hasError ? 'Fallback mode' : 'Live feed'}
                 </div>
@@ -95,26 +95,26 @@ const MostBoughtStocks = () => {
 
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 content-start">
                 {cards.map((stock) => (
-                    <div key={stock.id} className="p-4 relative group hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-500 border border-slate-100 rounded-2xl bg-white">
-                        <div className="absolute top-3 right-3 text-slate-200 group-hover:text-emerald-500 cursor-pointer transition-colors">
+                    <div key={stock.id} className="p-4 relative group hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500 border border-slate-200/80 rounded-2xl bg-white/10 backdrop-blur-sm shadow-sm">
+                        <div className="absolute top-3 right-3 text-slate-300 group-hover:text-blue-500 cursor-pointer transition-colors">
                             <Bookmark size={15} />
                         </div>
 
-                        <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-emerald-600/60 mb-4 shadow-sm group-hover:bg-emerald-50 transition-colors">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50/50 border border-blue-100/50 flex items-center justify-center font-black text-blue-600/70 mb-4 shadow-sm group-hover:bg-blue-100 transition-colors">
                             {stock.logo}
                         </div>
 
-                        <h4 className="text-xs font-bold text-slate-700 mb-5 line-clamp-2 h-8 leading-tight group-hover:text-emerald-700 transition-colors">{displaySymbol(stock.name)}</h4>
+                        <h4 className="text-xs font-bold text-slate-700 mb-5 line-clamp-2 h-8 leading-tight group-hover:text-blue-700 transition-colors">{displaySymbol(stock.name)}</h4>
 
                         {stock.tag && (
-                            <div className={`inline-flex items-center mb-4 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-full ${stock.isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                            <div className={`inline-flex items-center mb-4 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-full ${stock.isPositive ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
                                 {stock.tag}
                             </div>
                         )}
 
                         <div className="mt-auto border-t border-slate-50 pt-3">
                             <div className="text-sm font-black text-slate-800">{stock.price}</div>
-                            <div className={`text-[10px] font-bold flex items-center gap-1 mt-1 ${stock.isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            <div className={`text-[10px] font-bold flex items-center gap-1 mt-1 ${stock.isPositive ? 'text-blue-500' : 'text-rose-500'}`}>
                                 {stock.isPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                                 {stock.change}
                             </div>

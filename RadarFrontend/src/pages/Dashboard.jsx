@@ -94,7 +94,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!isTraderMode) {
-      document.body.style.backgroundColor = "#FBF7F2";
+      document.body.style.backgroundColor = "";
       document.body.style.backgroundImage = "none";
     } else {
       document.body.style.backgroundColor = "";
