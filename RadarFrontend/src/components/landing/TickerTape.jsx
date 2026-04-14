@@ -61,7 +61,7 @@ export default function TickerTape({ variant = "dark" }) {
                 const res = await fetchMarketData({ category: "index", limit: 8 });
                 if (res && res.length > 0) {
                     setItems(res.map((item) => ({
-                        symbol: String(item.symbol || item.name || "ASSET").substring(0, 10),
+                        symbol: String(item.symbol || item.name || "ASSET").split('.')[0].substring(0, 10),
                         value: Number.isFinite(Number(item.price)) ? Number(item.price).toLocaleString() : "--",
                         change: (() => {
                             const rawChange = Number(item.change_24h ?? item.change ?? 0);

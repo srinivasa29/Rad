@@ -9,327 +9,578 @@ import {
     Banknote, 
     ShieldCheck, 
     ChevronRight,
+    ChevronDown,
     Search,
     SlidersHorizontal,
     Plus,
     X,
     Info,
-    Check
+    Check,
+    ArrowUpRight,
+    Zap
 } from 'lucide-react';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 const mockReadyMade = [
-    { id: 1, title: 'Consistent Growers', desc: 'Companies with 15%+ profit growth over 3 years.', icon: Activity, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { id: 2, title: 'Strong Financials', desc: 'Low debt, high cash flow and solid margins.', icon: Banknote, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { id: 3, title: 'Value Picks', desc: 'Fundamentally strong stocks trading below intrinsic value.', icon: ShieldCheck, color: 'text-purple-500', bg: 'bg-purple-50' },
-    { id: 4, title: 'Near 52W Low', desc: 'Stocks trading close to their 52-week support levels.', icon: TrendingUp, color: 'text-rose-500', bg: 'bg-rose-50' },
-    { id: 5, title: 'High Volume Movers', desc: 'Unusual trading volume with positive price action.', icon: BarChart3, color: 'text-amber-500', bg: 'bg-amber-50' }
-];
-
-const mockTrending = [
-    { id: 1, title: 'IT Sector Breakouts', desc: 'Tech stocks crossing 200-DMA', users: '2.4k' },
-    { id: 2, title: 'High Dividend Giants', desc: 'Yield > 4% with stable payouts', users: '1.8k' },
-    { id: 3, title: 'FMCG Defensive Play', desc: 'Low beta, high ROE screening', users: '950' },
+    { id: 1, title: 'Consistent Growers', desc: '15%+ profit growth over 3 years.', icon: Activity, color: 'text-blue-500', bg: 'bg-blue-50' },
+    { id: 2, title: 'Strong Financials', desc: 'Low debt, high cash flow.', icon: Banknote, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { id: 3, title: 'Value Picks', desc: 'Trading below intrinsic value.', icon: ShieldCheck, color: 'text-purple-500', bg: 'bg-purple-50' },
+    { id: 4, title: 'Dividend Kings', desc: 'Companies with 10yr+ dividend history.', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50' },
+    { id: 5, title: 'Debt-Free Leaders', desc: 'Zero debt balance sheet giants.', icon: Zap, color: 'text-red-500', bg: 'bg-red-50' },
+    { id: 6, title: 'Institutional Favorites', desc: 'Highest FII/DII accumulation.', icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-50' },
+    { id: 7, title: 'ESG Leaders', desc: 'High sustainability & governance scores.', icon: ShieldCheck, color: 'text-teal-500', bg: 'bg-teal-50' },
+    { id: 8, title: 'Tech Disruptors', desc: 'High R&D spend in emerging tech.', icon: BarChart3, color: 'text-cyan-500', bg: 'bg-cyan-50' },
 ];
 
 const mockResults = [
-    { id: 'TCS', name: 'Tata Consultancy Services', price: '₹3,542.10', change: '+1.2%', isPositive: true, sector: 'IT Services' },
-    { id: 'HINDUNILVR', name: 'Hindustan Unilever', price: '₹2,410.50', change: '-0.4%', isPositive: false, sector: 'FMCG' },
-    { id: 'ITC', name: 'ITC Limited', price: '₹415.80', change: '+2.1%', isPositive: true, sector: 'FMCG' },
-    { id: 'INFY', name: 'Infosys Ltd', price: '₹1,440.00', change: '+0.8%', isPositive: true, sector: 'IT Services' },
+    { id: 'TCS', name: 'Tata Consultancy Services', price: '₹3,542.10', change: '+1.2%', isPositive: true, mcap: '12.4T', sector: 'IT Services', why: 'Strong 200-DMA support with 15% ROE.', tags: ['Value', 'Low Risk'], confidence: 92, yield: '1.2%', beta: 0.85, volume: '2.4M', pe: 28.5, roe: '24.1%', trend: [3500, 3520, 3510, 3530, 3542] },
+    { id: 'HINDUNILVR', name: 'Hindustan Unilever', price: '₹2,410.50', change: '-0.4%', isPositive: false, mcap: '5.6T', sector: 'FMCG', why: 'Overbought on daily RSI, holding support.', tags: ['Defensive'], confidence: 85, yield: '1.5%', beta: 0.62, volume: '1.8M', pe: 54.2, roe: '18.5%', trend: [2450, 2440, 2430, 2420, 2410] },
+    { id: 'ITC', name: 'ITC Limited', price: '₹415.80', change: '+2.1%', isPositive: true, mcap: '5.1T', sector: 'FMCG', why: 'Breakout above monthly consolidation.', tags: ['Momentum', 'Yield'], confidence: 88, yield: '3.4%', beta: 0.74, volume: '8.2M', pe: 24.8, roe: '29.2%', trend: [400, 405, 408, 412, 415] },
+    { id: 'INFY', name: 'Infosys Ltd', price: '₹1,440.00', change: '+0.8%', isPositive: true, mcap: '5.9T', sector: 'IT Services', why: 'Institutional accumulation detected.', tags: ['Momentum'], confidence: 90, yield: '1.0%', beta: 1.12, volume: '3.6M', pe: 22.1, roe: '26.4%', trend: [1420, 1425, 1435, 1430, 1440] },
+];
+
+const strategies = [
+    { id: 'intra', label: 'Intraday Volatility', desc: 'High momentum stocks for quick trades', icon: Activity, color: 'text-emerald-500', filters: { change: '> 2%', volume: 'High' } },
+    { id: 'lowrisk', label: 'Low Risk Portfolio', desc: 'Stable, low beta picks for steady gains', icon: ShieldCheck, color: 'text-blue-500', filters: { beta: '< 0.8', yield: '> 2%' } },
+    { id: 'dip', label: 'Buy the Dip', desc: 'Oversold bounces at critical support', icon: TrendingUp, color: 'text-amber-500', filters: { change: '< -3%', rsi: 'Oversold' } },
+    { id: 'breakout', label: 'Breakouts', desc: 'Riding the wave of volume breakouts', icon: ArrowUpRight, color: 'text-purple-500', filters: { change: '> 1.5%', volume: 'Very High' } },
+    { id: 'gappers', label: 'Volume Gappers', desc: 'Stocks with significant pre-market volume gaps', icon: Zap, color: 'text-orange-500', filters: { volume: 'Extreme', change: '> 3%' } },
+    { id: 'orb', label: 'Opening Range Breakout', desc: 'Strategic filters for the first 15m breakout', icon: Activity, color: 'text-pink-500', filters: { change: '> 1%', volume: 'High' } },
+    { id: 'reversal', label: 'Mean Reversion', desc: 'Statistical pullbacks to critical moving averages', icon: TrendingUp, color: 'text-teal-500', filters: { rsi: 'Neutral', change: '< 0%' } },
+];
+
+const allFilters = [
+    { id: 'mcap', label: 'Market Cap', icon: BarChart3, options: ['Large', 'Mid', 'Small', 'Micro'] },
+    { id: 'price', label: 'Price', icon: Banknote, options: ['Any', '< ₹500', '₹500 - ₹2k', '> ₹2k'] },
+    { id: 'change', label: 'Change %', icon: TrendingUp, options: ['Any', '> 0%', '> 2%', '> 5%', '< 0%'] },
+    { id: 'sector', label: 'Sector', icon: Search, options: ['All', 'IT', 'Finance', 'FMCG', 'Auto', 'Energy', 'Healthcare'] },
+    { id: 'roe', label: 'ROE', icon: Activity, options: ['Any', '> 10%', '> 15%', '> 20%'] },
+    { id: 'pe', label: 'P/E', icon: Filter, options: ['Any', 'Low (<15)', 'Medium', 'High'] },
+    { id: 'yield', label: 'Div. Yield', icon: Banknote, options: ['Any', '> 1%', '> 2%', '> 3%'] },
+    { id: 'volume', label: 'Volume', icon: Activity, options: ['Any', 'Low', 'Normal', 'High', 'Very High'] },
+    { id: 'rsi', label: 'RSI', icon: BarChart3, options: ['Any', 'Oversold (<30)', 'Neutral', 'Overbought (>70)'] },
+    { id: 'beta', label: 'Beta', icon: ShieldCheck, options: ['Any', '< 0.8', '0.8 - 1.2', '> 1.2'] },
+    { id: 'debt', label: 'Debt/Eq', icon: Filter, options: ['Low (<0.5)', 'Moderate', 'High'] },
+    { id: 'eps', label: 'EPS Growth', icon: TrendingUp, options: ['Any', '> 5%', '> 15%', '> 25%'] },
+    { id: 'range', label: '52W Range', icon: SlidersHorizontal, options: ['Any', 'Near High', 'Near Low', 'Midway'] },
+    { id: 'inst', label: 'Inst. Holding', icon: Users, options: ['Any', '> 50%', '> 70%', 'Increasing'] },
+    { id: 'margin', label: 'Profit Margin', icon: Activity, options: ['Any', '> 10%', '> 20%', '> 30%'] },
+    { id: 'peg', label: 'PEG Ratio', icon: Filter, options: ['Any', '< 1 (Cheap)', '1 - 2', '> 2'] },
+    { id: 'pb', label: 'Price/Book', icon: Banknote, options: ['Any', '< 1', '< 3', '> 5'] },
 ];
 
 
-const Screeners = () => {
-    const [marketCap, setMarketCap] = useState('Large');
-    const [industry, setIndustry] = useState(['Tech', 'Finance']);
-    const [activeScreener, setActiveScreener] = useState(null);
-    const currentTheme = 'blue';
-    const setCurrentTheme = () => {}; // No-op to prevent breakages if called elsewhere
+const Screeners = ({ isHero = false }) => {
+    const [activeFilters, setActiveFilters] = useState({});
+    const [visibleFilters, setVisibleFilters] = useState(['mcap', 'price', 'change', 'sector', 'roe', 'pe']);
+    const [activeStrategy, setActiveStrategy] = useState(null);
+    const [openFilter, setOpenFilter] = useState(null);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showSignalModal, setShowSignalModal] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const userMode = localStorage.getItem('mode') || 'INVESTOR';
+
+    const handleFilterChange = (id, value) => {
+        setActiveFilters(prev => ({ ...prev, [id]: value }));
+        setOpenFilter(null);
+        setActiveStrategy(null);
+    };
+
+    const handleStrategySelect = (strat) => {
+        setShowSignalModal(strat);
+        setActiveStrategy(strat.id);
+        setActiveFilters(prev => ({ ...prev, ...strat.filters }));
+    };
+
+    const addMoreFilter = (id) => {
+        if (!visibleFilters.includes(id)) {
+            setVisibleFilters(prev => [...prev, id]);
+        }
+        setOpenFilter(null);
+    };
+
+    const filteredResults = mockResults.filter(stock => {
+        if (searchTerm && !stock.id.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+        if (activeFilters.mcap && activeFilters.mcap !== 'Any') {
+            if (activeFilters.mcap === 'Large' && !stock.mcap.includes('T')) return false;
+        }
+        if (activeFilters.sector && activeFilters.sector !== 'All') {
+            if (!stock.sector.includes(activeFilters.sector)) return false;
+        }
+        return true;
+    });
 
     React.useEffect(() => {
         const style = document.createElement('style');
         style.id = 'screeners-component-styles';
         style.innerHTML = `
-            /* Slider glossy styling */
-            input[type="range"].screener-slider {
-                -webkit-appearance: none;
-                width: 100%;
-                height: 6px;
-                background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
-                border-radius: 8px;
-                outline: none;
-                box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+            .filter-dropdown {
+                animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+                box-shadow: 0 12px 30px rgba(0,0,0,0.1), 0 0 1px rgba(0,0,0,0.1);
+                min-width: 240px;
             }
-            
-            input[type="range"].screener-slider::-webkit-slider-thumb {
-                -webkit-appearance: none;
-                appearance: none;
-                width: 18px;
-                height: 18px;
-                border-radius: 50%;
-                background: #ffffff;
-                border: 2px solid #3b82f6;
-                box-shadow: 0 4px 10px rgba(59,130,246,0.3), inset 0 1px 1px rgba(255,255,255,0.9);
-                cursor: pointer;
+            @keyframes slideDown {
+                from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            .filter-chip { position: relative; }
+            .filter-value-list { max-height: 250px; overflow-y: auto; }
+            .filter-value-list::-webkit-scrollbar { width: 4px; }
+            .filter-value-list::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 99px; }
+            .filter-chip:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(59, 130, 246, 0.12); }
+            .filter-chip.active { background: white; border-color: #3b82f6; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1); }
+            .strategy-chip { transition: all 0.2s ease; cursor: pointer; }
+            .strategy-chip.active { background: #eff6ff; border-color: #3b82f6; color: #2563eb; }
+            .custom-table th { text-align: left; padding: 16px; font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 800; border-bottom: 1px solid #f1f5f9; }
+            .custom-table td { padding: 16px; font-size: 14px; color: #1e293b; border-bottom: 1px solid #f8fafc; }
+            .modal-overlay { background: rgba(15, 23, 42, 0.6); backdrop-blur: 4px; }
+            .horizontal-carousel {
+                display: flex;
+                overflow-x: auto;
+                gap: 1.5rem;
+                padding: 4px 0 20px 0;
+                scroll-behavior: smooth;
+            }
+            .horizontal-carousel::-webkit-scrollbar { display: none; }
+            .custom-input-box {
+                background: #f8fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 13px;
+                font-weight: 600;
+                width: 100%;
+                outline: none;
                 transition: all 0.2s;
             }
-
-            input[type="range"].screener-slider::-webkit-slider-thumb:hover {
-                transform: scale(1.15);
-                box-shadow: 0 5px 15px rgba(59,130,246,0.4), inset 0 1px 1px rgba(255,255,255,0.9);
+            .custom-input-box:focus {
+                border-color: #3b82f6;
+                background: white;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            }
+            .fade-in-up { animation: fadeInUp 0.3s ease-out; }
+            @keyframes fadeInUp {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .scale-in { animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+            @keyframes scaleIn {
+                from { opacity: 0; transform: scale(0.9); }
+                to { opacity: 1; transform: scale(1); }
             }
         `;
         document.head.appendChild(style);
-
         return () => {
             const el = document.getElementById('screeners-component-styles');
             if (el) document.head.removeChild(el);
         };
     }, []);
 
-    const handleIndustryToggle = (ind) => {
-        setIndustry(prev => prev.includes(ind) ? prev.filter(i => i !== ind) : [...prev, ind]);
-    };
-
-    const handleScreenerClick = (id) => {
-        setActiveScreener(id === activeScreener ? null : id);
-    };
-
-    // Card Glassmorphism Framework
-    const baseCardClass = "bg-[rgba(255,255,255,0.85)] backdrop-blur-[10px] rounded-[20px] border border-[rgba(255,255,255,0.4)] shadow-[0_20px_50px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.6)] p-7 mb-8";
-    const sectionTitleClass = "text-[20px] font-[700] text-[#1e293b] flex items-center mb-6 pl-3 border-l-[3px] border-[#3b82f6]";
-    
-    // Dynamic Focus Panel
-    const rightPanelClass = "bg-[rgba(255,255,255,0.92)] backdrop-blur-[12px] rounded-[22px] border border-[rgba(255,255,255,0.5)] shadow-[0_30px_60px_rgba(0,0,0,0.1),0_10px_40px_rgba(59,130,246,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] p-7 mb-8 transition-all duration-300";
-
-    const btnGradientHoverClass = "w-full mt-8 py-[14px] rounded-[14px] bg-gradient-to-r from-[#3b82f6] to-[#1e40af] text-white font-[700] text-[15px] shadow-[0_10px_25px_rgba(59,130,246,0.35),inset_0_1px_1px_rgba(255,255,255,0.3)] transition-all duration-300 flex justify-center items-center gap-2 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(59,130,246,0.45)] active:scale-[0.98]";
+    const baseCardClass = "bg-[rgba(255,255,255,0.7)] backdrop-blur-[12px] rounded-[24px] border border-[rgba(255,255,255,0.4)] shadow-[0_8px_32px_rgba(0,0,0,0.05)] p-6 mb-8";
+    const filterChipClass = "filter-chip px-4 py-2 rounded-full border border-slate-200 bg-white/60 text-slate-600 font-bold text-[13px] flex items-center gap-2 cursor-pointer z-40 transition-all";
 
     return (
-        <div className="w-full min-h-screen py-8 px-4 md:px-10 bg-transparent transition-all duration-500">
-            <div className="w-full mx-auto fade-in">
+        <div className={`w-full ${isHero ? '' : 'min-h-screen py-8 px-4 md:px-10 bg-[#f8fafc]/50'}`}>
+            <div className={`mx-auto fade-in ${isHero ? '' : 'max-w-[1600px]'}`}>
                 
-                {/* Header & Theme Palette Selector */}
-                <div className="mb-12 flex justify-between items-start">
-                    <div>
-                        <h1 className="text-[34px] font-black text-[#1e293b] mb-2 tracking-tight drop-shadow-sm">Screeners</h1>
-                        <p className="text-[#64748b] font-semibold text-[15px]">Filter the market based on precise criteria. Build your ultimate radar.</p>
+                {/* Personalization Banner */}
+                <div className="mb-6 flex items-center justify-between px-2">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-blue-600 p-2 rounded-lg text-white shadow-lg">
+                            <Activity size={20} />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-black text-slate-800">Smart Market Screener</h1>
+                            <p className="text-[12px] font-bold text-slate-500 flex items-center gap-1.5 uppercase tracking-wider">
+                                <ShieldCheck size={14} className="text-blue-500" />
+                                ⚡ Tailored for you: {userMode === 'TRADER' ? 'Active Trader' : 'Long-term Investor'}
+                            </p>
+                        </div>
                     </div>
-                    
-                    {}
+                    <div className="flex gap-3">
+                        <button 
+                            className="bg-white border border-slate-200 px-5 py-2.5 rounded-full flex items-center gap-2 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+                            onClick={() => setShowCreateModal(true)}
+                        >
+                            <Plus size={18} strokeWidth={3} className="text-blue-500" />
+                            Create Filter
+                        </button>
+                        <button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 py-2.5 rounded-full flex items-center gap-2 text-sm font-bold transition-all hover:scale-105 shadow-lg shadow-blue-200">
+                            <Star size={18} strokeWidth={3} />
+                            Save Screener
+                        </button>
+                    </div>
                 </div>
 
-                <div className="flex flex-col xl:flex-row gap-10">
-                    {/* LEFT COLUMN (65%) */}
-                    <div className="w-full xl:w-[65%] flex flex-col">
-                        
-                        {/* Ready Made Screeners */}
-                        <div className={baseCardClass}>
-                            <div className="flex items-center justify-between mb-2">
-                                <h2 className={sectionTitleClass}>
-                                    Ready-made Screeners
-                                </h2>
-                                <button className="text-[14px] font-bold text-[#3b82f6] hover:text-[#1d4ed8] transition-colors -mt-6">View All</button>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-                                {mockReadyMade.map(item => {
-                                    const isActive = activeScreener === item.id;
-                                    return (
-                                    <div 
-                                        key={item.id}
-                                        onClick={() => handleScreenerClick(item.id)}
-                                        className={`group cursor-pointer p-[20px] rounded-[18px] transition-all duration-[300ms] ease hover:-translate-y-[4px] hover:scale-[1.02] hover:shadow-[0_15px_35px_rgba(0,0,0,0.06),0_10px_20px_rgba(59,130,246,0.08)] border ${isActive ? 'bg-[rgba(255,255,255,0.95)] border-[rgba(59,130,246,0.6)] shadow-[0_10px_25px_rgba(59,130,246,0.15)] ring-2 ring-blue-500/10' : 'bg-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.6)] shadow-[0_4px_10px_rgba(0,0,0,0.03)] hover:border-[rgba(255,255,255,1)] hover:bg-[rgba(255,255,255,0.9)]'}`}
-                                    >
-                                        <div className="flex items-start gap-4">
-                                            <div className={`p-3 rounded-[14px] shadow-sm ${item.bg} ${item.color} transition-transform duration-300 group-hover:scale-110`}>
-                                                {isActive ? <Check size={20} strokeWidth={3} className="text-[#3b82f6]" /> : <item.icon size={20} strokeWidth={2.5} />}
-                                            </div>
-                                            <div>
-                                                <h3 className={`font-bold text-[15px] mb-1.5 transition-colors ${isActive ? 'text-[#3b82f6]' : 'text-[#1e293b] group-hover:text-[#3b82f6]'}`}>{item.title}</h3>
-                                                <p className="text-[13px] text-[#64748b] leading-relaxed line-clamp-2">{item.desc}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    );
-                                })}
-                            </div>
+                {/* HORIZONTAL SMART SCREENER HERO */}
+                <div className={`${baseCardClass} !p-4 !mb-6 bg-white overflow-visible relative z-30`}>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2 px-3 border-r border-slate-200">
+                            <SlidersHorizontal size={18} className="text-slate-400" />
+                            <span className="text-[14px] font-black text-slate-800 mr-2">Filters</span>
                         </div>
 
-                        {/* Trending Screeners */}
-                        <div className={baseCardClass}>
-                            <h2 className={sectionTitleClass}>
+                        {allFilters.filter(f => visibleFilters.includes(f.id)).map(f => {
+                            const Icon = f.icon;
+                            return (
+                                <div key={f.id} className="relative">
+                                    <div 
+                                        className={`${filterChipClass} ${openFilter === f.id ? 'active' : ''}`}
+                                        onClick={() => setOpenFilter(openFilter === f.id ? null : f.id)}
+                                    >
+                                        <span className="opacity-70"><Icon size={15} /></span>
+                                        <span>{f.label}</span>
+                                        <span className="text-blue-600 font-black ml-1 line-clamp-1 max-w-[80px]">{activeFilters[f.id] || 'Any'}</span>
+                                        <ChevronDown size={14} strokeWidth={3} className={`mt-0.5 transition-transform ${openFilter === f.id ? 'rotate-180 text-blue-500' : 'opacity-40'}`} />
+                                    </div>
+
+                                    {openFilter === f.id && (
+                                        <div className="filter-dropdown absolute top-full left-0 mt-2 bg-white rounded-xl border border-slate-200 p-3 min-w-[240px] z-50">
+                                            <div className="p-1 text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2">Custom Value</div>
+                                            <div className="px-1 mb-3">
+                                                <input 
+                                                    type="text" 
+                                                    className="custom-input-box text-slate-800" 
+                                                    placeholder={`Enter ${f.label}...`}
+                                                    value={activeFilters[f.id] || ''}
+                                                    onChange={(e) => setActiveFilters(prev => ({...prev, [f.id]: e.target.value}))}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            </div>
+                                            <div className="p-1 text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1 border-t border-slate-50 pt-2">Presets</div>
+                                            <div className="filter-value-list">
+                                                {f.options.map(opt => (
+                                                    <button 
+                                                        key={opt}
+                                                        onClick={() => handleFilterChange(f.id, opt)}
+                                                        className={`w-full text-left px-3 py-2 rounded-lg text-[13px] font-bold flex items-center justify-between transition-colors ${activeFilters[f.id] === opt ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50'}`}
+                                                    >
+                                                        {opt}
+                                                        {activeFilters[f.id] === opt && <Check size={14} strokeWidth={3} />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        <div className="relative">
+                            <button 
+                                onClick={() => setOpenFilter(openFilter === 'add' ? null : 'add')}
+                                className="flex items-center gap-2 text-[13px] font-black text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-full transition-all"
+                            >
+                                <Plus size={16} strokeWidth={3} />
+                                Add Filter
+                            </button>
+                            {openFilter === 'add' && (
+                                <div className="filter-dropdown absolute top-full right-0 mt-2 bg-white rounded-xl border border-slate-200 p-2 min-w-[220px] z-50 filter-value-list shadow-2xl">
+                                    <div className="p-2 text-[11px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-50 mb-1 text-center">Available Metrics</div>
+                                    {allFilters.filter(f => !visibleFilters.includes(f.id)).map(f => {
+                                        const Icon = f.icon;
+                                        return (
+                                            <button 
+                                                key={f.id}
+                                                onClick={() => addMoreFilter(f.id)}
+                                                className="w-full text-left px-3 py-2.5 rounded-lg text-[13.5px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-3 transition-all"
+                                            >
+                                                <Icon size={16} className="opacity-50" />
+                                                {f.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-4">
+                        <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-2">Quick Signals</span>
+                        <div className="flex gap-2">
+                            {strategies.map(s => {
+                                const Icon = s.icon;
+                                return (
+                                    <button 
+                                        key={s.id}
+                                        onClick={() => handleStrategySelect(s)}
+                                        className={`strategy-chip px-4 py-1.5 rounded-full border border-slate-100 bg-slate-50/50 text-[12px] font-bold flex items-center gap-2 transition-all ${activeStrategy === s.id ? 'active' : 'text-slate-500'}`}
+                                    >
+                                        <Icon size={14} className={s.color} />
+                                        {s.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mb-10 space-y-8">
+                    <div>
+                        <div className="flex items-center justify-between mb-4 px-2">
+                            <h2 className="text-[16px] font-black text-slate-800 flex items-center gap-2">
+                                <TrendingUp size={18} className="text-orange-500" />
                                 Trending Screeners
                             </h2>
-                            <div className="space-y-3">
-                                {mockTrending.map((item) => (
-                                    <div 
-                                        key={item.id} 
-                                        className="flex items-center justify-between p-[16px] bg-[rgba(255,255,255,0.6)] rounded-[16px] border border-transparent hover:border-[rgba(255,255,255,0.9)] cursor-pointer transition-all duration-[300ms] ease hover:-translate-y-1 hover:bg-[rgba(255,255,255,0.85)] hover:scale-[1.01] group shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_12px_25px_rgba(0,0,0,0.06)]"
-                                    >
-                                        <div>
-                                            <div className="font-[700] text-[15px] text-[#1e293b] group-hover:text-[#3b82f6] transition-colors">{item.title}</div>
-                                            <div className="text-[13px] text-[#64748b] font-medium mt-1">{item.desc}</div>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-[12px] font-[800] text-[#64748b] bg-[rgba(255,255,255,0.9)] group-hover:text-[#3b82f6] px-[12px] py-[6px] rounded-full transition-colors border border-[rgba(0,0,0,0.03)] group-hover:border-[rgba(59,130,246,0.2)] shadow-sm">
-                                            <Users size={14} className="opacity-75" />
-                                            {item.users}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            <button className="text-[12px] font-black text-blue-600 uppercase tracking-widest hover:underline">Explore More</button>
                         </div>
-
-                        {/* Screener Results */}
-                        <div className={baseCardClass}>
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                                <h2 className={sectionTitleClass.replace('mb-6', 'mb-0')}>
-                                    Live Results <span className="text-[13px] font-[700] text-[#64748b] ml-3 tracking-normal bg-[rgba(255,255,255,0.8)] border border-[rgba(255,255,255,0.9)] px-[10px] py-[4px] shadow-sm rounded-full inline-block">14 matches</span>
-                                </h2>
-                                <div className="relative">
-                                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Search tickers..." 
-                                        className="pl-10 pr-4 py-2.5 bg-[rgba(255,255,255,0.7)] border border-[rgba(255,255,255,0.5)] rounded-[14px] text-sm focus:outline-none focus:border-[#3b82f6] focus:bg-[rgba(255,255,255,0.9)] focus:ring-[2px] focus:ring-[#3b82f6]/20 transition-all font-[600] w-full sm:w-64 text-[#1e293b]"
-                                    />
+                        <div className="horizontal-carousel">
+                            {[
+                                { title: 'IT Sector Breakouts', users: '2.4k', growth: '+12%', color: 'border-blue-100' },
+                                { title: 'High Dividend Giants', users: '1.8k', growth: '+4.2%', color: 'border-emerald-100' },
+                                { title: 'FMCG Defensive Play', users: '950', growth: '+1.5%', color: 'border-amber-100' },
+                                { title: 'Midcap Growth Alpha', users: '3.1k', growth: '+22%', color: 'border-purple-100' },
+                                { title: 'Nifty 50 Rebound', users: '1.2k', growth: '+5.4%', color: 'border-slate-100' },
+                                { title: 'AI Momentum Scans', users: '4.2k', growth: '+18.4%', color: 'border-cyan-100' },
+                                { title: 'SmallCap Rockets', users: '6.5k', growth: '+31%', color: 'border-rose-100' },
+                                { title: 'Pharma Recovery', users: '800', growth: '+2.1%', color: 'border-teal-100' },
+                                { title: 'EV Supply Chain', users: '2.9k', growth: '+14%', color: 'border-lime-100' },
+                                { title: 'Banking Consolidation', users: '1.5k', growth: '+3.8%', color: 'border-indigo-100' },
+                            ].map((scr, i) => (
+                                <div key={i} className={`min-w-[280px] bg-white border ${scr.color} p-5 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer group`}>
+                                    <div className="flex justify-between items-start mb-4">
+                                        <h3 className="font-black text-[15px] text-slate-800 group-hover:text-blue-600">{scr.title}</h3>
+                                        <span className="text-[11px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full">{scr.growth}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[12px] font-bold text-slate-400">
+                                        <span className="flex items-center gap-1.5"><Users size={14} /> {scr.users} users</span>
+                                        <ChevronRight size={16} />
+                                    </div>
                                 </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                {mockResults.map(stock => (
-                                    <div 
-                                        key={stock.id} 
-                                        className="p-[20px] rounded-[18px] bg-[rgba(255,255,255,0.85)] border border-[rgba(255,255,255,0.6)] shadow-[0_8px_20px_rgba(0,0,0,0.04)] transition-all duration-[300ms] ease hover:-translate-y-1.5 hover:border-[rgba(255,255,255,1)] hover:shadow-[0_20px_45px_rgba(59,130,246,0.15),0_0_20px_rgba(59,130,246,0.08)] group flex flex-col justify-between"
-                                    >
-                                        <div className="flex justify-between items-start mb-5">
-                                            <div>
-                                                <h3 className="font-black text-[17px] text-[#1e293b] group-hover:text-[#3b82f6] transition-colors">{stock.id}</h3>
-                                                <p className="text-[13px] text-[#64748b] font-[600] mt-0.5">{stock.name}</p>
-                                                <span className="inline-block mt-3 text-[11px] font-[800] text-[#64748b] bg-[rgba(255,255,255,0.7)] px-3 py-1 rounded-[8px] border border-[rgba(255,255,255,0.8)] shadow-sm">{stock.sector}</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="font-extrabold text-[16px] text-[#1e293b]">{stock.price}</div>
-                                                <div className={`text-[13px] font-[800] ${stock.isPositive ? 'text-[#3E84F6] bg-[#3E84F6]/10' : 'text-[#f43f5e] bg-[#f43f5e]/10'} inline-block px-2 py-0.5 rounded-[6px] mt-1.5 shadow-sm`}>{stock.change}</div>
-                                            </div>
-                                        </div>
-                                        <button className="w-full flex items-center justify-center gap-2 py-3 rounded-full text-[14px] font-[800] text-[#3b82f6] bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.15)] hover:bg-[#3b82f6] hover:text-white transition-all duration-300 hover:shadow-[0_8px_20px_rgba(59,130,246,0.25)] hover:scale-[1.02] active:scale-[0.98]">
-                                            <Plus size={16} strokeWidth={3} />
-                                            Add to Watchlist
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
+                            ))}
                         </div>
-
                     </div>
 
-                    {/* RIGHT COLUMN (35%) */}
-                    <div className="w-full xl:w-[35%] flex flex-col">
-                        <div className="sticky top-[100px] z-20 flex flex-col h-fit">
-                        
-                        {/* Custom Builder (Primary Focus) */}
-                        <div className={rightPanelClass}>
-                            <div className="flex items-center justify-between mb-8">
-                                <h2 className="text-[20px] font-black text-[#1e293b] flex items-center gap-2 drop-shadow-sm">
-                                    <SlidersHorizontal size={20} className="text-[#3b82f6]" />
-                                    Custom Screener Builder
-                                </h2>
-                                <button className="text-[13px] font-[800] text-[#94a3b8] hover:text-[#f43f5e] hover:bg-rose-50 px-[10px] py-[6px] rounded-[8px] transition-all flex items-center gap-1.5 shadow-sm border border-transparent hover:border-rose-100">
-                                    <X size={14} strokeWidth={3} /> Clear
-                                </button>
-                            </div>
-
-                            <div className="space-y-7 max-h-[55vh] overflow-y-auto pr-3 custom-scrollbar">
-                                {/* Market Cap Toggle */}
-                                <div>
-                                    <label className="block text-[14px] font-[800] text-[#1e293b] mb-3">Market Cap</label>
-                                    <div className="flex bg-[rgba(255,255,255,0.65)] p-1.5 rounded-[14px] border border-[rgba(255,255,255,0.5)] shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
-                                        {['Small', 'Mid', 'Large'].map(cap => (
-                                            <button 
-                                                key={cap}
-                                                onClick={() => setMarketCap(cap)}
-                                                className={`flex-1 py-2 text-[13px] font-[800] rounded-[10px] transition-all duration-300 ${marketCap === cap ? 'bg-white text-[#3b82f6] shadow-[0_4px_12px_rgba(0,0,0,0.06),inset_0_1px_1px_rgba(255,255,255,1)] border border-[rgba(255,255,255,0.8)] scale-[1.02]' : 'text-[#64748b] hover:text-[#1e293b] hover:bg-[rgba(255,255,255,0.8)]'}`}
-                                            >
-                                                {cap}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Sliders */}
-                                {[
-                                    { label: 'P/E Ratio', min: '0', max: '50+' },
-                                    { label: 'Price Change % (1Y)', min: '-50%', max: '+100%' },
-                                    { label: 'Debt to Equity', min: '0', max: '3.0' },
-                                    { label: 'Return on Equity (ROE)', min: '0%', max: '30%+' }
-                                ].map(slider => (
-                                    <div key={slider.label}>
-                                        <div className="flex justify-between items-center mb-4">
-                                            <label className="text-[14px] font-[800] text-[#1e293b]">{slider.label}</label>
-                                            <span className="text-[12px] font-[900] text-[#3b82f6] bg-blue-50/80 px-3 py-1 rounded-full border border-blue-100 shadow-sm backdrop-blur-[4px]">Any</span>
-                                        </div>
-                                        <div className="py-2">
-                                            <input type="range" className="screener-slider" />
-                                        </div>
-                                        <div className="flex justify-between text-[11px] font-[700] text-[#94a3b8] mt-2">
-                                            <span>{slider.min}</span>
-                                            <span>{slider.max}</span>
-                                        </div>
-                                    </div>
-                                ))}
-
-                                {/* Industry Chips */}
-                                <div>
-                                    <label className="block text-[14px] font-[800] text-[#1e293b] mb-3">Industry</label>
-                                    <div className="flex flex-wrap gap-2.5">
-                                        {['Tech', 'Finance', 'FMCG', 'Auto', 'Energy', 'Healthcare'].map(ind => {
-                                            const isSelected = industry.includes(ind);
-                                            return (
-                                                <button 
-                                                    key={ind}
-                                                    onClick={() => handleIndustryToggle(ind)}
-                                                    className={`px-[16px] py-[8px] rounded-full text-[13px] font-[800] transition-all duration-300 border ${isSelected ? 'bg-gradient-to-br from-[#3b82f6] to-[#2563eb] text-white border-transparent shadow-[0_8px_16px_rgba(59,130,246,0.35),inset_0_1px_0_rgba(255,255,255,0.3)] scale-[1.05]' : 'bg-[rgba(255,255,255,0.8)] text-[#64748b] border-[rgba(255,255,255,0.9)] hover:border-[#3b82f6]/40 hover:text-[#1e293b] shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(59,130,246,0.1)]'}`}
-                                                >
-                                                    {ind}
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button className={btnGradientHoverClass}>
-                                Show Results
-                                <ChevronRight size={18} />
-                            </button>
-                        </div>
-
-                        {/* Radar Intelligence Card */}
-                        <div className={baseCardClass}>
-                            <h2 className="text-[15px] font-[800] text-[#1e293b] flex items-center gap-2 mb-5 border-l-[3px] border-amber-400 pl-2">
-                                <Info size={18} className="text-amber-500" />
-                                Why These Match
+                    <div>
+                        <div className="flex items-center justify-between mb-4 px-2">
+                            <h2 className="text-[16px] font-black text-slate-800 flex items-center gap-2">
+                                <Star size={18} className="text-amber-500" />
+                                Ready-made Expert Screeners
                             </h2>
-                            <ul className="space-y-4">
-                                <li className="flex items-start gap-4">
-                                    <div className="mt-1.5 w-[6px] h-[6px] rounded-full bg-[#3b82f6] shrink-0 border border-[#3b82f6]/20 ring-[3px] ring-[#3b82f6]/10"></div>
-                                    <p className="text-[13px] text-[#64748b] leading-relaxed font-[600]">
-                                        <strong className="text-[#1e293b]">High ROE</strong> indicates efficient capital usage by management to generate profits.
-                                    </p>
-                                </li>
-                                <li className="flex items-start gap-4">
-                                    <div className="mt-1.5 w-[6px] h-[6px] rounded-full bg-[#3b82f6] shrink-0 border border-[#3b82f6]/20 ring-[3px] ring-[#3b82f6]/10"></div>
-                                    <p className="text-[13px] text-[#64748b] leading-relaxed font-[600]">
-                                        <strong className="text-[#1e293b]">Low debt</strong> suggests financial stability, reducing risk in high-rate environments.
-                                    </p>
-                                </li>
-                            </ul>
+                            <button className="text-[12px] font-black text-blue-600 uppercase tracking-widest hover:underline">View All</button>
                         </div>
+                        <div className="horizontal-carousel">
+                            {mockReadyMade.map(item => {
+                                const Icon = item.icon || Activity;
+                                return (
+                                    <div key={item.id} className="min-w-[300px] bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer group">
+                                        <div className="flex items-center gap-4 mb-3">
+                                            <div className={`p-2.5 rounded-xl ${item.bg} ${item.color} group-hover:scale-110 transition-transform shadow-sm`}>
+                                                <Icon size={20} strokeWidth={3} />
+                                            </div>
+                                            <h3 className="font-black text-[15px] text-slate-800">{item.title}</h3>
+                                        </div>
+                                        <p className="text-[12px] font-bold text-slate-400 leading-relaxed mb-4">{item.desc}</p>
+                                        <button className="w-full py-2 bg-slate-50 text-slate-400 font-black text-[11px] uppercase tracking-widest rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-all">Launch Preview</button>
+                                    </div>
+                                );
+                            })}
                         </div>
-
                     </div>
-
                 </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-20">
+                    <div className="lg:col-span-12">
+                        <div className={`${baseCardClass} !p-0 overflow-hidden bg-white`}>
+                            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+                                <div>
+                                    <h2 className="text-lg font-black text-slate-800">Screener Insights</h2>
+                                    <p className="text-[12px] font-bold text-slate-500">Live results matching your active criteria</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="relative">
+                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Find ticker..." 
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="pl-9 pr-4 py-2 bg-slate-100 border-none rounded-lg text-xs font-bold w-48 focus:ring-2 focus:ring-blue-50 outline-none"
+                                        />
+                                    </div>
+                                    <div className="bg-white border border-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-sm text-xs font-bold text-slate-600">
+                                        Matches: <span className="text-blue-600">{filteredResults.length}</span>
+                                    </div>
+                                    <button className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-md hover:bg-blue-700 transition-all">Export Report</button>
+                                </div>
+                            </div>
+                            
+                            <div className="overflow-x-auto">
+                                <table className="w-full custom-table">
+                                    <thead className="bg-slate-50/50">
+                                        <tr>
+                                            <th>Ticker</th>
+                                            <th>Price</th>
+                                            <th>Change</th>
+                                            <th>Trend</th>
+                                            <th>Mcap</th>
+                                            <th>Metrics</th>
+                                            <th>Insight (Behavioral Diagnostics)</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredResults.map(stock => (
+                                            <tr key={stock.id} className="hover:bg-slate-50/80 transition-colors group">
+                                                <td>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center font-black text-[10px] text-slate-400 text-center uppercase p-1">Stock</div>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-black text-slate-900 group-hover:text-blue-600 transition-colors">{(stock.id || '').split('.')[0]}</span>
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase">{stock.sector}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="font-bold text-slate-700">{stock.price}</td>
+                                                <td>
+                                                    <span className={`px-2 py-0.5 rounded text-[12px] font-black ${stock.isPositive ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
+                                                        {stock.change}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div className="w-24 h-8">
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <AreaChart data={stock.trend.map((v, i) => ({ price: v, i }))}>
+                                                                <defs>
+                                                                    <linearGradient id={`grad-${stock.id}`} x1="0" y1="0" x2="0" y2="1">
+                                                                        <stop offset="5%" stopColor={stock.isPositive ? '#10b981' : '#f43f5e'} stopOpacity={0.3} />
+                                                                        <stop offset="95%" stopColor={stock.isPositive ? '#10b981' : '#f43f5e'} stopOpacity={0} />
+                                                                    </linearGradient>
+                                                                </defs>
+                                                                <Area 
+                                                                    type="monotone" 
+                                                                    dataKey="price" 
+                                                                    stroke={stock.isPositive ? '#10b981' : '#f43f5e'} 
+                                                                    fill={`url(#grad-${stock.id})`}
+                                                                    strokeWidth={2}
+                                                                    isAnimationActive={false}
+                                                                />
+                                                            </AreaChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+                                                </td>
+                                                <td className="text-slate-500 font-bold">{stock.mcap}</td>
+                                                <td>
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="flex items-center justify-between text-[11px] font-bold">
+                                                            <span className="text-slate-400">P/E:</span>
+                                                            <span className="text-slate-600">{stock.pe}</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-[11px] font-bold">
+                                                            <span className="text-slate-400">ROE:</span>
+                                                            <span className="text-slate-600">{stock.roe}</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-[11px] font-bold">
+                                                            <span className="text-slate-400">Yield:</span>
+                                                            <span className="text-slate-600">{stock.yield}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="max-w-[400px]">
+                                                    <div className="flex flex-col gap-2">
+                                                        <p className="text-[13px] text-slate-600 font-medium leading-tight">{stock.why}</p>
+                                                        <div className="flex gap-1.5">
+                                                            {stock.tags.map(t => (
+                                                                <span key={t} className="text-[10px] font-black px-2 py-0.5 bg-blue-50 text-blue-600 rounded border border-blue-100/50 uppercase">
+                                                                    {t}
+                                                                </span>
+                                                            ))}
+                                                            <div className="flex items-center gap-2 ml-2">
+                                                                <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                                    <div className="h-full bg-emerald-500" style={{ width: `${stock.confidence}%` }}></div>
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-slate-400">{stock.confidence}% Signal</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <button className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:bg-blue-600 hover:text-white transition-all shadow-sm border border-slate-100">
+                                                        <Star size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {filteredResults.length === 0 && (
+                                            <tr>
+                                                <td colSpan="6" className="text-center py-20">
+                                                    <div className="flex flex-col items-center gap-3 opacity-30">
+                                                        <Search size={48} />
+                                                        <p className="font-black text-lg">No matches found</p>
+                                                        <button onClick={() => setActiveFilters({})} className="text-blue-600 font-black">Reset filters</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* MODALS */}
+                {showCreateModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 modal-overlay" onClick={() => setShowCreateModal(false)} />
+                        <div className="bg-white rounded-3xl w-full max-w-md p-8 relative z-10 shadow-2xl fade-in-up">
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <h2 className="text-2xl font-black text-slate-800">Create New Filter</h2>
+                                    <p className="text-sm font-bold text-slate-400">Add a custom metric to your radar.</p>
+                                </div>
+                                <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={20} /></button>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Filter Name</label>
+                                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-800 focus:bg-white focus:border-blue-500 transition-all" placeholder="e.g. FII Holding %" />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Options (comma separated)</label>
+                                    <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-800 h-20 focus:bg-white focus:border-blue-500 transition-all" placeholder="Large, Mid, Small..."></textarea>
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Logic Query</label>
+                                    <div className="p-4 bg-slate-900 rounded-xl">
+                                        <code className="text-emerald-400 font-mono text-xs">SELECT * FROM market WHERE x {'>'} y</code>
+                                    </div>
+                                </div>
+                                <button className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-lg shadow-xl shadow-blue-200 mt-4 active:scale-95 transition-all">Create Filter Metric</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showSignalModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 modal-overlay" onClick={() => setShowSignalModal(null)} />
+                        <div className="bg-white rounded-3xl w-full max-w-sm p-8 relative z-10 shadow-2xl scale-in text-center">
+                            {(() => {
+                                const Icon = showSignalModal.icon || Activity;
+                                return (
+                                    <div className={`mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-lg bg-blue-50 text-blue-600`}>
+                                        <Icon size={32} strokeWidth={3} />
+                                    </div>
+                                );
+                            })()}
+                            <h2 className="text-xl font-black text-slate-800 mb-2">{showSignalModal.label}</h2>
+                            <p className="text-slate-500 font-bold mb-6 text-sm leading-relaxed">{showSignalModal.desc}</p>
+                            <div className="p-4 bg-slate-50 rounded-2xl text-left mb-6">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Metrics Configured</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {Object.entries(showSignalModal.filters).map(([k, v]) => (
+                                        <span key={k} className="text-[11px] font-black px-2 py-1 bg-white border border-slate-100 rounded text-slate-600 capitalize">
+                                            {k}: <span className="text-blue-600">{v}</span>
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                            <button onClick={() => setShowSignalModal(null)} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black shadow-lg">Close Explanation</button>
+                        </div>
+                    </div>
+                )}
+
             </div>
         </div>
     );

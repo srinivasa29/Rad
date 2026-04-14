@@ -4,6 +4,7 @@ import { fetchMarketData, fetchMarketHistory, fetchMarketNews } from '../api/mar
 import { fetchTechnicalSummary } from '../api/technicalApi';
 import { fetchRealtimeQuote } from '../api/quotesApi';
 import api from '../api/api';
+import Header from '../components/common/Header';
 
 const BACKEND_SYMBOL_MAP = {
     RELIANCE: 'RELIANCE.NS',
@@ -415,6 +416,23 @@ export default function StockPage() {
     const [newsStatus, setNewsStatus] = useState({ live: false, warning: '' });
 
     useEffect(() => {
+        if (mode === 'INVESTOR') {
+            document.body.style.backgroundColor = '#f0f9ff';
+            document.body.style.backgroundImage = 'linear-gradient(180deg, #f0f9ff 0%, #e1effe 100%)';
+            document.body.style.backgroundAttachment = 'fixed';
+        } else {
+            document.body.style.backgroundColor = '#020617';
+            document.body.style.backgroundImage = 'linear-gradient(180deg, #020617 0%, #0F172A 100%)';
+            document.body.style.backgroundAttachment = 'fixed';
+        }
+        return () => {
+            document.body.style.backgroundColor = '';
+            document.body.style.backgroundImage = '';
+            document.body.style.backgroundAttachment = '';
+        };
+    }, [mode]);
+
+    useEffect(() => {
         setMode(getPreferredMode());
     }, []);
 
@@ -552,13 +570,14 @@ export default function StockPage() {
 
     return (
         <div
-            className={`min-h-screen ${isTraderMode ? 'text-slate-100' : 'text-slate-800'}`}
+            className={`min-h-screen pt-4 ${isTraderMode ? 'text-slate-100' : 'text-slate-800'}`}
             style={{
                 background: isTraderMode
                     ? 'linear-gradient(180deg, #0B1220 0%, #0F172A 100%)'
-                    : 'linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%)',
+                    : 'linear-gradient(180deg, #f0f9ff 0%, #e1effe 100%)',
             }}
         >
+            <Header onToggleMode={() => setMode(mode === 'TRADER' ? 'INVESTOR' : 'TRADER')} />
             <div className="w-full px-3 md:px-6 xl:px-8 py-4 md:py-6">
                 <StockPageHeader
                     navigate={navigate}

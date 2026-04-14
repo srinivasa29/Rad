@@ -93,13 +93,20 @@ export const fetchMarketHistory = async (symbol, type = 'STOCK', interval = '1D'
     }
 };
 
-export const fetchMarketNews = async () => {
+export const fetchMarketNews = async (params = {}) => {
     try {
-        const response = await api.get('/market/news');
-        return response.data;
+        // Try the new intelligent news endpoint first
+        const response = await api.get('/news', { params });
+        return response.data?.data ?? response.data;
     } catch (error) {
-        console.error("Error fetching market news:", error);
-        throw error;
+        console.warn("Intelligent news API failed, falling back to basic news:", error.message);
+        try {
+            const response = await api.get('/market/news', { params });
+            return response.data;
+        } catch (fallbackError) {
+            console.error("All news fetch attempts failed:", fallbackError);
+            throw fallbackError;
+        }
     }
 };
 

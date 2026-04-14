@@ -1,6 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useEffect, useMemo, useState, useRef } from 'react';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
 import api from '../api/api';
+import './Profile.css';
+import { 
+    Bell, 
+    MessageCircle, 
+    ChevronRight, 
+    Zap, 
+    Activity, 
+    User as UserIcon, 
+    Clock, 
+    CheckCircle, 
+    Shield, 
+    AlertCircle,
+    ArrowRight,
+    LayoutDashboard,
+    Star,
+    Filter,
+    Newspaper,
+    Search,
+    Settings,
+    LogOut
+} from 'lucide-react';
 
 const toPayload = (value, fallback = null) => {
     if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'data')) {
@@ -584,39 +605,261 @@ export function ReportsExportPage() {
 }
 
 export function ProfilePage() {
-    const [form, setForm] = useState({ username: '', email: '' });
-    const [status, setStatus] = useState('');
+    const [profile, setProfile] = useState({ 
+        username: 'Krishna', 
+        email: 'krishna@email.com',
+        joinedDate: 'Joined Feb 2024'
+    });
+    
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const profileRef = useRef(null);
+    const navigate = useNavigate();
+
+    // Alignment Metrics
+    const investorPercent = 40;
+    const traderPercent = 60;
 
     useEffect(() => {
-        const load = async () => {
-            const response = await api.get('/auth/me').catch(() => ({ data: {} }));
-            const me = toPayload(response.data, {});
-            setForm({
-                username: me?.username || '',
-                email: me?.email || '',
-            });
+        const handleClickOutside = (e) => {
+            if (profileRef.current && !profileRef.current.contains(e.target)) {
+                setIsProfileOpen(false);
+            }
         };
-        load();
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const save = async (event) => {
-        event.preventDefault();
-        await api.put('/user/profile', form).catch(() => null);
-        setStatus('Profile updated.');
-    };
+    const initial = profile.username.charAt(0).toUpperCase();
 
     return (
-        <PageShell
-            title="Profile"
-            subtitle="Update your account details."
-        >
-            <form onSubmit={save} className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-3">
-                <input value={form.username} onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))} placeholder="Username" className="w-full rounded-lg bg-slate-900 border border-white/10 px-3 py-2 text-sm" />
-                <input value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} placeholder="Email" className="w-full rounded-lg bg-slate-900 border border-white/10 px-3 py-2 text-sm" />
-                <button type="submit" className="rounded-lg bg-cyan-400 text-slate-950 px-4 py-2 font-bold text-sm">Save Profile</button>
-                {status ? <div className="text-sm text-emerald-300">{status}</div> : null}
-            </form>
-        </PageShell>
+        <div className="profile-page-root">
+            <header className="navbar profile-custom-navbar rounded-xl mx-auto max-w-[1400px] border border-blue-100 shadow-sm relative z-[110] bg-white flex items-center justify-between px-12 py-3">
+                <div className="flex items-center gap-4 shrink-0">
+                    <img
+                        src="/radar-logo-final.jpg"
+                        alt="Radar Logo"
+                        className="w-10 h-10 rounded-full object-cover border border-blue-100/50 shadow-sm"
+                    />
+                    <span className="brand-name font-black tracking-tighter text-2xl" style={{ color: '#3E84F6' }}>RADAR</span>
+                </div>
+
+                <div className="hidden lg:flex items-center gap-10 ml-12">
+                    {[
+                        { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
+                        { id: 'WATCHLIST', label: 'Watchlist', icon: Star, to: '/dashboard?module=watchlist' },
+                        { id: 'SCREENERS', label: 'Screeners', icon: Filter, to: '/dashboard?module=screeners' },
+                        { id: 'NEWS', label: 'News', icon: Newspaper, to: '/dashboard?module=news' }
+                    ].map((item) => (
+                        <Link
+                            key={item.id}
+                            to={item.to}
+                            className="flex items-center gap-2.5 text-sm font-extrabold tracking-tight transition-all duration-300 hover:scale-105"
+                            style={{ color: '#3E84F6' }}
+                        >
+                            <item.icon size={18} strokeWidth={2.5} />
+                            {item.label}
+                        </Link>
+                    ))}
+                </div>
+
+                <div className="flex items-center gap-8 ml-auto">
+                    <div className="hidden md:flex relative w-72 h-10">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400">
+                            <Search size={18} />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search stocks..."
+                            className="w-full h-full rounded-2xl pl-12 pr-4 text-xs font-semibold focus:outline-none bg-white border border-blue-50 text-blue-900 placeholder:text-blue-200 shadow-none hover:border-blue-100"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                        <div className="text-[#3E84F6] cursor-pointer hover:scale-110 transition-transform">
+                            <Bell size={22} strokeWidth={2} />
+                        </div>
+                        <div className="relative" ref={profileRef}>
+                            <div 
+                                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                className="w-10 h-10 flex items-center justify-center rounded-full bg-[#3E84F6] shadow-[0_4px_12px_rgba(62,132,246,0.3)] text-white font-bold text-sm cursor-pointer hover:scale-105 transition-transform"
+                            >
+                                {initial}
+                            </div>
+
+                            {/* Profile Dropdown Content */}
+                            {isProfileOpen && (
+                                <div className="absolute right-0 top-14 w-72 rounded-xl shadow-2xl border py-2 backdrop-blur-xl z-[200] origin-top-right bg-white border-blue-100/50">
+                                    <div className="px-4 py-4 border-b border-blue-50 flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-base font-bold text-white">
+                                            {initial}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-800">{profile.username}</p>
+                                            <p className="text-xs text-slate-500">{profile.email}</p>
+                                        </div>
+                                    </div>
+                                    <div className="py-2">
+                                        <Link 
+                                            to="/profile" 
+                                            onClick={() => setIsProfileOpen(false)} 
+                                            className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-slate-700 hover:bg-blue-50/50 transition-colors"
+                                        >
+                                            <UserIcon size={16} /> My Profile
+                                        </Link>
+                                        <button className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-slate-700 hover:bg-blue-50/50 transition-colors">
+                                            <Settings size={16} /> Settings
+                                        </button>
+                                        <button 
+                                            onClick={() => navigate('/')}
+                                            className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-rose-500 hover:bg-rose-50/50 transition-colors"
+                                        >
+                                            <LogOut size={16} /> Sign Out
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            {/* Page Header */}
+            <div className="profile-header-bg">
+                <h1 className="profile-title-text">My Profile</h1>
+            </div>
+
+            {/* Main Content Area */}
+            <main className="profile-main-container">
+                <div className="glass-card">
+                    {/* Top Section: Overview & Market Behavior */}
+                    <div className="profile-top-row">
+                        <div className="overview-col">
+                            <div className="profile-avatar-big">{initial}</div>
+                            <div className="overview-info">
+                                <h2>{profile.username}</h2>
+                                <p className="user-email">{profile.email}</p>
+                                <div className="joined-meta">
+                                    <Clock size={14} /> {profile.joinedDate}
+                                </div>
+                                <div className="mode-pill">
+                                    <Zap size={12} fill="#2563eb" /> Trader Mode
+                                </div>
+                                <div className="archetype-title">
+                                    <Zap size={14} className="text-yellow-500" fill="currentColor" /> 
+                                    The Predator — Advanced Trader Archetype
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="market-behavior-top">
+                            <div className="card-heading">Market Behavior Alignment</div>
+                            <div className="behavior-bars-grid">
+                                <div className="behavior-bar-item">
+                                    <div className="bar-label-wrap">
+                                        <span>INVESTOR</span>
+                                        <span>{investorPercent}%</span>
+                                    </div>
+                                    <div className="bar-track">
+                                        <div className="bar-fill investor" style={{ width: `${investorPercent}%` }} />
+                                    </div>
+                                </div>
+                                <div className="behavior-bar-item">
+                                    <div className="bar-label-wrap">
+                                        <span>TRADER</span>
+                                        <span>{traderPercent}%</span>
+                                    </div>
+                                    <div className="bar-track">
+                                        <div className="bar-fill trader" style={{ width: `${traderPercent}%` }} />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="behavior-meta-actions">
+                                <span className="last-assessed">Last assessed: Feb 20</span>
+                                <button className="btn-retake">Retake Assessment</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bottom Section: 3-Column Grid */}
+                    <div className="profile-bottom-grid">
+                        
+                        {/* Col 1: Market Behavior Mini */}
+                        <div className="stat-card">
+                            <div className="card-heading">Market Behavior</div>
+                            <div className="behavior-bars-grid !mb-4">
+                                <div className="behavior-bar-item !gap-1">
+                                    <div className="bar-label-wrap !text-[10px]">
+                                        <span>INV</span>
+                                        <span>40%</span>
+                                    </div>
+                                    <div className="bar-track !h-[4px]">
+                                        <div className="bar-fill investor" style={{ width: '40%' }} />
+                                    </div>
+                                </div>
+                                <div className="behavior-bar-item !gap-1">
+                                    <div className="bar-label-wrap !text-[10px]">
+                                        <span>TRA</span>
+                                        <span>60%</span>
+                                    </div>
+                                    <div className="bar-track !h-[4px]">
+                                        <div className="bar-fill trader" style={{ width: '60%' }} />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="card-cta">Go to Behavior Assessment <ArrowRight size={14} /></div>
+                        </div>
+
+                        {/* Col 2: Activity Snapshot */}
+                        <div className="stat-card">
+                            <div className="card-heading">Activity Snapshot</div>
+                            <div className="mini-stats-grid">
+                                <div className="mini-stat">
+                                    <span className="num">6</span>
+                                    <span className="label">Stocks</span>
+                                </div>
+                                <div className="mini-stat">
+                                    <span className="num">14</span>
+                                    <span className="label">Screeners Run</span>
+                                </div>
+                                <div className="mini-stat">
+                                    <span className="num">3</span>
+                                    <span className="label">Alerts</span>
+                                </div>
+                            </div>
+                            <div className="ticker-wrap">
+                                <span className="ticker-item">RELIANCE</span>
+                                <span className="ticker-item">INFY</span>
+                                <span className="ticker-item">TATAMOTORS</span>
+                            </div>
+                            <div className="card-cta">Change Mode <ArrowRight size={14} /></div>
+                        </div>
+
+                        {/* Col 3: Preferences */}
+                        <div className="stat-card">
+                            <div className="card-heading">Preferences</div>
+                            <div className="pref-list">
+                                <div className="pref-item">
+                                    <span className="pref-label">Preferred Sectors</span>
+                                    <span className="pref-val">Technology, Finance</span>
+                                </div>
+                                <div className="pref-item">
+                                    <span className="pref-label">Risk Level</span>
+                                    <span className="pref-val risk-high">
+                                        <AlertCircle size={14} /> High
+                                    </span>
+                                </div>
+                                <div className="pref-item">
+                                    <span className="pref-label">Investment Style</span>
+                                    <span className="pref-val">Momentum / Technical</span>
+                                </div>
+                            </div>
+                            <div className="card-cta">Edit Preferences <ArrowRight size={14} /></div>
+                        </div>
+
+                    </div>
+                </div>
+            </main>
+        </div>
     );
 }
 

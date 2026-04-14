@@ -28,6 +28,8 @@ const StockPage = lazy(() => import('./pages/StockPage'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 const RealtimeDemoPage = lazy(() => import('./pages/RealtimeDemoPage'));
 const SpecShowcasePage = lazy(() => import('./pages/SpecShowcase'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const InvestorStockPage = lazy(() => import('./pages/InvestorStockPage'));
 
 const AppLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-[#020617] text-[#E2E8F0]">
@@ -113,6 +115,7 @@ function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/auth/oauth/callback" element={<OAuthCallbackRoute />} />
             <Route path="/stocks/:symbol" element={<StockPage />} />
+            <Route path="/investor-stock/:symbol" element={<InvestorStockPage />} />
             <Route path="/asset/:symbol" element={<AssetAliasRoute />} />
             <Route path="/trader/momentum" element={<DashboardAliasRoute mode="TRADER" module="DASHBOARD" />} />
             <Route path="/investor/valuation" element={<DashboardAliasRoute mode="INVESTOR" module="DASHBOARD" />} />
@@ -132,6 +135,7 @@ function App() {
             <Route path="/admin/health" element={<Navigate to="/admin" replace />} />
             <Route path="/demo" element={<RealtimeDemoPage />} />
             <Route path="/spec/components" element={<SpecShowcasePage />} />
+            <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/404" element={<RouteStatusPage title="404 - Not Found" message="The page you requested does not exist or may have moved." actionTo="/" actionLabel="Return Home" />} />
             <Route path="/500" element={<RouteStatusPage title="500 - Server Error" message="Something went wrong while processing your request. Please try again." actionTo="/" actionLabel="Return Home" />} />
             <Route path="*" element={<Navigate to="/404" replace />} />

@@ -1,294 +1,547 @@
-import React, { useState, useEffect } from "react";
-import { Filter, Search, SlidersHorizontal, ArrowDown, ArrowUp } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { 
+    Filter, 
+    Star, 
+    TrendingUp, 
+    Users, 
+    Activity, 
+    BarChart3, 
+    Banknote, 
+    ShieldCheck, 
+    ChevronRight,
+    Search,
+    SlidersHorizontal,
+    Plus,
+    X,
+    Info,
+    Check,
+    ChevronDown,
+    Zap,
+    LayoutDashboard
+} from 'lucide-react';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { runScreenerScan } from "../../api/screenerApi";
 
-const PRESETS = [
-  { id: "custom", label: "Custom Scan" },
-  { id: "momentum", label: "Momentum Movers" },
-  { id: "value", label: "Value Picks" },
-  { id: "breakout", label: "High RSI Breakouts" },
+const mockReadyMade = [
+    { id: 1, title: 'Consistent Growers', desc: '15%+ profit growth over 3 years.', icon: Activity, color: 'text-[#42C0A5]', bg: 'bg-[#42C0A5]/10' },
+    { id: 2, title: 'Strong Financials', desc: 'Low debt, high cash flow.', icon: Banknote, color: 'text-[#42C0A5]', bg: 'bg-[#42C0A5]/10' },
+    { id: 3, title: 'Value Picks', desc: 'Trading below intrinsic value.', icon: ShieldCheck, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+    { id: 4, title: 'High Yielders', desc: 'Top 5% dividend yield stocks.', icon: Star, color: 'text-amber-400', bg: 'bg-amber-400/10' },
+    { id: 5, title: 'Institutional Favorites', desc: 'Highest FII/DII accumulation.', icon: Users, color: 'text-indigo-400', bg: 'bg-indigo-400/10' },
+    { id: 6, title: 'Debt-Free Leaders', desc: 'Zero debt balance sheet giants.', icon: Zap, color: 'text-red-400', bg: 'bg-red-400/10' },
+    { id: 7, title: 'ESG Alpha', desc: 'Leading sustainability scores.', icon: ShieldCheck, color: 'text-teal-400', bg: 'bg-teal-400/10' },
+];
+
+const mockResults = [
+    { id: 'RELIANCE', name: 'Reliance Industries', price: '₹2,942.10', change: '+1.2%', isPositive: true, mcap: '19.4T', sector: 'Energy', why: 'Strong 200-DMA support with institutional accumulation.', tags: ['Value', 'Growth'], confidence: 92, yield: '0.8%', beta: 0.95, volume: '4.4M', pe: 26.4, roe: '14.2%', trend: [2850, 2870, 2890, 2920, 2942] },
+    { id: 'TCS', name: 'Tata Consultancy Services', price: '₹3,810.50', change: '-0.4%', isPositive: false, mcap: '13.6T', sector: 'IT Services', why: 'Consolidating near major Fibonacci support level.', tags: ['Blue Chip'], confidence: 85, yield: '1.2%', beta: 0.72, volume: '1.2M', pe: 29.1, roe: '28.5%', trend: [3850, 3840, 3820, 3815, 3810] },
+    { id: 'HDFCBANK', name: 'HDFC Bank', price: '₹1,615.80', change: '+2.1%', isPositive: true, mcap: '12.1T', sector: 'Banking', why: 'Breakout above horizontal resistance with volume spike.', tags: ['Momentum', 'Finance'], confidence: 88, yield: '1.1%', beta: 1.04, volume: '12.2M', pe: 18.2, roe: '17.1%', trend: [1550, 1570, 1585, 1600, 1615] },
+    { id: 'INFY', name: 'Infosys Ltd', price: '₹1,540.00', change: '+0.8%', isPositive: true, mcap: '6.4T', sector: 'IT Services', why: 'Price above all major EMAs, bullish bias.', tags: ['Momentum'], confidence: 90, yield: '1.5%', beta: 1.15, volume: '2.6M', pe: 24.5, roe: '26.8%', trend: [1510, 1520, 1535, 1530, 1540] },
+];
+
+const strategies = [
+    { id: 'intra', label: 'Intraday Volatility', desc: 'High momentum stocks for quick trades', icon: Activity, color: 'text-[#42C0A5]', filters: { change: '> 2%', volume: 'High', rsi: 'Overbought' } },
+    { id: 'lowrisk', label: 'Defensive Growth', desc: 'Stable, low beta picks for steady gains', icon: ShieldCheck, color: 'text-blue-400', filters: { beta: '< 0.8', yield: '> 2%', mcap: 'Large' } },
+    { id: 'dip', label: 'Contrarian Buy', desc: 'Oversold bounces at critical support', icon: TrendingUp, color: 'text-amber-400', filters: { change: '< -3%', rsi: 'Oversold' } },
+    { id: 'breakout', label: 'Momentum Breakout', desc: 'Riding the wave of volume breakouts', icon: BarChart3, color: 'text-purple-400', filters: { change: '> 1.5%', volume: 'Very High' } },
+    { id: 'gappers', label: 'Volume Gappers', desc: 'Significant pre-market volume gaps', icon: Zap, color: 'text-orange-400', filters: { change: '> 3%', volume: 'Extreme' } },
+    { id: 'orb', label: 'Opening Range Breakout', desc: 'Volatility spikes in early session', icon: Activity, color: 'text-pink-400', filters: { change: '> 1%', volume: 'High' } },
+    { id: 'swing', label: 'Overnight Stars', desc: 'Strong closing with institutional accumulation', icon: Star, color: 'text-yellow-400', filters: { change: '> 0%', volume: 'High' } },
+];
+
+const allFilters = [
+    { id: 'mcap', label: 'Market Cap', icon: BarChart3, options: ['Large', 'Mid', 'Small', 'Micro'] },
+    { id: 'price', label: 'Price', icon: Banknote, options: ['Any', '< ₹500', '₹500 - ₹2k', '> ₹2k'] },
+    { id: 'change', label: 'Change %', icon: TrendingUp, options: ['Any', '> 0%', '> 2%', '> 5%', '< 0%'] },
+    { id: 'sector', label: 'Sector', icon: Search, options: ['All', 'IT', 'Finance', 'FMCG', 'Auto', 'Energy', 'Healthcare'] },
+    { id: 'roe', label: 'ROE', icon: Activity, options: ['Any', '> 10%', '> 15%', '> 20%'] },
+    { id: 'pe', label: 'P/E', icon: Filter, options: ['Any', 'Low (<15)', 'Medium', 'High'] },
+    { id: 'yield', label: 'Div. Yield', icon: Banknote, options: ['Any', '> 1%', '> 2%', '> 3%'] },
+    { id: 'volume', label: 'Volume', icon: Activity, options: ['Any', 'Low', 'Normal', 'High', 'Very High'] },
+    { id: 'rsi', label: 'RSI', icon: BarChart3, options: ['Any', 'Oversold (<30)', 'Neutral', 'Overbought (>70)'] },
+    { id: 'beta', label: 'Beta', icon: ShieldCheck, options: ['Any', '< 0.8', '0.8 - 1.2', '> 1.2'] },
+    { id: 'debt', label: 'Debt/Eq', icon: Filter, options: ['Low (<0.5)', 'Moderate', 'High'] },
+    { id: 'eps', label: 'EPS Growth', icon: TrendingUp, options: ['Any', '> 5%', '> 15%', '> 25%'] },
+    { id: 'range', label: '52W Range', icon: SlidersHorizontal, options: ['Any', 'Near High', 'Near Low', 'Midway'] },
+    { id: 'inst', label: 'Inst. Holding', icon: Users, options: ['Any', '> 50%', '> 70%', 'Increasing'] },
+    { id: 'margin', label: 'Profit Margin', icon: Activity, options: ['Any', '> 10%', '> 20%', '> 30%'] },
+    { id: 'peg', label: 'PEG Ratio', icon: Filter, options: ['Any', '< 1 (Cheap)', '1 - 2', '> 2'] },
+    { id: 'pb', label: 'Price/Book', icon: Banknote, options: ['Any', '< 1', '< 3', '> 5'] },
 ];
 
 const AdvancedScreener = () => {
-  const [activePreset, setActivePreset] = useState("custom");
-  const [results, setResults] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasError, setHasError] = useState(false);
+    const [activeFilters, setActiveFilters] = useState({});
+    const [visibleFilters, setVisibleFilters] = useState(['mcap', 'price', 'change', 'sector', 'roe', 'pe']);
+    const [activeStrategy, setActiveStrategy] = useState(null);
+    const [openFilter, setOpenFilter] = useState(null);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showSignalModal, setShowSignalModal] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [results, setResults] = useState(mockResults);
+    const [isLoading, setIsLoading] = useState(false);
 
-  const [filters, setFilters] = useState({
-    minPrice: "", maxPrice: "",
-    minChange: "", maxChange: "",
-    minPe: "", maxPe: "",
-    minMarketCap: "", maxMarketCap: "",
-    minRsi: "", maxRsi: "",
-    minScore: "", maxScore: "",
-    volumeStatus: "",
-  });
+    useEffect(() => {
+        const style = document.createElement('style');
+        style.id = 'advanced-screener-styles';
+        style.innerHTML = `
+            .trader-theme .filter-dropdown {
+                background: #161b22;
+                border: 1px solid #30363d;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+                animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            .trader-theme .filter-chip {
+                background: rgba(48, 54, 61, 0.4);
+                border: 1px solid #30363d;
+                color: #8b949e;
+                transition: all 0.2s;
+            }
+            .trader-theme .filter-chip:hover {
+                background: rgba(48, 54, 61, 0.8);
+                color: #f0f6fc;
+                border-color: #42C0A5;
+            }
+            .trader-theme .filter-chip.active {
+                background: rgba(66, 192, 165, 0.1);
+                border-color: #42C0A5;
+                color: #42C0A5;
+            }
+            .trader-theme .custom-input-box {
+                background: #0d1117;
+                border: 1px solid #30363d;
+                color: #f0f6fc;
+            }
+            .trader-theme .custom-input-box:focus {
+                border-color: #42C0A5;
+                box-shadow: 0 0 0 3px rgba(66, 192, 165, 0.15);
+            }
+            .trader-theme .horizontal-carousel::-webkit-scrollbar { display: none; }
+            .trader-theme .strategy-chip {
+                background: rgba(33, 38, 45, 0.5);
+                border: 1px solid #30363d;
+                color: #8b949e;
+            }
+            .trader-theme .strategy-chip.active {
+                background: rgba(66, 192, 165, 0.1);
+                border-color: #42C0A5;
+                color: #42C0A5;
+            }
+            @keyframes slideDown {
+                from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+        return () => {
+            const el = document.getElementById('advanced-screener-styles');
+            if (el) document.head.removeChild(el);
+        };
+    }, []);
 
-  const [sortBy, setSortBy] = useState("score");
-  const [sortOrder, setSortOrder] = useState("desc");
+    const handleFilterChange = (id, value) => {
+        setActiveFilters(prev => ({ ...prev, [id]: value }));
+        setOpenFilter(null);
+        setActiveStrategy(null);
+    };
 
-  const executeScan = async () => {
-    setIsLoading(true);
-    setHasError(false);
-    try {
-      const payload = {
-        preset: activePreset !== "custom" ? activePreset : undefined,
-        limit: 50,
-        strictLive: false,
-        sortBy,
-        sortOrder
-      };
+    const handleStrategySelect = (strat) => {
+        setShowSignalModal(strat);
+        setActiveStrategy(strat.id);
+        setActiveFilters(prev => ({ ...prev, ...strat.filters }));
+    };
 
-      if (activePreset === "custom") {
-        const cleanFilters = Object.fromEntries(
-          Object.entries(filters).filter(([_, v]) => v !== "")
-        );
-        payload.filters = cleanFilters;
-      }
+    const addMoreFilter = (id) => {
+        if (!visibleFilters.includes(id)) {
+            setVisibleFilters(prev => [...prev, id]);
+        }
+        setOpenFilter(null);
+    };
 
-      const response = await runScreenerScan(payload);
-      if (response && response.success) {
-        setResults(response.data.results || []);
-      } else {
-        setResults([]);
-        setHasError(true);
-      }
-    } catch (error) {
-      console.error("Screener scan failed:", error);
-      setResults([]);
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const filteredResults = results.filter(stock => {
+        const id = stock.id || stock.symbol || '';
+        if (searchTerm && !id.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+        if (activeFilters.mcap && activeFilters.mcap !== 'Any') {
+            if (activeFilters.mcap === 'Large' && !stock.mcap.includes('T')) return false;
+        }
+        if (activeFilters.sector && activeFilters.sector !== 'All') {
+            if (!stock.sector.includes(activeFilters.sector)) return false;
+        }
+        return true;
+    });
 
-  useEffect(() => {
-    executeScan();
-  }, [activePreset, sortBy, sortOrder]);
-
-  const handleFilterChange = (e) => {
-    setActivePreset("custom");
-    setFilters({ ...filters, [e.target.name]: e.target.value });
-  };
-
-  const handleSort = (field) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortBy(field);
-      setSortOrder("desc");
-    }
-  };
-
-  const formatMarketCap = (cap) => {
-    if (!cap) return "--";
-    return cap;
-  };
-
-  return (
-    <div className="trader-card flex flex-col h-full bg-transparent border border-white/10 overflow-hidden relative" style={{ minHeight: "400px" }}>
-      {isLoading && (
-        <div className="absolute inset-0 bg-[#0b0f17]/70 backdrop-blur-sm z-20 flex items-center justify-center text-[11px] font-mono text-[#42C0A5] uppercase tracking-wider">
-          <div className="w-4 h-4 rounded-full border-2 border-[#42C0A5] border-t-transparent animate-spin mr-2"></div>
-          Scanning Market Universe...
-        </div>
-      )}
-      
-      <div className="card-header flex justify-between items-center mb-0 px-3 py-2 bg-gradient-to-r from-[#1a1e2e] to-[#131722] border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <Filter size={14} className="text-[#42C0A5]" />
-          <h3 className="text-[#e2e8f0] font-bold text-sm tracking-wider uppercase">Advanced Stock Screener</h3>
-        </div>
-        <div className="flex gap-2">
-          {PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              onClick={() => setActivePreset(preset.id)}
-              className={`px-3 py-1 text-[11px] font-bold tracking-wide rounded transition-all flex items-center gap-1 ${
-                activePreset === preset.id
-                  ? "bg-[#42C0A5]/20 text-[#42C0A5] border border-[#42C0A5]/30"
-                  : "bg-white/5 text-[#8b909a] border border-white/10 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col xl:flex-row p-0">
-        {/* Filters Sidebar */}
-        <div className="w-full xl:w-64 border-r border-white/10 bg-[#131722]/50 p-3 h-full overflow-y-auto custom-scrollbar flex-shrink-0">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-xs text-[#9194a2] font-semibold uppercase tracking-wider flex items-center gap-1">
-              <SlidersHorizontal size={12} /> Custom Filters
-            </span>
-            <button
-              onClick={() => {
-                setFilters({
-                  minPrice: "", maxPrice: "", minChange: "", maxChange: "",
-                  minPe: "", maxPe: "", minMarketCap: "", maxMarketCap: "",
-                  minRsi: "", maxRsi: "", minScore: "", maxScore: "", volumeStatus: "",
-                });
-                setActivePreset("custom");
-              }}
-              className="text-[10px] text-[#5d606b] hover:text-white hover:underline transition-colors"
-            >
-              CLEAR
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-[#7f8591] font-semibold uppercase tracking-wider">Technical Score</label>
-              <div className="flex gap-2">
-                <input type="number" name="minScore" value={filters.minScore} onChange={handleFilterChange} placeholder="Min" className="w-1/2 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-[#42C0A5]/50 transition-colors" />
-                <input type="number" name="maxScore" value={filters.maxScore} onChange={handleFilterChange} placeholder="Max" className="w-1/2 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-[#42C0A5]/50 transition-colors" />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-[#7f8591] font-semibold uppercase tracking-wider">RSI (14)</label>
-              <div className="flex gap-2">
-                <input type="number" name="minRsi" value={filters.minRsi} onChange={handleFilterChange} placeholder="Min" className="w-1/2 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-[#42C0A5]/50 transition-colors" />
-                <input type="number" name="maxRsi" value={filters.maxRsi} onChange={handleFilterChange} placeholder="Max" className="w-1/2 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-[#42C0A5]/50 transition-colors" />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-[#7f8591] font-semibold uppercase tracking-wider">Change %</label>
-              <div className="flex gap-2">
-                <input type="number" name="minChange" value={filters.minChange} onChange={handleFilterChange} placeholder="Min %" className="w-1/2 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-[#42C0A5]/50 transition-colors" />
-                <input type="number" name="maxChange" value={filters.maxChange} onChange={handleFilterChange} placeholder="Max %" className="w-1/2 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-[#42C0A5]/50 transition-colors" />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-[#7f8591] font-semibold uppercase tracking-wider">P/E Ratio</label>
-              <div className="flex gap-2">
-                <input type="number" name="minPe" value={filters.minPe} onChange={handleFilterChange} placeholder="Min" className="w-1/2 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-[#42C0A5]/50 transition-colors" />
-                <input type="number" name="maxPe" value={filters.maxPe} onChange={handleFilterChange} placeholder="Max" className="w-1/2 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-[#42C0A5]/50 transition-colors" />
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <button
-                onClick={executeScan}
-                className="w-full bg-gradient-to-r from-[#42C0A5] to-[#36a68f] text-black font-bold text-xs py-2.5 rounded hover:opacity-90 transition-opacity flex justify-center items-center gap-2"
-              >
-                <Search size={14} /> RUN SCAN
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Results Data Grid */}
-        <div className="flex-1 overflow-x-auto relative">
-          <table className="w-full text-left border-collapse min-w-[700px]">
-            <thead className="sticky top-0 z-10 bg-[#161b22] border-b border-white/10">
-              <tr>
-                {[{ key: "symbol", label: "Symbol" },
-                  { key: "price", label: "Price" },
-                  { key: "change", label: "Change %" },
-                  { key: "rsi", label: "RSI" },
-                  { key: "score", label: "Score" },
-                  { key: "bias", label: "Bias" },
-                  { key: "pe", label: "P/E" },
-                  { key: "sector", label: "Sector" }
-                ].map((col) => (
-                  <th
-                    key={col.key}
-                    onClick={() => handleSort(col.key)}
-                    className="p-3 text-[10px] text-[#8b909a] font-bold uppercase tracking-wider cursor-pointer hover:bg-white/5 transition-colors whitespace-nowrap select-none"
-                  >
-                    <div className="flex items-center gap-1">
-                      {col.label}
-                      {sortBy === col.key && (
-                        sortOrder === "desc" ? <ArrowDown size={10} className="text-[#42C0A5]" /> : <ArrowUp size={10} className="text-[#42C0A5]" />
-                      )}
+    return (
+        <div className="trader-theme flex flex-col w-full min-h-screen bg-[#0b0f17] text-[#8b949e] p-4 md:p-8">
+            <div className="max-w-[1700px] mx-auto w-full">
+                
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 px-2">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-[#42C0A5]/10 flex items-center justify-center text-[#42C0A5] border border-[#42C0A5]/20 shadow-[0_0_20px_rgba(66,192,165,0.1)]">
+                            <Zap size={24} fill="currentColor" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-black text-[#f0f6fc] tracking-tight">Advanced Smart Screener</h1>
+                            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#42C0A5]">
+                                <Activity size={12} />
+                                Multi-dimensional Signal Discovery
+                            </div>
+                        </div>
                     </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5 bg-[#0b0f17]/30">
-              {!isLoading && hasError && (
-                <tr>
-                  <td colSpan="8" className="p-6 text-center text-xs font-mono text-[#f0b429] uppercase tracking-wider">
-                    Error loading screener results. Check backend connection.
-                  </td>
-                </tr>
-              )}
-              {!isLoading && !hasError && results.length === 0 && (
-                <tr>
-                  <td colSpan="8" className="p-6 text-center text-xs font-mono text-[#5d606b] uppercase tracking-wider">
-                    No stocks match the selected criteria.
-                  </td>
-                </tr>
-              )}
-              {results.map((row, idx) => (
-                <tr key={`${row.symbol}-${idx}`} className="hover:bg-white/5 transition-colors">
-                  <td className="p-3">
-                    <div className="flex flex-col">
-                      <span className="font-bold text-[#e2e8f0] text-[13px]">{row.displaySymbol}</span>
-                      <span className="text-[9px] text-[#717789] truncate max-w-[120px]">{row.name}</span>
+                    
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => setShowCreateModal(true)}
+                            className="bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] px-5 py-2.5 rounded-xl text-sm font-bold text-[#c9d1d9] transition-all flex items-center gap-2 group"
+                        >
+                            <Plus size={18} className="text-[#42C0A5] group-hover:scale-125 transition-transform" />
+                            Create Filter
+                        </button>
+                        <button className="bg-[#42C0A5] hover:bg-[#36a68f] text-[#0b0f17] px-6 py-2.5 rounded-xl text-sm font-black transition-all flex items-center gap-2 shadow-lg shadow-[#42C0A5]/20">
+                            <Star size={18} fill="#0b0f17" />
+                            Save Configuration
+                        </button>
                     </div>
-                  </td>
-                  <td className="p-3 font-mono text-xs text-[#cfd3df]">
-                    {row.price !== null ? row.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "--"}
-                  </td>
-                  <td className="p-3 font-mono text-xs font-bold">
-                    {row.change !== null ? (
-                      <span className={row.change > 0 ? "text-[#42C0A5]" : row.change < 0 ? "text-[#ed5750]" : "text-[#8b909a]"}>
-                        {row.change > 0 ? '+' : ''}{row.change.toFixed(2)}%
-                      </span>
-                    ) : "--"}
-                  </td>
-                  <td className="p-3 font-mono text-xs">
-                    {row.rsi !== null ? (
-                      <span className={row.rsi >= 70 ? "text-[#ed5750]" : row.rsi <= 30 ? "text-[#42C0A5]" : "text-[#cfd3df]"}>
-                        {row.rsi.toFixed(1)}
-                      </span>
-                    ) : "--"}
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                       <span className="font-mono text-xs text-white">{row.score !== null ? row.score : "--"}</span>
-                       {row.score !== null && (
-                         <div className="w-12 h-1.5 bg-black/40 rounded-full overflow-hidden">
-                           <div className="h-full rounded-full bg-gradient-to-r from-[#ed5750] via-yellow-400 to-[#42C0A5]"
-                                style={{ width: `${Math.max(0, Math.min(100, row.score))}%` }}>
-                           </div>
-                         </div>
-                       )}
+                </div>
+
+                {/* Horizontal Smart Filter Hero */}
+                <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-4 mb-8 shadow-2xl relative z-40 overflow-visible">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2 pr-4 border-r border-[#30363d] text-[#c9d1d9] font-bold text-sm">
+                            <SlidersHorizontal size={18} className="text-[#42C0A5]" />
+                            Metrics
+                        </div>
+                        
+                        {allFilters.filter(f => visibleFilters.includes(f.id)).map(f => {
+                            const Icon = f.icon;
+                            return (
+                                <div key={f.id} className="relative">
+                                    <div 
+                                        onClick={() => setOpenFilter(openFilter === f.id ? null : f.id)}
+                                        className={`filter-chip px-4 py-2 rounded-xl flex items-center gap-2.5 text-[13px] font-bold cursor-pointer transition-all ${activeFilters[f.id] ? 'active' : ''}`}
+                                    >
+                                        <Icon size={14} className="opacity-70" />
+                                        <span>{f.label}:</span>
+                                        <span className="text-[#f0f6fc]">{activeFilters[f.id] || 'Any'}</span>
+                                        <ChevronDown size={14} className={`transition-transform duration-300 ${openFilter === f.id ? 'rotate-180' : ''}`} />
+                                    </div>
+                                    
+                                    {openFilter === f.id && (
+                                        <div className="filter-dropdown absolute top-full left-0 mt-2 p-3 min-w-[220px] rounded-xl z-50">
+                                            <div className="mb-3">
+                                                <div className="text-[10px] font-black uppercase tracking-wider mb-2 text-[#42C0A5]/70">Custom Input</div>
+                                                <input 
+                                                    type="text" 
+                                                    className="custom-input-box"
+                                                    placeholder={`Enter ${f.label}...`}
+                                                    value={activeFilters[f.id] || ''}
+                                                    onChange={(e) => handleFilterChange(f.id, e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="text-[10px] font-black uppercase tracking-wider mb-2 text-[#42C0A5]/70 border-t border-[#30363d] pt-2">Presets</div>
+                                            <div className="space-y-1">
+                                                {f.options.map(opt => (
+                                                    <button 
+                                                        key={opt}
+                                                        onClick={() => handleFilterChange(f.id, opt)}
+                                                        className={`w-full text-left px-3 py-2 rounded text-xs font-bold transition-colors ${activeFilters[f.id] === opt ? 'bg-[#42C0A5]/10 text-[#42C0A5]' : 'hover:bg-white/5 text-[#8b949e]'}`}
+                                                    >
+                                                        {opt}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        
+                        <div className="relative">
+                            <button 
+                                onClick={() => setOpenFilter(openFilter === 'add' ? null : 'add')}
+                                className="px-4 py-2 text-[13px] font-bold text-[#42C0A5] hover:bg-[#42C0A5]/5 rounded-xl transition-all flex items-center gap-2"
+                            >
+                                <Plus size={16} /> Add Filter
+                            </button>
+                            {openFilter === 'add' && (
+                                <div className="filter-dropdown absolute top-full right-0 mt-2 p-2 min-w-[200px] rounded-xl z-50 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                    {allFilters.filter(f => !visibleFilters.includes(f.id)).map(f => {
+                                        const Icon = f.icon;
+                                        return (
+                                            <button 
+                                                key={f.id}
+                                                onClick={() => addMoreFilter(f.id)}
+                                                className="w-full text-left px-3 py-2 rounded-lg text-xs font-bold text-[#8b949e] hover:bg-white/5 hover:text-[#f0f6fc] flex items-center gap-3"
+                                            >
+                                                <Icon size={14} className="opacity-50" />
+                                                {f.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                  </td>
-                  <td className="p-3 text-[10px] font-bold tracking-wider">
-                    {row.bias ? (
-                      <span className={`px-2 py-0.5 rounded ${
-                        row.bias === 'bullish' ? 'bg-[#42C0A5]/10 text-[#42C0A5] border border-[#42C0A5]/20' : 
-                        row.bias === 'bearish' ? 'bg-[#ed5750]/10 text-[#ed5750] border border-[#ed5750]/20' : 
-                        'bg-white/5 text-[#8b909a] border border-white/10'
-                      }`}>
-                        {row.bias.toUpperCase()}
-                      </span>
-                    ) : "--"}
-                  </td>
-                  <td className="p-3 font-mono text-xs text-[#a6abba]">
-                    {row.pe !== null ? row.pe.toFixed(2) : "--"}
-                  </td>
-                  <td className="p-3 text-[10px] uppercase text-[#717789] tracking-wider truncate max-w-[100px]">
-                    {row.sector || "--"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+                    {/* Quick Strategies */}
+                    <div className="mt-4 pt-4 border-t border-[#30363d] flex items-center gap-4">
+                        <span className="text-[10px] font-black text-[#8b949e] uppercase tracking-[0.2em] px-2">Market Signals</span>
+                        <div className="flex gap-2.5">
+                            {strategies.map(s => {
+                                const Icon = s.icon;
+                                return (
+                                    <button 
+                                        key={s.id}
+                                        onClick={() => handleStrategySelect(s)}
+                                        className={`strategy-chip px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2.5 transition-all ${activeStrategy === s.id ? 'active' : ''}`}
+                                    >
+                                        <Icon size={14} className={activeStrategy === s.id ? 'text-[#42C0A5]' : s.color} />
+                                        {s.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Trending and Expert Sections */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between px-2">
+                             <div className="flex items-center gap-2 font-black text-[#c9d1d9] text-sm">
+                                <TrendingUp size={16} className="text-orange-400" />
+                                EXPLODING THEMES
+                             </div>
+                             <ChevronRight size={16} className="text-[#8b949e]" />
+                        </div>
+                        <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+                            {[
+                                { title: 'Intraday Highs', val: '+12%', sub: 'Active Scans: 12' },
+                                { title: 'Bullish Crossover', val: '+5.5%', sub: 'Active Scans: 28' },
+                                { title: 'Volume Spike', val: '+8.2%', sub: 'Active Scans: 44' },
+                                { title: 'RSI Oversold', val: '+2.1%', sub: 'Active Scans: 19' },
+                                { title: 'Golden Cross', val: '+14.2%', sub: 'Active Scans: 7' },
+                                { title: 'High Vol Gappers', val: '+22.5%', sub: 'Active Scans: 15' },
+                                { title: 'Opening Breakout', val: '+18.1%', sub: 'Active Scans: 32' },
+                                { title: 'Crypto-related STK', val: '+31.4%', sub: 'Active Scans: 5' },
+                            ].map((t, i) => (
+                                <div key={i} className="min-w-[220px] bg-[#161b22] border border-[#30363d] p-5 rounded-2xl hover:border-[#42C0A5]/40 cursor-pointer transition-all group relative overflow-hidden">
+                                     <div className="absolute top-0 right-0 p-2 opacity-5 group-hover:opacity-10 transition-opacity">
+                                        <TrendingUp size={40} className="text-[#42C0A5]" />
+                                     </div>
+                                     <div className="text-[10px] font-black text-[#42C0A5] mb-2 tracking-widest uppercase">Strategy {i+1}</div>
+                                     <div className="text-sm font-bold text-[#f0f6fc] mb-1">{t.title}</div>
+                                     <div className="flex items-center justify-between mt-4">
+                                        <div className="text-[11px] text-[#8b949e] font-bold">{t.sub}</div>
+                                        <span className="text-[10px] font-black text-[#42C0A5] bg-[#42C0A5]/10 px-2 py-0.5 rounded-full">{t.val}</span>
+                                     </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between px-2">
+                             <div className="flex items-center gap-2 font-black text-[#c9d1d9] text-sm">
+                                <ShieldCheck size={16} className="text-blue-400" />
+                                INSTITUTIONAL PICKS
+                             </div>
+                             <ChevronRight size={16} className="text-[#8b949e]" />
+                        </div>
+                        <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+                            {mockReadyMade.map(item => {
+                                const Icon = item.icon;
+                                return (
+                                    <div key={item.id} className="min-w-[240px] bg-[#161b22] border border-[#30363d] p-4 rounded-xl hover:border-[#42C0A5]/40 cursor-pointer transition-all">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <Icon size={18} className={item.color} />
+                                            <span className="text-sm font-bold text-[#f0f6fc]">{item.title}</span>
+                                        </div>
+                                        <p className="text-[11px] text-[#8b949e] line-clamp-1">{item.desc}</p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Results Table */}
+                <div className="bg-[#161b22] border border-[#30363d] rounded-2xl overflow-hidden shadow-2xl">
+                    <div className="p-5 border-b border-[#30363d] flex items-center justify-between bg-[#1c2128]">
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8b949e]" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search Ticker..." 
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="bg-[#0b0f17] border border-[#30363d] rounded-lg pl-9 pr-4 py-2 text-xs font-bold text-[#f0f6fc] focus:border-[#42C0A5] outline-none transition-all w-64"
+                                />
+                            </div>
+                            <div className="h-6 w-[1px] bg-[#30363d]"></div>
+                            <span className="text-[11px] font-black text-[#8b949e] uppercase tracking-widest">Matches: <span className="text-[#42C0A5]">{filteredResults.length} Assets</span></span>
+                        </div>
+                        <div className="flex gap-3">
+                            <button className="bg-[#21262d] text-[#c9d1d9] px-4 py-2 rounded-lg text-xs font-bold border border-[#30363d] hover:bg-[#30363d] transition-all">Settings</button>
+                            <button className="bg-[#42C0A5] text-[#0b0f17] px-4 py-2 rounded-lg text-xs font-black shadow-lg shadow-[#42C0A5]/10">Export Dataset</button>
+                        </div>
+                    </div>
+                    
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-[#0b0f17]/50 border-b border-[#30363d]">
+                                <tr className="text-[10px] font-black text-[#484f58] uppercase tracking-[0.2em]">
+                                    <th className="p-4">Asset</th>
+                                    <th className="p-4">Price</th>
+                                    <th className="p-4">Change</th>
+                                    <th className="p-4">Trend</th>
+                                    <th className="p-4">Metrics</th>
+                                    <th className="p-4">Diagnostic Insight</th>
+                                    <th className="p-4 text-center">Confidence</th>
+                                    <th className="p-4">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#30363d]">
+                                {filteredResults.map(stock => (
+                                    <tr key={stock.id} className="hover:bg-white/[0.02] transition-colors group">
+                                        <td className="p-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded bg-[#21262d] flex items-center justify-center text-[10px] font-black text-[#42C0A5]">STK</div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-black text-[#f0f6fc] group-hover:text-[#42C0A5] transition-colors">{(stock.id || '').split('.')[0]}</span>
+                                                    <span className="text-[10px] text-[#8b949e] font-bold uppercase">{stock.sector}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 font-mono text-sm text-[#f0f6fc]">{stock.price}</td>
+                                        <td className="p-4 font-mono text-sm">
+                                            <span className={`px-2 py-0.5 rounded text-[11px] font-black ${stock.isPositive ? 'text-[#42C0A5] bg-[#42C0A5]/10' : 'text-[#f85149] bg-[#f85149]/10'}`}>
+                                                {stock.change}
+                                            </span>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="w-20 h-7">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart data={stock.trend.map((v, i) => ({ p: v, i }))}>
+                                                        <defs>
+                                                            <linearGradient id={`t-grad-${stock.id}`} x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor={stock.isPositive ? '#42C0A5' : '#f85149'} stopOpacity={0.3} />
+                                                                <stop offset="95%" stopColor={stock.isPositive ? '#42C0A5' : '#f85149'} stopOpacity={0} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <Area 
+                                                            type="monotone" 
+                                                            dataKey="p" 
+                                                            stroke={stock.isPositive ? '#42C0A5' : '#f85149'} 
+                                                            fill={`url(#t-grad-${stock.id})`}
+                                                            strokeWidth={1.5}
+                                                            isAnimationActive={false}
+                                                        />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex flex-col gap-0.5 min-w-[70px]">
+                                                <div className="flex justify-between text-[10px] font-bold">
+                                                    <span className="text-[#484f58]">P/E</span>
+                                                    <span className="text-[#c9d1d9]">{stock.pe}</span>
+                                                </div>
+                                                <div className="flex justify-between text-[10px] font-bold">
+                                                    <span className="text-[#484f58]">ROE</span>
+                                                    <span className="text-[#c9d1d9]">{stock.roe}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 max-w-[450px]">
+                                            <div className="flex flex-col gap-2">
+                                                <p className="text-[13px] text-[#8b949e] font-medium leading-tight">{stock.why}</p>
+                                                <div className="flex gap-2">
+                                                    {stock.tags.map(t => (
+                                                        <span key={t} className="text-[9px] font-black px-2 py-0.5 bg-[#21262d] text-[#c9d1d9] rounded uppercase tracking-wider">
+                                                            {t}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <span className="text-[11px] font-black text-[#f0f6fc]">{stock.confidence}%</span>
+                                                <div className="w-20 h-1.5 bg-[#21262d] rounded-full overflow-hidden">
+                                                    <div className="h-full bg-gradient-to-r from-[#42C0A5] to-emerald-300" style={{ width: `${stock.confidence}%` }}></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <button className="p-2 rounded-lg bg-[#21262d] text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#30363d] transition-all border border-[#30363d]">
+                                                <Star size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {/* Modals */}
+            {showCreateModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowCreateModal(false)} />
+                    <div className="bg-[#161b22] border border-[#30363d] rounded-3xl w-full max-w-md p-8 relative z-10 shadow-2xl">
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h2 className="text-2xl font-black text-[#f0f6fc]">Create Filter</h2>
+                                <p className="text-sm font-bold text-[#8b949e]">Define custom processing logic</p>
+                            </div>
+                            <button onClick={() => setShowCreateModal(false)} className="text-[#8b949e] hover:text-white"><X size={20} /></button>
+                        </div>
+                        <div className="space-y-5">
+                            <div>
+                                <label className="block text-[10px] font-black text-[#42C0A5] uppercase tracking-widest mb-2">Metric Identity</label>
+                                <input type="text" className="w-full bg-[#0d1117] border border-[#30363d] rounded-xl px-4 py-3 text-sm text-[#f0f6fc] outline-none focus:border-[#42C0A5]" placeholder="e.g. Institutional Delta %" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-[#42C0A5] uppercase tracking-widest mb-2">Logic Description</label>
+                                <textarea className="w-full bg-[#0d1117] border border-[#30363d] rounded-xl px-4 py-3 text-sm text-[#f0f6fc] outline-none focus:border-[#42C0A5] h-24" placeholder="Describe how this filter should behave..."></textarea>
+                            </div>
+                            <button className="w-full py-4 bg-[#42C0A5] text-[#0b0f17] rounded-xl font-black text-lg transition-all active:scale-95 shadow-lg shadow-[#42C0A5]/10 mt-2">Activate Metric</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showSignalModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowSignalModal(null)} />
+                    <div className="bg-[#161b22] border border-[#30363d] rounded-3xl w-full max-w-sm p-8 relative z-10 shadow-2xl text-center">
+                        {(() => {
+                            const Icon = showSignalModal.icon || Activity;
+                            return (
+                                <div className={`mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-2xl bg-[#42C0A5]/10 text-[#42C0A5] border border-[#42C0A5]/20`}>
+                                    <Icon size={32} strokeWidth={3} />
+                                </div>
+                            );
+                        })()}
+                        <h2 className="text-xl font-black text-[#f0f6fc] mb-2">{showSignalModal.label}</h2>
+                        <p className="text-[#8b949e] font-bold mb-6 text-sm leading-relaxed">{showSignalModal.desc}</p>
+                        <div className="p-4 bg-[#0d1117] rounded-2xl text-left mb-6 border border-[#30363d]">
+                            <span className="text-[10px] font-black text-[#42C0A5] uppercase tracking-widest block mb-2">Conditions</span>
+                            <div className="flex flex-wrap gap-2">
+                                {Object.entries(showSignalModal.filters).map(([k, v]) => (
+                                    <span key={k} className="text-[11px] font-bold px-2 py-1 bg-[#161b22] border border-[#30363d] rounded text-[#c9d1d9] capitalize">
+                                        {k}: <span className="text-[#42C0A5]">{v}</span>
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                        <button onClick={() => setShowSignalModal(null)} className="w-full py-3 bg-[#30363d] text-[#f0f6fc] rounded-xl font-black hover:bg-[#3d444d] transition-all">Close Pipeline</button>
+                    </div>
+                </div>
+            )}
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default AdvancedScreener;

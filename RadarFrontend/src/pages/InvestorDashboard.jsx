@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import YourInvestments from '../components/investor/YourInvestments';
 import MostBoughtStocks from '../components/investor/MostBoughtStocks';
 import SharedTickerTape from '../components/landing/TickerTape';
 import Watchlist from '../components/investor/Watchlist';
 import Screeners from '../components/investor/Screeners';
+import Header from '../components/common/Header';
 
 import {
     LayoutDashboard,
@@ -22,6 +23,17 @@ import {
     TrendingDown,
     LogOut,
     Menu,
+    Zap,
+    RefreshCw,
+    Compass,
+    ArrowUp,
+    ArrowDown,
+    ArrowRight,
+    ChevronDown,
+    ChevronUp,
+    AlertCircle,
+    ExternalLink,
+    AlertTriangle,
 } from "lucide-react";
 import {
     ResponsiveContainer,
@@ -139,16 +151,8 @@ const themes = {
 };
 
 const InvestorMode = ({ onToggleMode }) => {
-    const navigate = useNavigate();
-    const {
-        profile,
-        userInitial,
-        notifications,
-        unreadCount,
-        isLoadingNotifications,
-        isMarkingNotifications,
-        markAllNotificationsRead,
-    } = useHeaderData();
+    const [activeModule, setActiveModule] = useState("DASHBOARD");
+
     useEffect(() => {
         const currentTheme = 'blue';
         const fullBackground = themes[currentTheme].gradient;
@@ -175,486 +179,16 @@ const InvestorMode = ({ onToggleMode }) => {
         };
     }, []);
 
-    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-    const [isProfileOpen, setIsProfileOpen] = useState(false);
-    const [showLogoutModal, setShowLogoutModal] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState([]);
-    const [trendingSearches, setTrendingSearches] = useState([]);
-    const [isSearching, setIsSearching] = useState(false);
-    const [showSearchDropdown, setShowSearchDropdown] = useState(false);
-    const [highlightedIndex, setHighlightedIndex] = useState(-1);
-    const searchContainerRef = useRef(null);
-
-    const handleLogout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("userMode");
-        localStorage.removeItem("mode");
-        navigate("/", { state: { skipPreloader: true } });
-    };
-
-    const [activeModule, setActiveModule] = useState("DASHBOARD");
-
-    useEffect(() => {
-        let isMounted = true;
-
-        const loadTrending = async () => {
-            const trends = await fetchTrendingSearches();
-            if (isMounted) {
-                setTrendingSearches(trends.slice(0, 6));
-            }
-        };
-
-        loadTrending();
-        return () => {
-            isMounted = false;
-        };
-    }, []);
-
-    useEffect(() => {
-        let isMounted = true;
-        const query = searchQuery.trim();
-
-        if (!query) {
-            setSearchResults([]);
-            setIsSearching(false);
-            return undefined;
-        }
-
-        const timer = setTimeout(async () => {
-            try {
-                setIsSearching(true);
-                const response = await fetchMarketData({ search: query });
-                if (isMounted) {
-                    setSearchResults(Array.isArray(response) ? response.slice(0, 8) : []);
-                }
-            } catch (error) {
-                console.error('Search failed:', error);
-                if (isMounted) {
-                    setSearchResults([]);
-                }
-            } finally {
-                if (isMounted) {
-                    setIsSearching(false);
-                }
-            }
-        }, 250);
-
-        return () => {
-            isMounted = false;
-            clearTimeout(timer);
-        };
-    }, [searchQuery]);
-
-    useEffect(() => {
-        const handleOutsideClick = (event) => {
-            if (!searchContainerRef.current) {
-                return;
-            }
-
-            if (!searchContainerRef.current.contains(event.target)) {
-                setShowSearchDropdown(false);
-                setHighlightedIndex(-1);
-            }
-        };
-
-        document.addEventListener('mousedown', handleOutsideClick);
-        document.addEventListener('touchstart', handleOutsideClick);
-
-        return () => {
-            document.removeEventListener('mousedown', handleOutsideClick);
-            document.removeEventListener('touchstart', handleOutsideClick);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!showSearchDropdown) {
-            setHighlightedIndex(-1);
-            return;
-        }
-
-        const optionsLength = searchQuery.trim().length > 0 ? searchResults.length : trendingSearches.length;
-        if (optionsLength === 0) {
-            setHighlightedIndex(-1);
-            return;
-        }
-
-        if (highlightedIndex >= optionsLength) {
-            setHighlightedIndex(0);
-        }
-    }, [showSearchDropdown, searchQuery, searchResults, trendingSearches, highlightedIndex]);
-
-    const openStockPage = (value) => {
-        const symbol = String(value || '').trim();
-        if (!symbol) {
-            return;
-        }
-        navigate(`/stocks/${encodeURIComponent(symbol.toUpperCase())}`);
-    };
-
-    const handleSearchSelect = async (item) => {
-        const label = item?.symbol || item?.name || '';
-        setSearchQuery(label);
-        setShowSearchDropdown(false);
-        setHighlightedIndex(-1);
-        setActiveModule('WATCHLIST');
-        openStockPage(label);
-
-        if (label) {
-            await logSearchQuery(label);
-        }
-    };
-
-    const handleTrendingSelect = async (term) => {
-        setSearchQuery(term);
-        setShowSearchDropdown(false);
-        setHighlightedIndex(-1);
-        setActiveModule('WATCHLIST');
-        openStockPage(term);
-        await logSearchQuery(term);
-    };
-
     return (
-        <div className="dashboard-container investor-theme pt-6">
-            <header className="navbar rounded-2xl mx-6 lg:mx-10 border border-blue-100 shadow-sm relative z-[110]">
-                <div className="flex items-center gap-4 shrink-0">
-                    <div className="w-12 h-12 rounded-full bg-[#3E84F6]/10 flex items-center justify-center border border-[#3E84F6]/20 overflow-hidden shadow-inner">
-                        <img
-                            src="/radar-logo-final.jpg"
-                            alt="Radar Logo"
-                            className="w-full h-full object-cover scale-100"
-                        />
-                    </div>
-                    <span className="brand-name font-black tracking-tighter text-2xl" style={{ color: '#3E84F6' }}>RADAR</span>
-                </div>
-
-                {/* Main Navigation */}
-                <div className="hidden lg:flex items-center gap-6 xl:gap-10 ml-8 xl:ml-12">
-                    {[
-                        { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard },
-                        { id: 'WATCHLIST', label: 'Watchlist', icon: Star },
-                        { id: 'SCREENERS', label: 'Screeners', icon: Filter },
-                        { id: 'NEWS', label: 'News', icon: Newspaper }
-                    ].map((item) => (
-                        <button
-                            key={item.id}
-                            onClick={() => setActiveModule(item.id)}
-                            className={`flex items-center gap-2.5 text-sm font-black tracking-tight transition-all duration-300 ${activeModule === item.id
-                                ? 'scale-105'
-                                : 'hover:scale-105'
-                                }`}
-                            style={{ color: '#3E84F6' }}
-                        >
-                            <item.icon size={18} strokeWidth={2.5} />
-                            {item.label}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Search Bar */}
-                <div className="hidden md:flex ml-auto mr-4 lg:mr-8 relative group" ref={searchContainerRef}>
-                    <div className="relative w-48 lg:w-72 xl:w-80">
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'rgba(62, 132, 246, 0.5)' }}>
-                            <Search size={18} />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="Search stocks..."
-                            value={searchQuery}
-                            onFocus={() => {
-                                setShowSearchDropdown(true);
-                                setHighlightedIndex(searchQuery.trim().length > 0 ? (searchResults.length > 0 ? 0 : -1) : (trendingSearches.length > 0 ? 0 : -1));
-                            }}
-                            onChange={(e) => {
-                                setSearchQuery(e.target.value);
-                                setShowSearchDropdown(true);
-                                setHighlightedIndex(0);
-                            }}
-                            onKeyDown={async (e) => {
-                                const usingSearchResults = searchQuery.trim().length > 0;
-                                const optionsLength = usingSearchResults ? searchResults.length : trendingSearches.length;
-
-                                if (e.key === 'ArrowDown' && optionsLength > 0) {
-                                    e.preventDefault();
-                                    setShowSearchDropdown(true);
-                                    setHighlightedIndex((prev) => (prev + 1 + optionsLength) % optionsLength);
-                                    return;
-                                }
-
-                                if (e.key === 'ArrowUp' && optionsLength > 0) {
-                                    e.preventDefault();
-                                    setShowSearchDropdown(true);
-                                    setHighlightedIndex((prev) => (prev - 1 + optionsLength) % optionsLength);
-                                    return;
-                                }
-
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    if (usingSearchResults && searchResults.length > 0) {
-                                        const selected = searchResults[Math.max(0, highlightedIndex)] || searchResults[0];
-                                        await handleSearchSelect(selected);
-                                    } else if (!usingSearchResults && trendingSearches.length > 0) {
-                                        const selectedTrend = trendingSearches[Math.max(0, highlightedIndex)] || trendingSearches[0];
-                                        await handleTrendingSelect(selectedTrend);
-                                    } else if (searchQuery.trim()) {
-                                        await handleTrendingSelect(searchQuery.trim().toUpperCase());
-                                    }
-                                    return;
-                                }
-
-                                if (e.key === 'Escape') {
-                                    setShowSearchDropdown(false);
-                                    setHighlightedIndex(-1);
-                                }
-                            }}
-                            className="w-full rounded-full py-2.5 pl-12 pr-4 text-xs font-semibold focus:outline-none transition-all bg-white border border-blue-100/50 text-blue-900 focus:border-[#3E84F6] focus:shadow-sm placeholder:text-blue-300"
-                        />
-
-                        {showSearchDropdown && (
-                            <div className="absolute top-12 left-0 right-0 bg-white border border-blue-100 rounded-2xl shadow-xl overflow-hidden z-[120]">
-                                {isSearching && (
-                                    <div className="px-4 py-3 text-xs font-semibold text-slate-500">Searching market...</div>
-                                )}
-
-                                {!isSearching && searchQuery.trim().length > 0 && searchResults.length === 0 && (
-                                    <div className="px-4 py-3 text-xs font-semibold text-slate-500">No matching assets found.</div>
-                                )}
-
-                                {!isSearching && searchQuery.trim().length > 0 && searchResults.length > 0 && (
-                                    <div className="max-h-72 overflow-y-auto">
-                                        {searchResults.map((item) => (
-                                            <button
-                                                key={`${item.type}-${item.symbol}`}
-                                                onClick={() => handleSearchSelect(item)}
-                                                className={`w-full text-left px-4 py-3 transition-colors border-b border-blue-50 ${highlightedIndex >= 0 && searchResults[highlightedIndex] === item ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <p className="text-xs font-black text-slate-800">{displaySymbol(item.symbol)}</p>
-                                                        <p className="text-[11px] text-slate-500">{item.name}</p>
-                                                    </div>
-                                                    <span className="text-[10px] font-bold text-[#3E84F6]">{item.type}</span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {!isSearching && searchQuery.trim().length === 0 && (
-                                    <div className="px-4 py-3">
-                                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Trending</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {trendingSearches.map((term) => (
-                                                <button
-                                                    key={term}
-                                                    onClick={() => handleTrendingSelect(term)}
-                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-black transition-colors ${highlightedIndex >= 0 && trendingSearches[highlightedIndex] === term ? 'bg-blue-200 text-blue-800' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
-                                                >
-                                                    {term}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Right-side buttons (Notifications, Profile) */}
-
-                <div className="nav-buttons flex items-center gap-5 mr-2">
-                    {/* Notifications */}
-                    <div
-                        className="relative"
-                        onMouseEnter={() => setIsNotificationsOpen(true)}
-                        onMouseLeave={() => setIsNotificationsOpen(false)}
-                    >
-                        <button
-                            className="transition-all duration-200 relative w-10 h-10 flex items-center justify-center hover:bg-blue-50 rounded-full"
-                            style={{ color: '#3E84F6' }}
-                        >
-                            <Bell size={22} strokeWidth={2} />
-                            {unreadCount > 0 && (
-                                <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 bg-rose-500 rounded-full border-2 border-white text-[9px] font-black text-white flex items-center justify-center">
-                                    {unreadCount > 9 ? '9+' : unreadCount}
-                                </span>
-                            )}
-                        </button>
-
-
-                        {isNotificationsOpen && (
-                            <div className="absolute right-0 top-12 w-80 rounded-xl shadow-2xl border py-2 backdrop-blur-xl z-[100] transform origin-top-right transition-all bg-white border-[#1F3D2B]/10">
-                                <div className="px-4 py-2 border-b border-gray-700/50 flex justify-between items-center">
-                                    <h3 className="font-bold text-sm text-[#1F3D2B]">Notifications</h3>
-                                    <button
-                                        onClick={markAllNotificationsRead}
-                                        disabled={isMarkingNotifications || unreadCount === 0}
-                                        className="text-xs text-[#3E84F6] disabled:text-gray-400 hover:text-blue-700 transition-colors"
-                                    >
-                                        {isMarkingNotifications ? 'Saving...' : 'Mark read'}
-                                    </button>
-                                </div>
-                                <div className="max-h-64 overflow-y-auto">
-                                    {isLoadingNotifications ? (
-                                        <div className="px-4 py-6 text-xs text-gray-500 text-center">Loading notifications...</div>
-                                    ) : notifications.length > 0 ? (
-                                        notifications.map((notification) => (
-                                            <div key={notification._id || notification.id} className="px-4 py-3 border-b border-gray-700/30 hover:bg-gray-50 cursor-pointer flex gap-3">
-                                                <div className="mt-1"><CheckCircle size={14} className={notification.read ? "text-gray-400" : "text-[#3E84F6]"} /></div>
-                                                <div>
-                                                    <p className="text-xs font-semibold text-[#1F3D2B]">{notification.title || notification.message}</p>
-                                                    {notification.message && notification.title && (
-                                                        <p className="text-[11px] text-gray-500 mt-1">{notification.message}</p>
-                                                    )}
-                                                    <p className="text-[10px] text-gray-500 mt-1">{formatNotificationTime(notification.createdAt)}</p>
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="px-4 py-6 text-xs text-gray-500 text-center">No notifications yet.</div>
-                                    )}
-                                </div>
-                                <div className="px-4 py-2 text-center text-xs text-gray-500 cursor-pointer hover:text-[#3E84F6] transition-colors">View all activity</div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Profile Dropdown */}
-                    <div className="relative">
-                        <div
-                            onClick={() => setIsProfileOpen(!isProfileOpen)}
-                            className="profile-avatar shadow-[#3E84F6]/20 hover:scale-105 transition-transform"
-                        >
-                            {userInitial}
-                        </div>
-
-
-                        {/* Profile Dropdown Content */}
-                        {isProfileOpen && (
-                            <div className="absolute right-0 top-12 w-72 rounded-xl shadow-2xl border py-2 backdrop-blur-xl z-[100] transform origin-top-right transition-all bg-white border-[#1F3D2B]/10">
-
-                                {/* User Info */}
-                                <div className="px-4 py-4 border-b border-gray-700/50 flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-base font-bold text-white">
-                                        {userInitial}
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-[#1F3D2B]">{profile?.username || 'Current User'}</p>
-                                        <p className="text-xs text-gray-500">{profile?.email || localStorage.getItem('email') || 'user@radar.com'}</p>
-                                    </div>
-                                </div>
-
-                                {/* Navigation Links */}
-                                <div className="py-2">
-                                    <button className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-[#1F3D2B] hover:bg-[#1F3D2B]/5">
-                                        <User size={16} /> My Profile
-                                    </button>
-
-                                    <button className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-[#1F3D2B] hover:bg-[#1F3D2B]/5">
-                                        <Settings size={16} /> Settings
-                                    </button>
-                                    <button className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-[#1F3D2B] hover:bg-[#1F3D2B]/5">
-                                        <HelpCircle size={16} /> Help & Support
-                                    </button>
-                                </div>
-
-                                {/* Mode Switcher */}
-                                <div className="border-t border-b border-gray-700/50 py-3 px-4">
-                                    <div className="text-[10px] font-bold uppercase tracking-wider mb-3 text-center text-[#1F3D2B]/60">
-                                        Choose Your Interface
-                                    </div>
-
-                                    <div
-                                        className="relative w-full h-12 rounded-full cursor-pointer flex items-center p-1.5 transition-all duration-300 shadow-inner group bg-[#FBF7F2] border border-[#1F3D2B]/10"
-                                        onClick={() => {
-                                            localStorage.setItem('mode', 'TRADER');
-                                            updateUserMode('TRADER').catch((error) => {
-                                                console.error('Failed to sync preferred mode:', error);
-                                            });
-                                            onToggleMode();
-                                        }}
-                                    >
-                                        {/* Active Indicator */}
-                                        <div
-                                            className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full shadow-lg transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform translate-x-0 bg-white border border-[#1F3D2B]/10 shadow-sm"
-                                        >
-                                        </div>
-
-                                        {/* Investor Mode */}
-                                        <div className="w-1/2 flex items-center justify-center relative z-10 gap-2 h-full">
-                                            <Activity size={16} className="text-[#1F3D2B] scale-110 drop-shadow-sm" />
-                                            <span className="text-xs font-bold text-[#1F3D2B]">Investor</span>
-                                        </div>
-
-                                        {/* Trader Mode */}
-                                        <div className="w-1/2 flex items-center justify-center relative z-10 gap-2 h-full opacity-60 hover:opacity-100 transition-opacity">
-                                            <TrendingUp size={16} className="text-gray-400 group-hover:text-gray-600" />
-                                            <span className="text-xs font-bold text-gray-400 group-hover:text-gray-600">Trader</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Logout */}
-                                <div className="pt-2 pb-1">
-                                    <button
-                                        onClick={() => { setIsProfileOpen(false); setShowLogoutModal(true); }}
-                                        className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-blue-600 hover:bg-blue-50/50"
-                                    >
-                                        <LogOut size={16} /> Sign Out
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Mobile Hamburger Menu */}
-                    <div className="lg:hidden flex items-center ml-2 border-l border-slate-100 pl-4">
-                        <Menu size={24} className="text-[#3E84F6] cursor-pointer hover:text-blue-700" />
-                    </div>
-                </div>
-            </header>
-
-            {activeModule === "DASHBOARD" && (
-                <div className="my-6">
-                    <SharedTickerTape variant="investor" />
-                </div>
-            )}
-
+        <div className="dashboard-container investor-theme pt-4">
+            <Header 
+                activeModule={activeModule} 
+                setActiveModule={setActiveModule} 
+                onToggleMode={onToggleMode} 
+            />
             <main className="content fade-in transition-all duration-300">
                 <InvestorView activeModule={activeModule} />
             </main>
-
-            {/* Logout Confirmation Modal */}
-            {showLogoutModal && (
-                <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 fade-in">
-                    <div className="w-full max-w-[420px] rounded-3xl p-8 shadow-[0_20px_50px_rgba(0,0,0,0.1)] transform transition-all scale-100 bg-[#FCFBF8] border-none">
-                        <div className="text-center">
-                            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5 bg-[#FFF0F2] text-[#E12B56]">
-                                <LogOut size={28} strokeWidth={2.5} />
-                            </div>
-                            <h3 className="text-[22px] font-bold mb-2.5 text-[#1E293B]">Signing Out?</h3>
-                            <p className="text-[15px] mb-8 text-[#64748B] font-medium leading-relaxed">
-                                Ready to sign off, Captain? The market sleeps for no one!
-                            </p>
-                            <div className="flex gap-4">
-                                <button
-                                    onClick={() => setShowLogoutModal(false)}
-                                    className="flex-1 py-3.5 rounded-xl font-bold transition-all bg-[#F1EFEA] text-[#1F3D2B] hover:bg-[#E5E2DB]"
-                                >
-                                    No, Stay
-                                </button>
-                                <button
-                                    onClick={handleLogout}
-                                    className="flex-1 py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-[#FF416C] to-[#FF4B2B] hover:opacity-90 shadow-lg shadow-rose-500/30 transition-all"
-                                >
-                                    Yes, Logout
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
@@ -1586,52 +1120,553 @@ const TrendingThemes = () => {
 
 // Helper components for the dashboard
 
-const InvestorNewsFeed = () => {
-    const [news, setNews] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const load = async () => {
-            try {
-                setIsLoading(true);
-                const data = await fetchMarketNews();
-                setNews(Array.isArray(data) ? data : []);
-            } catch (err) {
-                console.error("News load failed:", err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        load();
-    }, []);
+const BreakingNewsTicker = () => {
+    const headlines = [
+        "Nifty 50 approaches record highs on positive global cues",
+        "RBI expected to maintain status quo in upcoming policy meet",
+        "IT sector stocks witness surge following strong Q3 earnings",
+        "Global markets react to latest US inflation data release",
+    ];
 
     return (
-        <div className="dashboard-layout fade-in bg-transparent w-full px-4 md:px-10 py-6">
-            <div className="main-content-area transition-all duration-300 w-full mb-10">
-                <div className="mb-8">
-                    <h1 className="text-[34px] font-black text-[#1e293b] tracking-tight mb-2">Market News</h1>
-                    <p className="text-[#64748b] font-semibold text-[15px]">The latest financial updates and market-moving headlines.</p>
+        <div className="px-6 lg:px-10 mt-4 mb-2">
+            <div className="ticker-banner py-2.5 overflow-hidden sticky top-[calc(0.75rem+72px)] z-[90] shadow-sm flex items-center gap-4 px-6">
+                <div className="flex items-center gap-1.5 shrink-0 bg-rose-50 px-2.5 py-1 rounded-md text-rose-600 font-black text-[10px] uppercase tracking-wider animate-pulse">
+                    <Zap size={12} fill="currentColor" />
+                    <span>Breaking</span>
+                </div>
+                <div className="ticker-wrapper relative flex-1">
+                    <div className="ticker-scroll flex items-center gap-12 whitespace-nowrap animate-ticker">
+                        {headlines.map((text, i) => (
+                            <span key={i} className="text-[11px] font-bold text-slate-700 hover:text-blue-600 cursor-pointer transition-colors">
+                                {text}
+                            </span>
+                        ))}
+                        {headlines.map((text, i) => (
+                            <span key={`dup-${i}`} className="text-[11px] font-bold text-slate-700 hover:text-blue-600 cursor-pointer transition-colors">
+                                {text}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const NewsTypeFilters = ({ selected, onToggle }) => {
+    const categories = ["Earnings", "Deals", "Policy", "Macro", "IPO"];
+    const isAllSelected = selected.length === 0;
+
+    return (
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+            <button
+                onClick={() => onToggle("All")}
+                className={`px-4 py-1.5 rounded-full text-[11px] font-black transition-all whitespace-nowrap ${
+                    isAllSelected
+                        ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
+                        : "bg-white text-slate-500 hover:bg-blue-50 hover:text-blue-600 border border-slate-100"
+                }`}
+            >
+                All
+            </button>
+            {categories.map((cat) => (
+                <button
+                    key={cat}
+                    onClick={() => onToggle(cat)}
+                    className={`px-4 py-1.5 rounded-full text-[11px] font-black transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                        selected.includes(cat)
+                            ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
+                            : "bg-white text-slate-500 hover:bg-blue-50 hover:text-blue-600 border border-slate-100"
+                    }`}
+                >
+                    {cat}
+                    {selected.includes(cat) && <CheckCircle size={10} />}
+                </button>
+            ))}
+        </div>
+    );
+};
+
+const AssetClassToggle = ({ active, onChange }) => {
+    return (
+        <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 self-start">
+            {["Stocks", "Crypto"].map((asset) => (
+                <button
+                    key={asset}
+                    onClick={() => onChange(asset)}
+                    className={`px-5 py-1.5 rounded-full text-[11px] font-black transition-all ${
+                        active === asset 
+                            ? "bg-white text-blue-600 shadow-sm" 
+                            : "text-slate-500 hover:text-slate-800"
+                    }`}
+                >
+                    {asset}
+                </button>
+            ))}
+        </div>
+    );
+};
+
+const RegionFilter = ({ active, onChange }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+        <div className="relative">
+            <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black text-slate-700 hover:border-blue-300 transition-all shadow-sm min-w-[120px]"
+            >
+                <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                <span>{active} News</span>
+                <ChevronDown size={14} className={`ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <div className="absolute top-full mt-2 left-0 right-0 bg-white border border-slate-100 rounded-xl shadow-2xl z-[9999] overflow-hidden py-1 transform-gpu">
+                    {["India", "Global"].map((reg) => (
+                        <button
+                            key={reg}
+                            onClick={() => {
+                                onChange(reg);
+                                setIsOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-2 text-[11px] font-bold transition-colors ${
+                                active === reg ? "text-blue-600 bg-blue-50/50" : "text-slate-600 hover:bg-slate-50"
+                            }`}
+                        >
+                            {reg}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+
+const NewsCard = ({ item, isInitiallyExpanded = false }) => {
+    const [isExpanded, setIsExpanded] = useState(isInitiallyExpanded);
+    const impact = item.impact || "Neutral";
+    const importance = item.importance || "Normal";
+    const sectors = item.sectors || item.affectedSectors || [];
+    const tags = item.tags || [];
+
+    return (
+        <div className={`news-intelligence-card transition-all duration-300 overflow-hidden group ${isExpanded ? 'ring-2 ring-blue-500/20 shadow-xl !bg-white' : 'hover:border-slate-300'}`}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4">
+                <div className="flex-1 space-y-3">
+                    {/* 1. Meta & Top Labels */}
+                    <div className="flex items-center gap-2 text-[10px] font-bold">
+                         <a 
+                            href={item.url || "#"} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 hover:text-blue-600 flex items-center gap-1 transition-colors"
+                         >
+                            <span>{item.source || 'Reuters'}</span>
+                            <ExternalLink size={9} className="stroke-[3]" />
+                         </a>
+                         <span className="text-slate-300">•</span>
+                         <span className="text-slate-400 font-medium uppercase tracking-wider">{item.time || 'Just now'}</span>
+                         {(importance === "High" || item.strategy === "AI Generated") && (
+                            <div className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-black uppercase ring-1 ring-blue-100 shadow-sm ml-2">
+                                <Zap size={10} className="fill-blue-500" />
+                                <span>AI Analyzed</span>
+                            </div>
+                         )}
+                    </div>
+
+                    {/* 2. Headline */}
+                    <a 
+                        href={item.url || "#"} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="block group-hover:translate-x-0.5 transition-transform"
+                    >
+                        <h3 className="text-[18px] font-black headline-text leading-[1.3] pr-4 hover:text-blue-600 transition-colors cursor-pointer">
+                            {item.title}
+                        </h3>
+                    </a>
+                    
+                    {/* 3. Smart Tags: Sector | Impact | Type */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* High-Fidelity Sector Impact Tags */}
+                        {sectors.slice(0, 3).map((sector, idx) => {
+                            const name = typeof sector === 'string' ? sector : sector.name;
+                            const sImpact = typeof sector === 'string' ? "Neutral" : (sector.impact || "Neutral");
+                            const isUp = sImpact === "Positive";
+                            const isDown = sImpact === "Negative";
+                            
+                            return (
+                                <div key={idx} className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all shadow-sm ${
+                                    isUp ? "bg-green-600 text-white" :
+                                    isDown ? "bg-red-600 text-white" :
+                                    "bg-slate-700 text-white"
+                                }`}>
+                                    <span>{name}</span>
+                                    <span className="text-[11px] leading-none mb-0.5 font-normal">
+                                        {isUp ? "↑" : isDown ? "↓" : "→"}
+                                    </span>
+                                </div>
+                            );
+                        })}
+
+                        {/* Sentiment Tag */}
+                        <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md border ${
+                            impact === "Positive" ? "bg-green-50 text-green-700 border-green-100" :
+                            impact === "Negative" ? "bg-red-50 text-red-700 border-red-100" :
+                            "bg-slate-100 text-slate-600 border-slate-200"
+                        }`}>
+                            {impact}
+                        </span>
+
+                        {/* Type Tag */}
+                        <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                            {item.category || "General"}
+                        </span>
+
+                        {/* Stock Snippets if available */}
+                        {(item.affectedStocks || []).length > 0 && <div className="h-3 w-[1px] bg-slate-200 mx-1"></div>}
+                        <div className="flex items-center gap-2.5">
+                            {(item.affectedStocks || []).slice(0, 3).map((stock, idx) => (
+                                <div key={idx} className="flex items-center gap-1 text-[10px] font-bold">
+                                    <span className="text-slate-500">{stock.symbol}</span>
+                                    <span className={stock.up ? "text-green-600" : "text-rose-600"}>
+                                        {stock.up ? "↑" : "↓"}{stock.change}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
 
-                <div className="space-y-4 max-w-5xl">
-                    {isLoading ? (
-                        <div className="flex items-center justify-center p-20">
-                            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                        </div>
-                    ) : news.length > 0 ? (
-                        news.map((item, i) => (
-                            <div key={i} className="investor-card p-6 flex flex-col gap-2 hover:shadow-md transition-shadow cursor-pointer">
-                                <div className="flex justify-between items-start">
-                                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{item.source || 'Market News'}</span>
-                                    <span className="text-[10px] font-bold text-slate-400">{item.time || 'Today'}</span>
+                {/* Insight Toggle Button */}
+                <div className="flex-shrink-0 md:pl-6 md:border-l border-slate-100">
+                    <button 
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[12px] font-black tracking-tight transition-all ${
+                            isExpanded 
+                                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
+                                : "text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-600 hover:text-white"
+                        }`}
+                    >
+                        <span>{isExpanded ? "Hide Insight" : "View Insight"}</span>
+                        <ChevronUp size={16} className={`transition-transform duration-300 ${isExpanded ? "" : "rotate-180"}`} />
+                    </button>
+                </div>
+            </div>
+
+
+            {isExpanded && (
+                <div className="bg-white border-t border-slate-100 p-6 space-y-6 animate-in slide-in-from-top-2 duration-300">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                        {/* Left Column: Instant Summaries */}
+                        <div className="space-y-6">
+                            <div>
+                                <div className="flex items-center gap-2.5 mb-3">
+                                    <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></div>
+                                    <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">WHAT HAPPENED</span>
                                 </div>
-                                <h3 className="text-lg font-bold text-slate-800 leading-tight">{item.headline || item.title}</h3>
-                                {item.summary && <p className="text-sm text-slate-500 line-clamp-2">{item.summary}</p>}
+                                <p className="text-[16px] text-slate-800 font-medium leading-relaxed pl-5 tracking-tight">
+                                    {item.whatHappened || "Processing core event details..."}
+                                </p>
                             </div>
-                        ))
-                    ) : (
-                        <div className="text-center p-20 text-slate-400 font-bold">No news available at the moment.</div>
+                            
+                            <div>
+                                <div className="flex items-center gap-2.5 mb-3">
+                                    <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></div>
+                                    <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">WHY IT MATTERS</span>
+                                </div>
+                                <p className="text-[15px] text-slate-700 font-medium leading-relaxed pl-5 tracking-tight">
+                                    {item.whyItMatters || "Strategic implications for current portfolio positions."}
+                                </p>
+                            </div>
+
+                            {/* Sector Impact Tags */}
+                            {sectors.length > 0 && (
+                                <div className="pt-2 pl-5">
+                                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-4">AFFECTED SECTORS</span>
+                                    <div className="flex flex-wrap gap-2.5">
+                                        {sectors.map((sector, idx) => {
+                                            const name = typeof sector === 'string' ? sector : sector.name;
+                                            const sImpact = typeof sector === 'string' ? "Neutral" : (sector.impact || "Neutral");
+                                            const isUp = sImpact === "Positive";
+                                            const isDown = sImpact === "Negative";
+                                            
+                                            return (
+                                                <div key={idx} className={`flex items-center gap-2 px-3.5 py-1.5 rounded text-[11px] font-black transition-all shadow-sm ${
+                                                    isUp ? "bg-green-600 text-white" :
+                                                    isDown ? "bg-red-600 text-white" :
+                                                    "bg-slate-700 text-white"
+                                                }`}>
+                                                    <span>{name}</span>
+                                                    <span className="text-[15px] leading-none mb-0.5 font-normal">
+                                                        {isUp ? "↑" : isDown ? "↓" : "→"}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Right Column: Market Impact Conclusion */}
+                        <div className="flex items-end md:justify-end">
+                            <div className={`p-6 rounded-3xl border flex gap-6 items-center w-full max-w-[420px] shadow-sm ${
+                                impact === "Positive" ? "bg-green-50/40 border-green-100" :
+                                impact === "Negative" ? "bg-red-50/40 border-red-100" :
+                                "bg-blue-50/40 border-blue-100"
+                            }`}>
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${
+                                    impact === "Positive" ? "bg-green-100 text-green-700" :
+                                    impact === "Negative" ? "bg-red-100 text-red-700" :
+                                    "bg-blue-100 text-blue-700"
+                                }`}>
+                                    {impact === "Positive" ? <TrendingUp size={28} /> : impact === "Negative" ? <TrendingDown size={28} /> : <Activity size={28} />}
+                                </div>
+                                <div className="space-y-1.5">
+                                    <span className={`text-[11px] font-black uppercase tracking-[0.25em] block ${
+                                        impact === "Positive" ? "text-green-700" :
+                                        impact === "Negative" ? "text-red-700" :
+                                        "text-blue-700"
+                                    }`}>MARKET IMPACT</span>
+                                    <p className="text-[14px] text-slate-800 font-bold leading-tight">
+                                        {impact === "Positive" ? `Positive driver for ${sectors.map(s => s.name || s).join(', ')} growth expectations.` :
+                                         impact === "Negative" ? `Direct pressure detected for rate-sensitive sectors like ${sectors.map(s => s.name || s).join(', ')}.` :
+                                         "Neutral consolidation expected with low direct volatility."}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Checkpoints footer */}
+                    {item.whatToWatch && item.whatToWatch.length > 0 && (
+                        <div className="pt-5 border-t border-slate-50 flex items-center gap-5">
+                            <span className="text-[11px] font-black text-indigo-500 uppercase tracking-widest whitespace-nowrap">CHECKPOINTS:</span>
+                            <div className="text-[12px] font-bold text-slate-500 bg-slate-50 px-4 py-1.5 rounded-full">
+                                {item.whatToWatch[0]}
+                            </div>
+                        </div>
                     )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+
+const InvestorNewsFeed = () => {
+    // Remove static mock data - now strictly live-only
+    const [rawNews, setRawNews] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [selectedCategories, setSelectedCategories] = useState([]); // Multi-select state
+    const [assetClass, setAssetClass] = useState("Stocks");
+    const [region, setRegion] = useState("India");
+    const [isWatchlistOnly, setIsWatchlistOnly] = useState(false);
+
+    // Toggle multi-select category logic
+    const toggleCategory = (cat) => {
+        if (cat === "All") {
+            setSelectedCategories([]);
+            return;
+        }
+
+        setSelectedCategories(prev => 
+            prev.includes(cat) 
+                ? prev.filter(c => c !== cat) 
+                : [...prev, cat]
+        );
+    };
+
+    // Advanced Dynamic Filtering with Sorting
+    const displayNews = useMemo(() => {
+        let filtered = [...rawNews];
+
+        // 1. Filter by categories (OR logic as requested)
+        if (selectedCategories.length > 0) {
+            filtered = filtered.filter(item => 
+                selectedCategories.some(cat => 
+                    item.category?.toLowerCase() === cat.toLowerCase()
+                )
+            );
+        }
+
+        // 2. Maintain strict chronological sorting (Latest First)
+        return filtered.sort((a, b) => new Date(b.publishedAt) || 0 - new Date(a.publishedAt) || 0);
+    }, [rawNews, selectedCategories]);
+
+    const hasNoRecentUpdates = useMemo(() => {
+        return displayNews.length > 0 && !displayNews.some(item => item.isToday);
+    }, [displayNews]);
+
+    const loadNews = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            // To support robust frontend filtering, we fetch a broader set of news (All Category)
+            const data = await fetchMarketNews({
+                category: "all", 
+                region: region.toLowerCase(),
+                assetClass: assetClass.toLowerCase(),
+                watchlist: isWatchlistOnly
+            });
+            
+            if (data && Array.isArray(data)) {
+                setRawNews(data.map(item => ({...item, isToday: true})));
+            } else {
+                setRawNews([]);
+            }
+        } catch (err) {
+            console.error("Failed to load live news:", err.message);
+            setError("Failed to reach news servers. Please check your connection or API keys.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        // Automatically fetch fresh news when critical backend filters change
+        loadNews();
+    }, [region, assetClass, isWatchlistOnly]);
+
+    return (
+        <div className="flex flex-col w-full">
+            <div className="dashboard-layout fade-in bg-transparent w-full px-4 md:px-10 py-6">
+                <div className="main-content-area transition-all duration-300 w-full mb-10 max-w-[1400px] mx-auto">
+                    
+
+                    {/* 1. LATEST HEADLINES HEADER */}
+                    <div className="mb-6 px-1">
+                        <div className="flex items-center gap-3 mb-1.5 group">
+                            <div className="p-2.5 bg-blue-600 rounded-xl text-white shadow-xl shadow-blue-500/30 ring-4 ring-blue-50 group-hover:scale-110 transition-transform">
+                                <Newspaper size={20} />
+                            </div>
+                            <h1 className="text-[32px] font-black text-slate-900 tracking-tight leading-none">Latest Headlines</h1>
+                        </div>
+                        <p className="text-slate-500 font-semibold text-[15px] pl-1">Intelligent discovery of signals across global market assets.</p>
+                    </div>
+
+                    {/* 2. FILTER BAR / ACTION BUTTONS */}
+                    <div className="flex flex-col gap-4 mb-4">
+                        <div className="glass-filter-container rounded-[20px] p-4 border border-white/50 shadow-lg shadow-blue-500/5 flex items-center justify-start gap-8 relative z-[100] overflow-visible">
+                            {/* Left: Tabs */}
+                            <div className="flex-shrink-0 bg-slate-50/80 p-1 rounded-[14px] border border-slate-100 shadow-inner">
+                                <NewsTypeFilters selected={selectedCategories} onToggle={toggleCategory} />
+                            </div>
+
+                            {/* Right: Controls */}
+                            <div className="flex items-center gap-10 flex-shrink-0 bg-white/40 px-6 py-2 rounded-2xl border border-white/60 shadow-sm overflow-visible ml-auto">
+                                <div className="flex items-center gap-3">
+                                    <span className="section-label whitespace-nowrap">Asset Layer</span>
+                                    <AssetClassToggle active={assetClass} onChange={setAssetClass} />
+                                </div>
+                                <div className="w-[1px] h-6 bg-slate-200/60 font-thin italic">|</div>
+                                <div className="flex items-center gap-3">
+                                    <span className="section-label whitespace-nowrap">Focus Region</span>
+                                    <RegionFilter active={region} onChange={setRegion} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between px-2">
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">
+                                        FEED CONTEXT: {region} • {assetClass}
+                                    </span>
+                                    {hasNoRecentUpdates && (
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 rounded border border-amber-100">
+                                            <AlertTriangle size={10} className="text-amber-600" />
+                                            <span className="text-[9px] font-bold text-amber-700 uppercase">Historical View</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2.5 ml-auto">
+                                <button 
+                                    onClick={loadNews}
+                                    disabled={isLoading}
+                                    className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-[11px] font-black shadow-lg shadow-blue-500/20 hover:scale-105 transition-all outline-none disabled:opacity-50"
+                                >
+                                    <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
+                                    <span>{isLoading ? "Refreshing..." : "Refresh Feed"}</span>
+                                </button>
+                                <button 
+                                    onClick={() => setIsWatchlistOnly(!isWatchlistOnly)}
+                                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-[11px] font-black border transition-all outline-none ${
+                                        isWatchlistOnly 
+                                            ? "bg-amber-100 border-amber-300 text-amber-700 shadow-md" 
+                                            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                    }`}
+                                >
+                                    <Star size={13} className={isWatchlistOnly ? "text-amber-600 fill-amber-500" : "text-amber-400"} />
+                                    <span>Watchlist</span>
+                                </button>
+                                <button 
+                                    onClick={() => {
+                                        setSelectedCategories([]);
+                                        setAssetClass("Stocks");
+                                        setRegion("India");
+                                        setIsWatchlistOnly(false);
+                                    }}
+                                    className="flex items-center gap-2 px-3.5 py-1.5 bg-white text-slate-700 rounded-lg text-[11px] font-black border border-slate-200 hover:bg-slate-50 transition-all outline-none"
+                                >
+                                    <Compass size={13} className="text-blue-500" />
+                                    <span>Clear Filters</span>
+                                </button>
+                                <div className="h-6 w-[1px] bg-slate-200 mx-1"></div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded">Total: {displayNews.length}</span>
+                            </div>
+                        </div>
+                    </div>
+
+
+
+                    <div className="news-feed-panel">
+                        {isLoading ? (
+                            <div className="space-y-4">
+                                {[1, 2, 3, 4, 5].map(i => (
+                                    <div key={i} className="bg-white/80 rounded-2xl p-6 border border-white/50 animate-pulse">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="space-y-3 flex-1">
+                                                <div className="h-3 w-24 bg-slate-200 rounded"></div>
+                                                <div className="h-5 w-3/4 bg-slate-200 rounded"></div>
+                                                <div className="h-4 w-1/2 bg-slate-100 rounded"></div>
+                                            </div>
+                                            <div className="w-24 h-8 bg-slate-100 rounded-xl"></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : error ? (
+                            <div className="flex flex-col items-center justify-center min-h-[40vh] text-center p-10 bg-rose-50/30 rounded-3xl border border-dashed border-rose-200/60">
+                                <AlertTriangle size={40} className="text-rose-400 mb-6" />
+                                <h3 className="text-xl font-black text-slate-800 mb-2">Sync Interrupted</h3>
+                                <p className="text-sm text-slate-500 max-w-sm font-medium leading-relaxed mb-6">{error}</p>
+                                <button onClick={loadNews} className="px-6 py-2 bg-rose-500 text-white rounded-xl text-xs font-black shadow-lg shadow-rose-500/20 hover:scale-105 transition-all">Retry Connection</button>
+                            </div>
+                        ) : displayNews.length > 0 ? (
+                            displayNews.map((item, i) => (
+                                <NewsCard key={item.id || i} item={item} isInitiallyExpanded={i === 0 && !hasNoRecentUpdates} />
+                            ))
+                        ) : (
+                            <div className="flex flex-col items-center justify-center min-h-[40vh] text-center p-10 bg-white/50 rounded-3xl border border-dashed border-blue-200/60">
+                                <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center mb-6 shadow-inner relative">
+                                    <Search size={40} className="text-blue-200" />
+                                    <div className="absolute inset-0 border-4 border-blue-100/30 rounded-full animate-ping opacity-20"></div>
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-800 mb-2">No Headlines Found</h3>
+                                <p className="text-sm text-slate-500 max-w-sm font-medium leading-relaxed">
+                                    No live headlines currently match your filters in the {region} region. Try broadening your criteria or selecting "All" categories.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -1656,8 +1691,10 @@ function InvestorView({ activeModule }) {
     // Default: DASHBOARD
     return (
         <div className="dashboard-layout fade-in bg-transparent transition-all duration-500 py-4 w-full px-4 md:px-10">
-            <div className="main-content-area transition-all duration-300 w-full">
-                <div className="flex justify-between items-center mb-6">
+            <div className="main-content-area transition-all duration-300 w-full mb-8">
+                {/* Welcome Greeting */}
+
+                <div className="flex justify-between items-center mb-6 px-1">
                     <div>
                         <h1 className="text-[34px] font-black text-[#1e293b] tracking-tight drop-shadow-sm">Welcome back, Captain.</h1>
                         <p className="text-[#64748b] font-semibold text-[15px]">At a glance overview of your portfolio and the global market pulse.</p>

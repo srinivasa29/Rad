@@ -13,8 +13,6 @@ export default function Login() {
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const [userMode, setUserMode] = useState('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -48,13 +46,6 @@ export default function Login() {
       return;
     }
 
-
-
-    if (!userMode) {
-      setErrors({ general: 'Please select a mode (Investor or Trader)' });
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -67,7 +58,6 @@ export default function Login() {
       });
 
       localStorage.setItem('token', res.data.token);
-      localStorage.setItem('userMode', userMode);
       window.location.href = '/dashboard';
     } catch (error) {
       setLoading(false);
@@ -134,50 +124,6 @@ export default function Login() {
 
 
 
-
-            {}
-            <div>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className={`w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-4 text-left focus:outline-none focus:border-[#10706B] focus:ring-4 focus:ring-[#10706B]/5 hover:border-[#10706B]/50 transition-all text-sm font-medium flex justify-between items-center ${userMode ? 'text-gray-900' : 'text-gray-400'}`}
-                >
-                  <span className="capitalize">{userMode ? `${userMode} Mode` : 'Select Mode'}</span>
-                  <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {isDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                      transition={{ duration: 0.2 }}
-                      className="absolute w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-2xl z-50 overflow-hidden"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => { setUserMode('investor'); setIsDropdownOpen(false); }}
-                        className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors flex items-center justify-between ${userMode === 'investor' ? 'bg-[#10706B]/5 text-[#10706B]' : 'hover:bg-gray-50 text-gray-700'}`}
-                      >
-                        Investor Mode
-                        {userMode === 'investor' && <div className="w-2 h-2 rounded-full bg-[#10706B]" />}
-                      </button>
-                      <div className="border-t border-gray-50"></div>
-                      <button
-                        type="button"
-                        onClick={() => { setUserMode('trader'); setIsDropdownOpen(false); }}
-                        className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors flex items-center justify-between ${userMode === 'trader' ? 'bg-[#10706B]/5 text-[#10706B]' : 'hover:bg-gray-50 text-gray-700'}`}
-                      >
-                        Trader Mode
-                        {userMode === 'trader' && <div className="w-2 h-2 rounded-full bg-[#10706B]" />}
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
 
             <motion.button
               whileHover={{ scale: 1.01 }}

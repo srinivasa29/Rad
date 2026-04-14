@@ -1,0 +1,68 @@
+﻿
+> findash@0.0.0 build
+> vite build
+
+[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mΓ£ô[39m 2845 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                             [39m[1m[2m  1.47 kB[22m[1m[22m[2m Γöé gzip:  0.62 kB[22m
+[2mdist/[22m[35massets/InvestorDashboard-BysTukJA.css  [39m[1m[2m  3.51 kB[22m[1m[22m[2m Γöé gzip:  1.22 kB[22m
+[2mdist/[22m[35massets/TraderDashboard-RAGl1bYY.css    [39m[1m[2m 10.38 kB[22m[1m[22m[2m Γöé gzip:  2.18 kB[22m
+[2mdist/[22m[35massets/Dashboard-Ct9A4Okz.css          [39m[1m[2m 40.23 kB[22m[1m[22m[2m Γöé gzip:  7.05 kB[22m
+[2mdist/[22m[35massets/index-CAvWAhp1.css              [39m[1m[2m114.94 kB[22m[1m[22m[2m Γöé gzip: 16.82 kB[22m
+[2mdist/[22m[36massets/api-DP2CD2x0.js                 [39m[1m[2m  0.55 kB[22m[1m[22m[2m Γöé gzip:  0.36 kB[22m
+[2mdist/[22m[36massets/portfolioApi-BEiOcKTm.js        [39m[1m[2m  0.97 kB[22m[1m[22m[2m Γöé gzip:  0.41 kB[22m
+[2mdist/[22m[36massets/Tilt-4kpKPywE.js                [39m[1m[2m  1.12 kB[22m[1m[22m[2m Γöé gzip:  0.67 kB[22m
+[2mdist/[22m[36massets/marketApi-4m98_89j.js           [39m[1m[2m  1.62 kB[22m[1m[22m[2m Γöé gzip:  0.73 kB[22m
+[2mdist/[22m[36massets/react-compat-Rj29YxKv.js        [39m[1m[2m  1.89 kB[22m[1m[22m[2m Γöé gzip:  0.67 kB[22m
+[2mdist/[22m[36massets/auth-Cv7eT5Cn.js                [39m[1m[2m  2.07 kB[22m[1m[22m[2m Γöé gzip:  0.93 kB[22m
+[2mdist/[22m[36massets/ForgotPassword-BVOaIReE.js      [39m[1m[2m  2.52 kB[22m[1m[22m[2m Γöé gzip:  1.12 kB[22m
+[2mdist/[22m[36massets/AuthLayout-BnNsQpAd.js          [39m[1m[2m  3.93 kB[22m[1m[22m[2m Γöé gzip:  1.55 kB[22m
+[2mdist/[22m[36massets/index-DhCtDHjC.js               [39m[1m[2m  4.54 kB[22m[1m[22m[2m Γöé gzip:  2.13 kB[22m
+[2mdist/[22m[36massets/Register-B6ktLR12.js            [39m[1m[2m  6.37 kB[22m[1m[22m[2m Γöé gzip:  2.26 kB[22m
+[2mdist/[22m[36massets/Login-u2WiAm3F.js               [39m[1m[2m  7.12 kB[22m[1m[22m[2m Γöé gzip:  2.54 kB[22m
+[2mdist/[22m[36massets/react-core-SsZjtT7H.js          [39m[1m[2m  8.62 kB[22m[1m[22m[2m Γöé gzip:  3.31 kB[22m
+[2mdist/[22m[36massets/icons-B6MunPwD.js               [39m[1m[2m 11.46 kB[22m[1m[22m[2m Γöé gzip:  4.40 kB[22m
+[2mdist/[22m[36massets/Dashboard-R-L2ZlrV.js           [39m[1m[2m 18.66 kB[22m[1m[22m[2m Γöé gzip:  5.94 kB[22m
+[2mdist/[22m[36massets/ui-utils-BNe0Xlio.js            [39m[1m[2m 25.48 kB[22m[1m[22m[2m Γöé gzip:  8.16 kB[22m
+[2mdist/[22m[36massets/motion-DCkC63Vc.js              [39m[1m[2m 30.98 kB[22m[1m[22m[2m Γöé gzip: 10.79 kB[22m
+[2mdist/[22m[36massets/router-Da9V_A-b.js              [39m[1m[2m 34.65 kB[22m[1m[22m[2m Γöé gzip: 12.55 kB[22m
+[2mdist/[22m[36massets/http-D5GkNzM3.js                [39m[1m[2m 36.23 kB[22m[1m[22m[2m Γöé gzip: 14.63 kB[22m
+[2mdist/[22m[36massets/Home-BdFwjhK-.js                [39m[1m[2m 61.03 kB[22m[1m[22m[2m Γöé gzip: 15.74 kB[22m
+[2mdist/[22m[36massets/TraderDashboard-DF2BVlwm.js     [39m[1m[2m 75.69 kB[22m[1m[22m[2m Γöé gzip: 17.89 kB[22m
+[2mdist/[22m[36massets/InvestorDashboard-BV_4JZVU.js   [39m[1m[2m102.48 kB[22m[1m[22m[2m Γöé gzip: 24.38 kB[22m
+[2mdist/[22m[36massets/react-dom-BDXf3sGj.js           [39m[1m[2m184.09 kB[22m[1m[22m[2m Γöé gzip: 57.66 kB[22m
+[2mdist/[22m[36massets/vendor-BAyDvzfM.js              [39m[1m[2m229.74 kB[22m[1m[22m[2m Γöé gzip: 77.01 kB[22m
+[2mdist/[22m[36massets/charts-Cg6Iu64I.js              [39m[1m[2m235.65 kB[22m[1m[22m[2m Γöé gzip: 61.22 kB[22m
+[2mdist/[22m[36massets/lottie-DmdNtfsf.js              [39m[1m[33m652.72 kB[39m[22m[2m Γöé gzip: 69.02 kB[22m
+node.exe : [33m
+At C:\Program 
+Files\nodejs\npm.ps1:29 
+char:3
++   & $NODE_EXE $NPM_CLI_JS 
+$args
++   
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: ([33m:S  
+  tring) [], RemoteExcepti   
+ on
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+(!) Some chunks are larger 
+than 500 kB after 
+minification. Consider:
+- Using dynamic import() to 
+code-split the application
+- Use build.rollupOptions.out
+put.manualChunks to improve 
+chunking: https://rollupjs.or
+g/configuration-options/#outp
+ut-manualchunks
+- Adjust chunk size limit 
+for this warning via build.ch
+unkSizeWarningLimit.[39m
+[32mΓ£ô built in 1m 34s[39m

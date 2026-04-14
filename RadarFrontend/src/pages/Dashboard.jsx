@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 
 import {
   LayoutDashboard,
@@ -84,14 +84,24 @@ export default function Dashboard() {
     markAllNotificationsRead,
   } = useHeaderData();
 
+
   useEffect(() => {
+    // 1. Module Routing
     const params = new URLSearchParams(location.search);
     const moduleParam = String(params.get("module") || "").toUpperCase();
     if (["DASHBOARD", "WATCHLIST", "SCREENERS", "NEWS"].includes(moduleParam)) {
       setActiveModule(moduleParam);
     }
-  }, [location.search]);
 
+    // 2. Forced Onboarding for First-Time Users
+    const token = localStorage.getItem("token");
+    const hasCompletedAssessment = localStorage.getItem("hasCompletedAssessment") === "true";
+    
+    // Only redirect if they are logged in but haven't finished assessment
+    if (token && !hasCompletedAssessment) {
+      navigate("/onboarding");
+    }
+  }, [location.search, navigate]);
   useEffect(() => {
     if (!isTraderMode) {
       document.body.style.backgroundColor = "";
@@ -211,7 +221,9 @@ export default function Dashboard() {
   const openTraderStockPage = async (value) => {
     const symbol = String(value || "").trim();
     if (!symbol) return;
-    navigate(`/stocks/${encodeURIComponent(symbol.toUpperCase())}`);
+    const mode = localStorage.getItem('mode') || 'INVESTOR';
+    const path = mode === 'INVESTOR' ? '/investor-stock/' : '/stocks/';
+    navigate(`${path}${encodeURIComponent(symbol.toUpperCase())}`);
     await logSearchQuery(symbol);
   };
 
@@ -573,15 +585,27 @@ export default function Dashboard() {
 
                         {}
                         <div className="py-2">
-                          <button className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
+                          <Link 
+                            to="/profile"
+                            onClick={() => setIsProfileOpen(false)}
+                            className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                          >
                             <User size={16} /> My Profile
-                          </button>
-                          <button className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
+                          </Link>
+                          <Link 
+                            to="/settings"
+                            onClick={() => setIsProfileOpen(false)}
+                            className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                          >
                             <Settings size={16} /> Settings
-                          </button>
-                          <button className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
+                          </Link>
+                          <Link 
+                            to="/help"
+                            onClick={() => setIsProfileOpen(false)}
+                            className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                          >
                             <HelpCircle size={16} /> Help &amp; Support
-                          </button>
+                          </Link>
                         </div>
 
                         {}

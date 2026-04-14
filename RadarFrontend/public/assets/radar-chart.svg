@@ -1,0 +1,37 @@
+<svg viewBox="0 0 468 468" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="radarGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#7dd3c0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f766e;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Background circles -->
+  <circle cx="234" cy="234" r="200" fill="none" stroke="#d1fae5" stroke-width="1" opacity="0.3"/>
+  <circle cx="234" cy="234" r="160" fill="none" stroke="#d1fae5" stroke-width="1" opacity="0.3"/>
+  <circle cx="234" cy="234" r="120" fill="none" stroke="#d1fae5" stroke-width="1" opacity="0.3"/>
+  <circle cx="234" cy="234" r="80" fill="none" stroke="#d1fae5" stroke-width="1" opacity="0.3"/>
+  <circle cx="234" cy="234" r="40" fill="none" stroke="#d1fae5" stroke-width="1" opacity="0.3"/>
+  
+  <!-- Radial lines -->
+  <line x1="234" y1="34" x2="234" y2="434" stroke="#d1fae5" stroke-width="0.5" opacity="0.2"/>
+  <line x1="134" y1="84" x2="334" y2="384" stroke="#d1fae5" stroke-width="0.5" opacity="0.2"/>
+  <line x1="34" y1="234" x2="434" y2="234" stroke="#d1fae5" stroke-width="0.5" opacity="0.2"/>
+  <line x1="134" y1="384" x2="334" y2="84" stroke="#d1fae5" stroke-width="0.5" opacity="0.2"/>
+  
+  <!-- Radar polygon (investor/trader indicator) -->
+  <polygon points="234,100 310,150 330,240 280,310 180,320 130,240" 
+           fill="url(#radarGrad)" opacity="0.6" stroke="#0f766e" stroke-width="2"/>
+  
+  <!-- Data points -->
+  <circle cx="234" cy="100" r="5" fill="#0ea5e9" stroke="#075985" stroke-width="1.5"/>
+  <circle cx="310" cy="150" r="5" fill="#06b6d4" stroke="#0369a1" stroke-width="1.5"/>
+  <circle cx="330" cy="240" r="5" fill="#14b8a6" stroke="#0f766e" stroke-width="1.5"/>
+  <circle cx="280" cy="310" r="5" fill="#10b981" stroke="#047857" stroke-width="1.5"/>
+  <circle cx="180" cy="320" r="5" fill="#3b82f6" stroke="#1e40af" stroke-width="1.5"/>
+  <circle cx="130" cy="240" r="5" fill="#06b6d4" stroke="#0369a1" stroke-width="1.5"/>
+  
+  <!-- Connection lines between points -->
+  <polyline points="234,100 310,150 330,240 280,310 180,320 130,240 234,100" 
+            fill="none" stroke="#0ea5e9" stroke-width="2" opacity="0.7"/>
+</svg>
