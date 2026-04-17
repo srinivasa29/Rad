@@ -1,29 +1,27 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { createPortal } from 'react-dom';
 import api from '../api/api';
 import './Profile.css';
-import ProfileDropdownPortal from '../components/common/ProfileDropdownPortal';
 import { 
     Bell, 
+    MessageCircle, 
+    ChevronRight, 
     Zap, 
     Activity, 
     User as UserIcon, 
     Clock, 
+    CheckCircle, 
     Shield, 
     AlertCircle,
     ArrowRight,
-    ArrowLeft,
-    ArrowUpRight,
-    ArrowDownRight,
     LayoutDashboard,
     Star,
     Filter,
     Newspaper,
     Search,
-    Play
+    Settings,
+    LogOut
 } from 'lucide-react';
-import { AdvancedWatchlistDashboard } from '../components/watchlist';
 
 const toPayload = (value, fallback = null) => {
     if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'data')) {
@@ -196,7 +194,7 @@ export function GlobalSearchPage() {
                         <div key={`${row.symbol}-${row.exchange}`} className="rounded-lg border border-white/10 p-3 text-sm">
                             <div className="font-black">{row.symbol}</div>
                             <div className="text-slate-300">{row.name}</div>
-                            <div className="text-xs text-slate-400">{row.type || row.assetType} â€¢ {row.exchange}</div>
+                            <div className="text-xs text-slate-400">{row.type || row.assetType} • {row.exchange}</div>
                         </div>
                     ))}
                 </div>
@@ -306,6 +304,7 @@ export function NewsPage() {
         load();
     }, []);
 
+    // Filter and sort news
     const filteredNews = rows.filter(item => {
         const matchesSource = selectedSource === 'all' || item.source === selectedSource;
         const matchesSearch = searchQuery === '' || item.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -331,9 +330,9 @@ export function NewsPage() {
             subtitle="Aggregated market feed from configured news providers."
         >
             <div className="space-y-6">
-                {}
+                {/* Controls Section */}
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-4">
-                    {}
+                    {/* Search Bar */}
                     <div className="flex gap-3">
                         <div className="flex-1 relative">
                             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -349,7 +348,7 @@ export function NewsPage() {
                         </div>
                     </div>
 
-                    {}
+                    {/* Tabs and Filters */}
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                         <div className="flex gap-2">
                             {['live', 'top news', 'watchlist', 'my feeds'].map((tab) => (
@@ -368,7 +367,7 @@ export function NewsPage() {
                         </div>
 
                         <div className="flex gap-3">
-                            {}
+                            {/* Sort Dropdown */}
                             <div>
                                 <label className="text-xs text-slate-400">Sort:</label>
                                 <select
@@ -382,7 +381,7 @@ export function NewsPage() {
                                 </select>
                             </div>
 
-                            {}
+                            {/* Source Filter */}
                             <div>
                                 <label className="text-xs text-slate-400">Source:</label>
                                 <select
@@ -401,9 +400,9 @@ export function NewsPage() {
                     </div>
                 </div>
 
-                {}
+                {/* News Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {}
+                    {/* Main News Column */}
                     <div className="lg:col-span-2 space-y-3">
                         {filteredNews.length > 0 ? (
                             filteredNews.map((item, index) => {
@@ -414,16 +413,16 @@ export function NewsPage() {
                                         className="group rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/[0.02] hover:border-cyan-500/30 hover:bg-white/10 transition-all p-5 cursor-pointer"
                                     >
                                         <div className="flex gap-4">
-                                            {}
+                                            {/* Icon/Avatar */}
                                             <div className="flex-shrink-0">
                                                 <div className="w-12 h-12 rounded-lg bg-slate-800 border border-white/10 flex items-center justify-center">
                                                     <span className="text-lg font-black text-cyan-400">
-                                                        {item.source?.charAt(0).toUpperCase() || 'ðŸ“°'}
+                                                        {item.source?.charAt(0).toUpperCase() || '📰'}
                                                     </span>
                                                 </div>
                                             </div>
 
-                                            {}
+                                            {/* Content */}
                                             <div className="flex-1">
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="flex-1">
@@ -431,7 +430,7 @@ export function NewsPage() {
                                                             {item.title}
                                                         </h3>
                                                         <p className="text-xs text-slate-400 mt-2">
-                                                            {item.source} â€¢ {item.time || item.publishedAt || '-'}
+                                                            {item.source} • {item.time || item.publishedAt || '-'}
                                                         </p>
                                                     </div>
                                                     <a
@@ -453,7 +452,7 @@ export function NewsPage() {
                                                     </p>
                                                 )}
 
-                                                {}
+                                                {/* Tags and Impact */}
                                                 <div className="flex items-center gap-2 mt-3 flex-wrap">
                                                     <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-${impactBadge.color}-500/20 text-${impactBadge.color}-300 border border-${impactBadge.color}-500/30`}>
                                                         {impactBadge.text}
@@ -488,9 +487,9 @@ export function NewsPage() {
                         )}
                     </div>
 
-                    {}
+                    {/* Sidebar */}
                     <div className="space-y-6">
-                        {}
+                        {/* Top Stories Widget */}
                         <div className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
                             <h3 className="font-black text-sm">TOP STORIES</h3>
                             <div className="space-y-3">
@@ -506,7 +505,7 @@ export function NewsPage() {
                             </div>
                         </div>
 
-                        {}
+                        {/* Sources Widget */}
                         <div className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
                             <h3 className="font-black text-sm">SOURCES</h3>
                             <div className="space-y-2">
@@ -695,7 +694,7 @@ export function AlertsPage() {
                     <div className="space-y-2 text-sm">
                         {activeAlerts.map((row) => (
                             <div key={row._id} className="border border-white/10 rounded-lg px-3 py-2 flex items-center justify-between">
-                                <div>{row.symbol} â€¢ {row.condition} â€¢ {row.threshold}</div>
+                                <div>{row.symbol} • {row.condition} • {row.threshold}</div>
                                 <button onClick={() => deleteAlert(row._id)} className="text-rose-300 text-xs font-bold">Delete</button>
                             </div>
                         ))}
@@ -706,7 +705,7 @@ export function AlertsPage() {
                     <div className="space-y-2 text-sm">
                         {history.map((row) => (
                             <div key={row._id} className="border border-white/10 rounded-lg px-3 py-2">
-                                {row.symbol} â€¢ {row.status}
+                                {row.symbol} • {row.status}
                             </div>
                         ))}
                     </div>
@@ -772,309 +771,249 @@ export function ProfilePage() {
     const profileRef = useRef(null);
     const navigate = useNavigate();
 
-    const styleMix = {
-        scalping: 52,
-        intraday: 33,
-        swing: 15,
-    };
+    // Alignment Metrics
+    const investorPercent = 40;
+    const traderPercent = 60;
 
-    const performanceCards = [
-        {
-            key: 'daily',
-            label: 'Daily P&L',
-            value: 12450,
-            points: [15, 28, 20, 36, 30, 42, 51, 48],
-        },
-        {
-            key: 'weekly',
-            label: 'Weekly P&L',
-            value: 38920,
-            points: [12, 18, 35, 22, 39, 41, 46, 63],
-        },
-        {
-            key: 'monthly',
-            label: 'Monthly P&L',
-            value: -6750,
-            points: [62, 58, 45, 49, 38, 34, 28, 24],
-        },
-    ];
-
-    const positions = [
-        { symbol: 'RELIANCE', entry: 2840.4, current: 2898.7 },
-        { symbol: 'TCS', entry: 3910.2, current: 3866.1 },
-        { symbol: 'INFY', entry: 1635.8, current: 1698.3 },
-        { symbol: 'HDFCBANK', entry: 1544.2, current: 1531.4 },
-    ];
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (profileRef.current && !profileRef.current.contains(e.target)) {
+                setIsProfileOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const initial = profile.username.charAt(0).toUpperCase();
 
-    const buildSparklinePath = (points) => {
-        if (!Array.isArray(points) || points.length === 0) {
-            return '';
-        }
-
-        const max = Math.max(...points);
-        const min = Math.min(...points);
-        const range = max - min || 1;
-
-        return points
-            .map((point, index) => {
-                const x = (index / (points.length - 1 || 1)) * 100;
-                const y = 100 - ((point - min) / range) * 100;
-                return `${x},${y}`;
-            })
-            .join(' ');
-    };
-
-    const formatPnl = (value) => {
-        const amount = Math.abs(Number(value || 0)).toLocaleString('en-IN');
-        return `${value >= 0 ? '+' : '-'}Rs ${amount}`;
-    };
-
-    const traderRisk = 'High';
-    const todayPnl = 12450;
-    const winRate = 68;
-    const totalTrades = 214;
-
     return (
         <div className="profile-page-root">
-            <header className="navbar profile-custom-navbar">
-                <div className="profile-nav-left">
-                    <button
-                        type="button"
-                        className="back-to-dashboard-btn"
-                        onClick={() => navigate('/dashboard')}
-                    >
-                        <ArrowLeft size={15} />
-                        <span>Back to Dashboard</span>
-                    </button>
-                    <div className="navbar-radar-badge">
-                        <img
-                            src="/radar-logo-final.jpg"
-                            alt="Radar Logo"
-                            className="w-7 h-7 rounded-full object-cover border border-blue-100/20"
-                        />
-                        <span>RADAR</span>
-                    </div>
+            <header className="navbar profile-custom-navbar rounded-xl mx-auto max-w-[1400px] border border-blue-100 shadow-sm relative z-[110] bg-white flex items-center justify-between px-12 py-3">
+                <div className="flex items-center gap-4 shrink-0">
+                    <img
+                        src="/radar-logo-final.jpg"
+                        alt="Radar Logo"
+                        className="w-10 h-10 rounded-full object-cover border border-blue-100/50 shadow-sm"
+                    />
+                    <span className="brand-name font-black tracking-tighter text-2xl" style={{ color: '#3E84F6' }}>RADAR</span>
                 </div>
 
-                <div className="profile-top-actions">
-                    <button type="button" className="top-icon-btn" aria-label="Notifications">
-                        <Bell size={19} strokeWidth={2.1} />
-                    </button>
-
-                    <div className="relative" ref={profileRef}>
-                        <button
-                            type="button"
-                            onClick={() => setIsProfileOpen(!isProfileOpen)}
-                            className="top-avatar-btn"
+                <div className="hidden lg:flex items-center gap-10 ml-12">
+                    {[
+                        { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
+                        { id: 'WATCHLIST', label: 'Watchlist', icon: Star, to: '/dashboard?module=watchlist' },
+                        { id: 'SCREENERS', label: 'Screeners', icon: Filter, to: '/dashboard?module=screeners' },
+                        { id: 'NEWS', label: 'News', icon: Newspaper, to: '/dashboard?module=news' }
+                    ].map((item) => (
+                        <Link
+                            key={item.id}
+                            to={item.to}
+                            className="flex items-center gap-2.5 text-sm font-extrabold tracking-tight transition-all duration-300 hover:scale-105"
+                            style={{ color: '#3E84F6' }}
                         >
-                            {initial}
-                        </button>
+                            <item.icon size={18} strokeWidth={2.5} />
+                            {item.label}
+                        </Link>
+                    ))}
+                </div>
 
-                        {}
-                        {isProfileOpen && createPortal(
-                            <ProfileDropdownPortal
-                                avatarRef={profileRef}
-                                profile={profile}
-                                userInitial={initial}
-                                onClose={() => setIsProfileOpen(false)}
-                                onLogout={() => {
-                                    setIsProfileOpen(false);
-                                    navigate('/');
-                                }}
-                                onToggleMode={() => {
-                                    localStorage.setItem('mode', 'TRADER');
-                                    setIsProfileOpen(false);
-                                    navigate('/dashboard');
-                                }}
-                            />,
-                            document.body
-                        )}
+                <div className="flex items-center gap-8 ml-auto">
+                    <div className="hidden md:flex relative w-72 h-10">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400">
+                            <Search size={18} />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search stocks..."
+                            className="w-full h-full rounded-2xl pl-12 pr-4 text-xs font-semibold focus:outline-none bg-white border border-blue-50 text-blue-900 placeholder:text-blue-200 shadow-none hover:border-blue-100"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                        <div className="text-[#3E84F6] cursor-pointer hover:scale-110 transition-transform">
+                            <Bell size={22} strokeWidth={2} />
+                        </div>
+                        <div className="relative" ref={profileRef}>
+                            <div 
+                                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                className="w-10 h-10 flex items-center justify-center rounded-full bg-[#3E84F6] shadow-[0_4px_12px_rgba(62,132,246,0.3)] text-white font-bold text-sm cursor-pointer hover:scale-105 transition-transform"
+                            >
+                                {initial}
+                            </div>
+
+                            {/* Profile Dropdown Content */}
+                            {isProfileOpen && (
+                                <div className="absolute right-0 top-14 w-72 rounded-xl shadow-2xl border py-2 backdrop-blur-xl z-[200] origin-top-right bg-white border-blue-100/50">
+                                    <div className="px-4 py-4 border-b border-blue-50 flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-base font-bold text-white">
+                                            {initial}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-800">{profile.username}</p>
+                                            <p className="text-xs text-slate-500">{profile.email}</p>
+                                        </div>
+                                    </div>
+                                    <div className="py-2">
+                                        <Link 
+                                            to="/profile" 
+                                            onClick={() => setIsProfileOpen(false)} 
+                                            className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-slate-700 hover:bg-blue-50/50 transition-colors"
+                                        >
+                                            <UserIcon size={16} /> My Profile
+                                        </Link>
+                                        <button className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-slate-700 hover:bg-blue-50/50 transition-colors">
+                                            <Settings size={16} /> Settings
+                                        </button>
+                                        <button 
+                                            onClick={() => navigate('/')}
+                                            className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-rose-500 hover:bg-rose-50/50 transition-colors"
+                                        >
+                                            <LogOut size={16} /> Sign Out
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </header>
 
+            {/* Page Header */}
             <div className="profile-header-bg">
-                <h1 className="profile-title-text">Trader Profile</h1>
+                <h1 className="profile-title-text">My Profile</h1>
             </div>
 
+            {/* Main Content Area */}
             <main className="profile-main-container">
-                <section className="trader-header-panel glass-card-dark">
-                    <div className="trader-head-left">
-                        <div className="profile-avatar-big">{initial}</div>
-                        <div className="overview-info">
-                            <div className="trader-name-row">
+                <div className="glass-card">
+                    {/* Top Section: Overview & Market Behavior */}
+                    <div className="profile-top-row">
+                        <div className="overview-col">
+                            <div className="profile-avatar-big">{initial}</div>
+                            <div className="overview-info">
                                 <h2>{profile.username}</h2>
-                                <span className="status-badge">Intraday Pro</span>
-                                <span className="status-badge status-badge-alt">Active Trader</span>
+                                <p className="user-email">{profile.email}</p>
+                                <div className="joined-meta">
+                                    <Clock size={14} /> {profile.joinedDate}
+                                </div>
+                                <div className="mode-pill">
+                                    <Zap size={12} fill="#2563eb" /> Trader Mode
+                                </div>
+                                <div className="archetype-title">
+                                    <Zap size={14} className="text-yellow-500" fill="currentColor" /> 
+                                    The Predator — Advanced Trader Archetype
+                                </div>
                             </div>
-                            <p className="user-email">{profile.email}</p>
-                            <div className="joined-meta">
-                                <Clock size={14} /> {profile.joinedDate}
+                        </div>
+
+                        <div className="market-behavior-top">
+                            <div className="card-heading">Market Behavior Alignment</div>
+                            <div className="behavior-bars-grid">
+                                <div className="behavior-bar-item">
+                                    <div className="bar-label-wrap">
+                                        <span>INVESTOR</span>
+                                        <span>{investorPercent}%</span>
+                                    </div>
+                                    <div className="bar-track">
+                                        <div className="bar-fill investor" style={{ width: `${investorPercent}%` }} />
+                                    </div>
+                                </div>
+                                <div className="behavior-bar-item">
+                                    <div className="bar-label-wrap">
+                                        <span>TRADER</span>
+                                        <span>{traderPercent}%</span>
+                                    </div>
+                                    <div className="bar-track">
+                                        <div className="bar-fill trader" style={{ width: `${traderPercent}%` }} />
+                                    </div>
+                                </div>
                             </div>
-                            <div className="live-indicator-wrap">
-                                <span className="live-dot" />
-                                <span>Live terminal connected</span>
+                            <div className="behavior-meta-actions">
+                                <span className="last-assessed">Last assessed: Feb 20</span>
+                                <button className="btn-retake">Retake Assessment</button>
                             </div>
                         </div>
                     </div>
 
-                    <div className="trader-head-right">
-                        <div className={`pnl-today-card ${todayPnl >= 0 ? 'is-profit' : 'is-loss'}`}>
-                            <span className="pnl-label">P&L Today</span>
-                            <span className="pnl-value live-value">{formatPnl(todayPnl)}</span>
+                    {/* Bottom Section: 3-Column Grid */}
+                    <div className="profile-bottom-grid">
+                        
+                        {/* Col 1: Market Behavior Mini */}
+                        <div className="stat-card">
+                            <div className="card-heading">Market Behavior</div>
+                            <div className="behavior-bars-grid !mb-4">
+                                <div className="behavior-bar-item !gap-1">
+                                    <div className="bar-label-wrap !text-[10px]">
+                                        <span>INV</span>
+                                        <span>40%</span>
+                                    </div>
+                                    <div className="bar-track !h-[4px]">
+                                        <div className="bar-fill investor" style={{ width: '40%' }} />
+                                    </div>
+                                </div>
+                                <div className="behavior-bar-item !gap-1">
+                                    <div className="bar-label-wrap !text-[10px]">
+                                        <span>TRA</span>
+                                        <span>60%</span>
+                                    </div>
+                                    <div className="bar-track !h-[4px]">
+                                        <div className="bar-fill trader" style={{ width: '60%' }} />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="card-cta">Go to Behavior Assessment <ArrowRight size={14} /></div>
                         </div>
-                        <div className="top-metrics-grid">
-                            <div className="metric-chip">
-                                <span className="chip-label">Win Rate</span>
-                                <strong className="chip-value">{winRate}%</strong>
+
+                        {/* Col 2: Activity Snapshot */}
+                        <div className="stat-card">
+                            <div className="card-heading">Activity Snapshot</div>
+                            <div className="mini-stats-grid">
+                                <div className="mini-stat">
+                                    <span className="num">6</span>
+                                    <span className="label">Stocks</span>
+                                </div>
+                                <div className="mini-stat">
+                                    <span className="num">14</span>
+                                    <span className="label">Screeners Run</span>
+                                </div>
+                                <div className="mini-stat">
+                                    <span className="num">3</span>
+                                    <span className="label">Alerts</span>
+                                </div>
                             </div>
-                            <div className="metric-chip">
-                                <span className="chip-label">Total Trades</span>
-                                <strong className="chip-value">{totalTrades}</strong>
+                            <div className="ticker-wrap">
+                                <span className="ticker-item">RELIANCE</span>
+                                <span className="ticker-item">INFY</span>
+                                <span className="ticker-item">TATAMOTORS</span>
                             </div>
-                            <div className="metric-chip">
-                                <span className="chip-label">Risk Level</span>
-                                <strong className="chip-value risk-text">{traderRisk}</strong>
-                            </div>
+                            <div className="card-cta">Change Mode <ArrowRight size={14} /></div>
                         </div>
+
+                        {/* Col 3: Preferences */}
+                        <div className="stat-card">
+                            <div className="card-heading">Preferences</div>
+                            <div className="pref-list">
+                                <div className="pref-item">
+                                    <span className="pref-label">Preferred Sectors</span>
+                                    <span className="pref-val">Technology, Finance</span>
+                                </div>
+                                <div className="pref-item">
+                                    <span className="pref-label">Risk Level</span>
+                                    <span className="pref-val risk-high">
+                                        <AlertCircle size={14} /> High
+                                    </span>
+                                </div>
+                                <div className="pref-item">
+                                    <span className="pref-label">Investment Style</span>
+                                    <span className="pref-val">Momentum / Technical</span>
+                                </div>
+                            </div>
+                            <div className="card-cta">Edit Preferences <ArrowRight size={14} /></div>
+                        </div>
+
                     </div>
-                </section>
-
-                <section className="trader-layout-grid">
-                    <div className="left-col">
-                        <article className="glass-card-dark panel-card">
-                            <h3 className="panel-title">Trading Style Breakdown</h3>
-                            <div className="style-ring-grid">
-                                <div className="style-ring-card">
-                                    <div className="style-ring" style={{ '--p': styleMix.scalping }}>
-                                        <span>{styleMix.scalping}%</span>
-                                    </div>
-                                    <p>Scalping</p>
-                                </div>
-                                <div className="style-ring-card">
-                                    <div className="style-ring style-ring-blue" style={{ '--p': styleMix.intraday }}>
-                                        <span>{styleMix.intraday}%</span>
-                                    </div>
-                                    <p>Intraday</p>
-                                </div>
-                                <div className="style-ring-card">
-                                    <div className="style-ring style-ring-slate" style={{ '--p': styleMix.swing }}>
-                                        <span>{styleMix.swing}%</span>
-                                    </div>
-                                    <p>Swing</p>
-                                </div>
-                            </div>
-                        </article>
-
-                        <article className="glass-card-dark panel-card">
-                            <h3 className="panel-title">Trader Stats</h3>
-                            <div className="quick-stats-stack">
-                                <div className="stats-row"><span>Avg Holding Time</span><strong>48m</strong></div>
-                                <div className="stats-row"><span>Best Session</span><strong>Opening Bell</strong></div>
-                                <div className="stats-row"><span>Execution Speed</span><strong>38ms</strong></div>
-                                <div className="stats-row"><span>Discipline Streak</span><strong>12 Days</strong></div>
-                            </div>
-                        </article>
-                    </div>
-
-                    <div className="center-col">
-                        <article className="glass-card-dark panel-card performance-panel">
-                            <h3 className="panel-title">Performance Panel</h3>
-                            <div className="performance-cards-grid">
-                                {performanceCards.map((card) => {
-                                    const isProfit = card.value >= 0;
-                                    const points = buildSparklinePath(card.points);
-                                    return (
-                                        <div key={card.key} className={`perf-card ${isProfit ? 'is-profit' : 'is-loss'}`}>
-                                            <div className="perf-head">
-                                                <span>{card.label}</span>
-                                                {isProfit ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                                            </div>
-                                            <strong className="perf-value live-value">{formatPnl(card.value)}</strong>
-                                            <svg viewBox="0 0 100 30" className="sparkline" preserveAspectRatio="none" aria-hidden="true">
-                                                <polyline
-                                                    points={points}
-                                                    fill="none"
-                                                    stroke={isProfit ? 'var(--pnl-green)' : 'var(--pnl-red)'}
-                                                    strokeWidth="2"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                />
-                                            </svg>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </article>
-
-                        <article className="glass-card-dark panel-card">
-                            <h3 className="panel-title">Active Positions</h3>
-                            <div className="positions-table-wrap">
-                                <table className="positions-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Symbol</th>
-                                            <th>Entry</th>
-                                            <th>Current</th>
-                                            <th>P/L</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {positions.map((row) => {
-                                            const pnl = Number((row.current - row.entry).toFixed(2));
-                                            const positive = pnl >= 0;
-                                            return (
-                                                <tr key={row.symbol} className="position-row">
-                                                    <td>{row.symbol}</td>
-                                                    <td>{row.entry.toFixed(2)}</td>
-                                                    <td>{row.current.toFixed(2)}</td>
-                                                    <td className={positive ? 'pl-profit live-value' : 'pl-loss live-value'}>
-                                                        {positive ? '+' : '-'}{Math.abs(pnl).toFixed(2)}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </article>
-                    </div>
-
-                    <div className="right-col">
-                        <article className="glass-card-dark panel-card">
-                            <h3 className="panel-title">Quick Actions</h3>
-                            <div className="action-stack">
-                                <button className="action-btn action-btn-primary"><Play size={15} />Start Trading</button>
-                                <button className="action-btn action-btn-secondary"><Filter size={15} />Open Screener</button>
-                                <button className="action-btn action-btn-tertiary"><Star size={15} />View Watchlist</button>
-                            </div>
-                        </article>
-
-                        <article className="glass-card-dark panel-card">
-                            <h3 className="panel-title">Psychology & Behavior</h3>
-                            <div className="behavior-list">
-                                <div className="behavior-item">
-                                    <span className="behavior-label"><Shield size={14} />Risk Appetite</span>
-                                    <span className="behavior-badge behavior-high">High</span>
-                                </div>
-                                <div className="behavior-item">
-                                    <span className="behavior-label"><Activity size={14} />Discipline Score</span>
-                                    <span className="behavior-badge behavior-good">82/100</span>
-                                </div>
-                                <div className="behavior-item">
-                                    <span className="behavior-label"><AlertCircle size={14} />Overtrading Indicator</span>
-                                    <span className="behavior-badge behavior-medium">Moderate</span>
-                                </div>
-                                <div className="behavior-item">
-                                    <span className="behavior-label"><Zap size={14} />Execution Temperament</span>
-                                    <span className="behavior-badge behavior-good">Controlled</span>
-                                </div>
-                            </div>
-                        </article>
-                    </div>
-                </section>
+                </div>
             </main>
         </div>
     );

@@ -36,10 +36,10 @@ const runBackfill = async () => {
             process.exit(1);
         }
 
-        logger.info('âœ… MongoDB connected');
+        logger.info('✅ MongoDB connected');
         logger.info('');
 
-        logger.info('ðŸ“Š Starting Nifty 50 backfill...');
+        logger.info('📊 Starting Nifty 50 backfill...');
         const startTime = Date.now();
 
         const results = await historicalDataBackfillService.backfillTopIndianStocks(

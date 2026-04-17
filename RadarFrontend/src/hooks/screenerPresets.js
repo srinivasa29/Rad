@@ -4,7 +4,7 @@ export const SCREENER_PRESETS = {
   momentum: {
     name: 'Momentum Movers',
     description: 'Stocks with strong upward price momentum and high RSI',
-    icon: 'ðŸš€',
+    icon: '🚀',
     category: 'Technical',
     filters: { minChange: 0.8, minRsi: 55, minScore: 55, volumeStatus: 'high_volume' },
     sortBy: 'change',
@@ -13,7 +13,7 @@ export const SCREENER_PRESETS = {
   value: {
     name: 'Value Picks',
     description: 'Undervalued stocks with low P/E ratios',
-    icon: 'ðŸ’Ž',
+    icon: '👎',
     category: 'Fundamental',
     filters: { maxPe: 22, minPrice: 50, minMarketCap: '1000Cr' },
     sortBy: 'pe',
@@ -22,7 +22,7 @@ export const SCREENER_PRESETS = {
   breakout: {
     name: 'High RSI Breakouts',
     description: 'Stocks breaking out with strong technical indicators',
-    icon: 'ðŸ“ˆ',
+    icon: '📈',
     category: 'Technical',
     filters: { minRsi: 60, minScore: 65, minChange: 0.5 },
     sortBy: 'score',
@@ -32,7 +32,7 @@ export const SCREENER_PRESETS = {
   dividendKings: {
     name: 'Dividend Kings',
     description: 'High dividend yield stocks with consistent payouts',
-    icon: 'ðŸ‘‘',
+    icon: '💎'
     category: 'Income',
     filters: { minDividendYield: 3.5, minMarketCap: '5000Cr', maxPe: 30 },
     sortBy: 'dividendYield',
@@ -41,7 +41,7 @@ export const SCREENER_PRESETS = {
   dividendGrowth: {
     name: 'Dividend Growth',
     description: 'Companies growing dividends year-over-year',
-    icon: 'ðŸ“Š',
+    icon: '📊',
     category: 'Income',
     filters: { minDividendYield: 2, minChange: 0, minScore: 50 },
     sortBy: 'dividendYield',
@@ -51,7 +51,7 @@ export const SCREENER_PRESETS = {
   growthLeaders: {
     name: 'Growth Leaders',
     description: 'High-growth stocks with strong earnings potential',
-    icon: 'ðŸŒŸ',
+    icon: '🌟',
     category: 'Growth',
     filters: { minChange: 1.5, minScore: 70, sectors: ['Technology', 'Healthcare'] },
     sortBy: 'change',
@@ -60,7 +60,7 @@ export const SCREENER_PRESETS = {
   smallCapGems: {
     name: 'Small Cap Gems',
     description: 'Small-cap stocks with big potential',
-    icon: 'ðŸ’ ',
+    icon: '💠',
     category: 'Growth',
     filters: { minMarketCap: '100Cr', maxMarketCap: '5000Cr', minScore: 60 },
     sortBy: 'score',
@@ -70,7 +70,7 @@ export const SCREENER_PRESETS = {
   oversold: {
     name: 'Oversold Bounce',
     description: 'Oversold stocks ready for reversal',
-    icon: 'ðŸ”„',
+    icon: '📄',
     category: 'Contrarian',
     filters: { maxRsi: 35, minScore: 40, volumeStatus: 'high_volume' },
     sortBy: 'rsi',
@@ -79,7 +79,7 @@ export const SCREENER_PRESETS = {
   fallenAngels: {
     name: 'Fallen Angels',
     description: 'Quality stocks temporarily beaten down',
-    icon: 'ðŸ˜‡',
+    icon: '😇',
     category: 'Contrarian',
     filters: { minChange: -5, maxChange: -1, maxPe: 25, minMarketCap: '10000Cr' },
     sortBy: 'change',
@@ -89,7 +89,7 @@ export const SCREENER_PRESETS = {
   blueChips: {
     name: 'Blue Chip Quality',
     description: 'Large-cap stable companies',
-    icon: 'ðŸ†',
+    icon: '🏆',
     category: 'Quality',
     filters: { minMarketCap: '50000Cr', maxPe: 35, minScore: 55 },
     sortBy: 'marketcap',
@@ -98,7 +98,7 @@ export const SCREENER_PRESETS = {
   defensiveStocks: {
     name: 'Defensive Stocks',
     description: 'Low-volatility defensive sectors',
-    icon: 'ðŸ›¡ï¸',
+    icon: '🛡️',
     category: 'Quality',
     filters: { sectors: ['FMCG', 'Pharma', 'Utilities'], minMarketCap: '5000Cr' },
     sortBy: 'marketcap',

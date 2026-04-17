@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { createPortal } from "react-dom";
 import {
     LayoutDashboard,
     Star,
@@ -20,7 +19,6 @@ import {
 import { useHeaderData } from "../../hooks/useHeaderData";
 import { fetchMarketData, fetchTrendingSearches, logSearchQuery } from "../../api/marketApi";
 import { updateUserMode } from "../../api/userApi";
-import ProfileDropdownPortal from "./ProfileDropdownPortal";
 
 const displaySymbol = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
 
@@ -59,7 +57,6 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
     const [showSearchDropdown, setShowSearchDropdown] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const searchContainerRef = useRef(null);
-    const profileButtonRef = useRef(null);
 
     const handleLogout = () => {
         localStorage.removeItem("token");
@@ -114,7 +111,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
     const openStockPage = (value) => {
         const symbol = String(value || '').trim();
         if (!symbol) return;
-        const mode = String(localStorage.getItem('mode') || 'INVESTOR').toUpperCase();
+        const mode = localStorage.getItem('mode') || 'INVESTOR';
         const path = mode === 'INVESTOR' ? '/investor-stock/' : '/stocks/';
         navigate(`${path}${encodeURIComponent(symbol.toUpperCase())}`);
     };
@@ -139,7 +136,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
     return (
         <>
             <header className="navbar rounded-2xl mx-6 lg:mx-10 border border-white/40 shadow-xl relative z-[110] bg-white/60 backdrop-blur-xl px-6 py-3 flex items-center justify-between">
-                {}
+                {/* Left Side: Logo & Brand */}
                 <div className="flex items-center gap-4 shrink-0">
                     <div className="w-10 h-10 rounded-full bg-[#3E84F6]/10 flex items-center justify-center border border-[#3E84F6]/20 overflow-hidden shadow-inner">
                         <img src="/radar-logo-final.jpg" alt="Radar Logo" className="w-full h-full object-cover" />
@@ -147,7 +144,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                     <span className="brand-name font-black tracking-tighter text-xl text-[#3E84F6]">RADAR</span>
                 </div>
 
-                {}
+                {/* Center: Navigation Links */}
                 <div className="hidden lg:flex items-center gap-8 ml-8">
                     {[
                         { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard },
@@ -167,9 +164,9 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                     ))}
                 </div>
 
-                {}
+                {/* Right Side: Search & Actions */}
                 <div className="flex items-center gap-4 flex-1 justify-end">
-                    {}
+                    {/* Compact Search Bar */}
                     <div className="relative hidden md:block max-w-[280px] w-full" ref={searchContainerRef}>
                         <div className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(62, 132, 246, 0.5)' }}>
                             <Search size={16} />
@@ -231,7 +228,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                         )}
                     </div>
 
-                    {}
+                    {/* Notification & Profile Buttons */}
                     <div className="flex items-center gap-2 border-l border-blue-100/30 pl-4">
                         <div className="relative" onMouseEnter={() => setIsNotificationsOpen(true)} onMouseLeave={() => setIsNotificationsOpen(false)}>
                             <button className="relative w-9 h-9 flex items-center justify-center hover:bg-blue-50 rounded-full text-[#3E84F6]">
@@ -260,31 +257,59 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                         </div>
 
                         <div className="relative">
-                            <div 
-                                ref={profileButtonRef}
-                                onClick={() => setIsProfileOpen(!isProfileOpen)} 
-                                className="w-9 h-9 rounded-full bg-[#3E84F6] text-white flex items-center justify-center text-xs font-black cursor-pointer hover:scale-110 transition-all shadow-lg shadow-blue-500/20"
-                            >
+                            <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="w-9 h-9 rounded-full bg-[#3E84F6] text-white flex items-center justify-center text-xs font-black cursor-pointer hover:scale-110 transition-all shadow-lg shadow-blue-500/20">
                                 {userInitial}
                             </div>
-                            
-                            {isProfileOpen && createPortal(
-                                <ProfileDropdownPortal
-                                    avatarRef={profileButtonRef}
-                                    profile={profile}
-                                    userInitial={userInitial}
-                                    onClose={() => setIsProfileOpen(false)}
-                                    onLogout={() => {
-                                        setShowLogoutModal(true);
-                                        setIsProfileOpen(false);
-                                    }}
-                                    onToggleMode={() => {
-                                        localStorage.setItem('mode', 'TRADER');
-                                        if (onToggleMode) onToggleMode();
-                                        setIsProfileOpen(false);
-                                    }}
-                                />,
-                                document.body
+                            {isProfileOpen && (
+                                <div className="absolute right-0 top-11 w-64 bg-white border border-blue-100 rounded-xl shadow-2xl py-2 z-[100] animate-in fade-in slide-in-from-top-1">
+                                    <div className="px-4 py-3 border-b bg-blue-50/50">
+                                        <p className="text-xs font-bold text-blue-900">{profile?.username || 'User'}</p>
+                                        <p className="text-[10px] text-blue-600/70 font-medium truncate">{profile?.email || 'user@radar.com'}</p>
+                                    </div>
+                                    <div className="py-1">
+                                        <Link to="/profile" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-3 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-blue-50 transition-colors">
+                                            <User size={16} /> My Profile
+                                        </Link>
+                                        
+                                        {/* Premium Mode Switcher */}
+                                        <div className="border-t border-b border-blue-50 py-3 px-4 bg-blue-50/20 my-1">
+                                            <div className="text-[10px] font-black uppercase tracking-wider mb-2 text-center text-blue-400">
+                                                Choose Your Interface
+                                            </div>
+
+                                            <div 
+                                                className="relative w-full h-10 rounded-full cursor-pointer flex items-center p-1 transition-all duration-300 shadow-inner group bg-slate-100 border border-slate-200"
+                                                onClick={() => {
+                                                    localStorage.setItem('mode', 'TRADER');
+                                                    if (onToggleMode) onToggleMode();
+                                                    setIsProfileOpen(false);
+                                                }}
+                                            >
+                                                {/* Animated Slide Background */}
+                                                <div 
+                                                    className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full shadow-sm transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform bg-white border border-slate-200 translate-x-0`}
+                                                ></div>
+
+                                                {/* Mode Options */}
+                                                <div className="w-1/2 flex items-center justify-center relative z-10 gap-2 h-full">
+                                                    <Activity size={14} className="text-blue-600" />
+                                                    <span className="text-[11px] font-black text-blue-600">Investor</span>
+                                                </div>
+
+                                                <div className="w-1/2 flex items-center justify-center relative z-10 gap-2 h-full opacity-50 hover:opacity-100 transition-opacity">
+                                                    <TrendingUp size={14} className="text-slate-500" />
+                                                    <span className="text-[11px] font-black text-slate-500">Trader</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-1">
+                                            <button onClick={() => setShowLogoutModal(true)} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-rose-600 hover:bg-rose-50/50 transition-colors">
+                                                <LogOut size={16} /> Sign Out
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>

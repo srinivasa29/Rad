@@ -98,11 +98,11 @@ const inferRegionCode = (asset) => {
 };
 
 const countryFlag = (code) => {
-    if (code === 'US') return 'ðŸ‡ºðŸ‡¸';
-    if (code === 'UK') return 'ðŸ‡¬ðŸ‡§';
-    if (code === 'JP') return 'ðŸ‡¯ðŸ‡µ';
-    if (code === 'EU') return 'ðŸ‡ªðŸ‡º';
-    return 'ðŸ‡®ðŸ‡³';
+    if (code === 'US') return '🇺🇸';
+    if (code === 'UK') return '🇬🇧';
+    if (code === 'JP') return '🇯🇵';
+    if (code === 'EU') return '🇪🇺';
+    return '🇮🇳';
 };
 
 const displaySymbol = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
@@ -116,14 +116,14 @@ const extractHeadlineSymbol = (value) => {
 
 const FALLBACK_THEME_ROWS = {
     rising: [
-        { name: 'AI Infrastructure', trend: '+3.2% wk', icon: 'âš¡' },
-        { name: 'Defense Manufacturing', trend: '+2.6% wk', icon: 'ðŸ›¡ï¸' },
-        { name: 'Green Energy', trend: '+2.1% wk', icon: 'ðŸŒ¿' },
+        { name: 'AI Infrastructure', trend: '+3.2% wk', icon: '⚡' },
+        { name: 'Defense Manufacturing', trend: '+2.6% wk', icon: '🛡️' },
+        { name: 'Green Energy', trend: '+2.1% wk', icon: '🌿' },
     ],
     falling: [
-        { name: 'Legacy Telecom', trend: '-1.8% wk', icon: 'ðŸ“‰' },
-        { name: 'Sugar Cycle', trend: '-1.4% wk', icon: 'ðŸ§Š' },
-        { name: 'Cement Weakness', trend: '-1.1% wk', icon: 'ðŸ›°ï¸' },
+        { name: 'Legacy Telecom', trend: '-1.8% wk', icon: '📉' },
+        { name: 'Sugar Cycle', trend: '-1.4% wk', icon: '🧊' },
+        { name: 'Cement Weakness', trend: '-1.1% wk', icon: '🛰️' },
     ],
 };
 
@@ -157,8 +157,10 @@ const InvestorMode = ({ onToggleMode }) => {
         const currentTheme = 'blue';
         const fullBackground = themes[currentTheme].gradient;
 
+        // Apply global background properties
         document.documentElement.style.setProperty('--investor-bg', fullBackground);
         
+        // 1:1 EXACT "Minimalist Sky" linear gradient from latest Step 3759 reference image
         document.body.style.backgroundColor = '#f0f9ff'; 
         document.body.style.backgroundImage = fullBackground;
         document.body.style.backgroundAttachment = 'fixed';
@@ -228,7 +230,7 @@ const MarketMoodGauge = () => {
 
     return (
         <div className="investor-card p-6 h-full flex flex-col justify-between relative overflow-hidden group">
-            {}
+            {/* Background blur */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -z-10 group-hover:bg-blue-500/10 transition-all duration-500"></div>
 
             {isLoading && (
@@ -239,7 +241,7 @@ const MarketMoodGauge = () => {
 
             {error && (
                 <div className="absolute inset-0 bg-white/5 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
-                    <span className="text-xl mb-2">ðŸ“¡</span>
+                    <span className="text-xl mb-2">📡</span>
                     <span className="text-xs font-bold text-rose-600">Mood Sensor Offline</span>
                     <button onClick={() => window.location.reload()} className="mt-3 text-[10px] bg-white/5 border border-current px-4 py-1.5 rounded-lg text-rose-600 font-black hover:bg-rose-50 hover:border-rose-300 shadow-sm transition-all uppercase tracking-wider">RETRY</button>
                 </div>
@@ -256,14 +258,14 @@ const MarketMoodGauge = () => {
             </div>
 
             <div className="gauge-chart-wrapper relative flex flex-col items-center justify-end h-32 mt-2">
-                {}
+                {/* Gauge SVG */}
                 <svg viewBox="0 0 200 110" className="w-full h-full">
-                    {}
+                    {/* Gradient and Filter Definitions */}
                     <defs>
                         <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="#ef4444" /> {}
-                            <stop offset="50%" stopColor="#eab308" /> {}
-                            <stop offset="100%" stopColor="#22c55e" /> {}
+                            <stop offset="0%" stopColor="#ef4444" /> {/* Red for Fear */}
+                            <stop offset="50%" stopColor="#eab308" /> {/* Yellow for Neutral */}
+                            <stop offset="100%" stopColor="#22c55e" /> {/* Green for Greed */}
                         </linearGradient>
                         <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
                             <feGaussianBlur stdDeviation="3" result="blur" />
@@ -271,13 +273,13 @@ const MarketMoodGauge = () => {
                         </filter>
                     </defs>
 
-                    {}
+                    {/* Background Arc */}
                     <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#f1f5f9" strokeWidth="20" strokeLinecap="round" />
 
-                    {}
+                    {/* Foreground Arc (Gradient) */}
                     <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gaugeGradient)" strokeWidth="20" strokeLinecap="round" strokeDasharray="251.2" strokeDashoffset="0" filter="url(#glow)" />
 
-                    {}
+                    {/* Ticks */}
                     {[0, 25, 50, 75, 100].map((tick, i) => {
                         const angle = (tick / 100) * 180 - 180;
                         const rad = (angle * Math.PI) / 180;
@@ -289,7 +291,7 @@ const MarketMoodGauge = () => {
                     })}
                 </svg>
 
-                {}
+                {/* Needle */}
                 <div
                     className="absolute bottom-2 left-1/2 w-1 h-24 bg-slate-800 origin-bottom rounded-full transition-transform duration-1000 ease-out z-10"
                     style={{ transform: `translateX(-50%) rotate(${needleRotation}deg)` }}
@@ -297,10 +299,10 @@ const MarketMoodGauge = () => {
                     <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-800 rounded-full"></div>
                 </div>
 
-                {}
+                {/* Needle Base */}
                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-8 h-8 bg-slate-800 rounded-full border-4 border-white shadow-lg z-20"></div>
 
-                {}
+                {/* Score Display */}
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-center z-0">
                     <span className="text-3xl font-black text-slate-800 tracking-tighter">{score}</span>
                     <span className="text-xs text-slate-400 block -mt-1">Score</span>
@@ -368,7 +370,7 @@ const ValuationThermometer = () => {
 
             {error && (
                 <div className="absolute inset-0 bg-white/5 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
-                    <span className="text-xl mb-2">ðŸ“ˆ</span>
+                    <span className="text-xl mb-2">📈</span>
                     <span className="text-xs font-bold text-rose-600">Valuation Data Unavailable</span>
                 </div>
             )}
@@ -378,7 +380,7 @@ const ValuationThermometer = () => {
             </div>
 
             <div className="space-y-8 flex-1">
-                {}
+                {/* P/E Ratio */}
                 <div>
                     <div className="flex justify-between items-end mb-2">
                         <div>
@@ -405,7 +407,7 @@ const ValuationThermometer = () => {
                     </div>
                 </div>
 
-                {}
+                {/* P/B Ratio */}
                 <div>
                     <div className="flex justify-between items-end mb-2">
                         <div>
@@ -458,7 +460,7 @@ const GlobalPulse = () => {
                         name: i.symbol || i.name || 'ASSET',
                         val: Number.isFinite(Number(i.price)) && Number(i.price) > 0 ? Number(i.price).toLocaleString() : '--',
                         change: Number.isFinite(Number(i.change_24h ?? i.change))
-                            ? `${Number(i.change_24h ?? i.change) >= 0 ? 'â–²' : 'â–¼'} ${Math.abs(Number(i.change_24h ?? i.change)).toFixed(2)}%`
+                            ? `${Number(i.change_24h ?? i.change) >= 0 ? '▲' : '▼'} ${Math.abs(Number(i.change_24h ?? i.change)).toFixed(2)}%`
                             : '--',
                         changeDirection: Number.isFinite(Number(i.change_24h ?? i.change))
                             ? (Number(i.change_24h ?? i.change) >= 0 ? 'up' : 'down')
@@ -494,7 +496,7 @@ const GlobalPulse = () => {
 
             {error && (
                 <div className="absolute inset-0 bg-white/5 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
-                    <span className="text-xl mb-2">ðŸŒ</span>
+                    <span className="text-xl mb-2">🌍</span>
                     <span className="text-xs font-bold text-rose-600">Global Markets Offline</span>
                 </div>
             )}
@@ -513,7 +515,7 @@ const GlobalPulse = () => {
                             </div>
                             <div>
                                 <div className="font-bold text-sm text-slate-700">{displaySymbol(m.name)}</div>
-                                <div className={`text-[10px] font-bold ${m.change.includes('â–²') ? 'text-blue-500' : 'text-rose-500'}`}>{m.change}</div>
+                                <div className={`text-[10px] font-bold ${m.change.includes('▲') ? 'text-blue-500' : 'text-rose-500'}`}>{m.change}</div>
                             </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
@@ -522,7 +524,7 @@ const GlobalPulse = () => {
                                 <path
                                     d={m.spark}
                                     fill="none"
-                                    stroke={m.change.includes('â–²') ? '#3E84F6' : '#ef4444'}
+                                    stroke={m.change.includes('▲') ? '#3E84F6' : '#ef4444'}
                                     strokeWidth="2.5"
                                     strokeLinecap="round"
                                 />
@@ -563,11 +565,11 @@ const DiscoveryShelves = () => {
                 const momentumBasket = (Array.isArray(liveSymbols) ? liveSymbols : []).slice(0, 8);
 
                 const next = [
-                    buildRow('Stock Of The Week', 'Highlighted by current fundamentals', response?.stockOfTheWeek ? [response.stockOfTheWeek] : [], 'â­'),
-                    buildRow('Dividend Leaders', 'Strong dividend profile', response?.topDividends, 'ðŸ“‘'),
-                    buildRow('Undervalued Gems', 'Lower valuation opportunities', response?.undervaluedGems, 'ðŸ’Ž'),
-                    buildRow('Momentum Leaders', 'Top names by current market action', response?.momentumLeaders?.length ? response.momentumLeaders : momentumBasket, 'ðŸš€'),
-                    buildRow('Most Active', 'Frequently traded names right now', momentumBasket, 'ðŸ”¥'),
+                    buildRow('Stock Of The Week', 'Highlighted by current fundamentals', response?.stockOfTheWeek ? [response.stockOfTheWeek] : [], '⭐'),
+                    buildRow('Dividend Leaders', 'Strong dividend profile', response?.topDividends, '📑'),
+                    buildRow('Undervalued Gems', 'Lower valuation opportunities', response?.undervaluedGems, '💎'),
+                    buildRow('Momentum Leaders', 'Top names by current market action', response?.momentumLeaders?.length ? response.momentumLeaders : momentumBasket, '🚀'),
+                    buildRow('Most Active', 'Frequently traded names right now', momentumBasket, '🔥'),
                 ].filter((item) => item.picks.length > 0);
 
                 setItems(next);
@@ -594,7 +596,7 @@ const DiscoveryShelves = () => {
 
             {error && (
                 <div className="absolute inset-0 bg-white/5 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
-                    <span className="text-xl mb-2">ðŸ§­</span>
+                    <span className="text-xl mb-2">🧭</span>
                     <span className="text-xs font-bold text-rose-600">Discovery feed unavailable</span>
                 </div>
             )}
@@ -617,7 +619,7 @@ const DiscoveryShelves = () => {
                                     <div className="text-xs text-slate-500">{item.desc}</div>
                                 </div>
                             </div>
-                            <span className="text-gray-300 group-hover:text-blue-600 transition-colors">â€º</span>
+                            <span className="text-gray-300 group-hover:text-blue-600 transition-colors">›</span>
                         </div>
 
                         <div className="bg-slate-500/10 rounded-lg p-2.5 flex items-center gap-3">
@@ -760,7 +762,7 @@ const SectorLandscape = () => {
 
             {error && (
                 <div className="absolute inset-0 bg-white/40 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
-                    <span className="text-3xl mb-3">ðŸ“Š</span>
+                    <span className="text-3xl mb-3">📊</span>
                     <span className="text-sm font-bold text-rose-600">Sector Performance Unavailable</span>
                     <button onClick={() => setTimeframe(timeframe)} className="mt-4 text-xs bg-white/60 border border-current px-4 py-2 rounded-lg text-rose-600 font-bold hover:bg-rose-50 transition-colors uppercase tracking-wider">Reload Sectors</button>
                 </div>
@@ -945,11 +947,11 @@ const EconomicCalendar = () => {
 
     const eventCountryFlag = (code) => {
         const upper = String(code || '').toUpperCase();
-        if (upper === 'US') return 'ðŸ‡ºðŸ‡¸';
-        if (upper === 'UK' || upper === 'GB') return 'ðŸ‡¬ðŸ‡§';
-        if (upper === 'EU') return 'ðŸ‡ªðŸ‡º';
-        if (upper === 'JP') return 'ðŸ‡¯ðŸ‡µ';
-        return 'ðŸ‡®ðŸ‡³';
+        if (upper === 'US') return '🇺🇸';
+        if (upper === 'UK' || upper === 'GB') return '🇬🇧';
+        if (upper === 'EU') return '🇪🇺';
+        if (upper === 'JP') return '🇯🇵';
+        return '🇮🇳';
     };
 
     return (
@@ -962,14 +964,14 @@ const EconomicCalendar = () => {
 
             {error && (
                 <div className="absolute inset-0 bg-white/5 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-4">
-                    <span className="text-xl mb-2">ðŸ“…</span>
+                    <span className="text-xl mb-2">📅</span>
                     <span className="text-xs font-bold text-rose-600">Calendar Error</span>
                 </div>
             )}
             <div className="card-header mb-3 flex items-start justify-between gap-3">
                 <div>
                     <h3 className="text-lg font-bold text-slate-800">Economic Calendar</h3>
-                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">Macro Pulse Â· High-impact events watchlist</p>
+                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">Macro Pulse · High-impact events watchlist</p>
                 </div>
                 <div className="text-[10px] font-bold text-slate-500 bg-slate-100 rounded-full px-2 py-1">{events.length} events</div>
             </div>
@@ -1023,7 +1025,7 @@ const TrendingThemes = () => {
                     .map((item, index) => ({
                         ...item,
                         trend: `+${item.value.toFixed(1)}% wk`,
-                        icon: ['ðŸ“ˆ', 'âš¡', 'ðŸ§ '][index % 3],
+                        icon: ['📈', '⚡', '🧠'][index % 3],
                     }));
 
                 const falling = normalized
@@ -1033,7 +1035,7 @@ const TrendingThemes = () => {
                     .map((item, index) => ({
                         ...item,
                         trend: `${item.value.toFixed(1)}% wk`,
-                        icon: ['ðŸ“‰', 'ðŸ§Š', 'ðŸ›°ï¸'][index % 3],
+                        icon: ['📉', '🧊', '🛰️'][index % 3],
                     }));
 
                 setRisingThemes(rising.length ? rising : FALLBACK_THEME_ROWS.rising);
@@ -1111,9 +1113,12 @@ const TrendingThemes = () => {
     );
 };
 
+// News Tab has been extracted to InvestorNewsDashboard component
+
+// News Tab logic has been moved to src/components/investor/InvestorNewsDashboard.jsx
 
 
-
+// Helper components for the dashboard
 
 const BreakingNewsTicker = () => {
     const headlines = [
@@ -1249,7 +1254,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
         <div className={`news-intelligence-card transition-all duration-300 overflow-hidden group ${isExpanded ? 'ring-2 ring-blue-500/20 shadow-xl !bg-white' : 'hover:border-slate-300'}`}>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4">
                 <div className="flex-1 space-y-3">
-                    {}
+                    {/* 1. Meta & Top Labels */}
                     <div className="flex items-center gap-2 text-[10px] font-bold">
                          <a 
                             href={item.url || "#"} 
@@ -1260,7 +1265,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                             <span>{item.source || 'Reuters'}</span>
                             <ExternalLink size={9} className="stroke-[3]" />
                          </a>
-                         <span className="text-slate-300">â€¢</span>
+                         <span className="text-slate-300">•</span>
                          <span className="text-slate-400 font-medium uppercase tracking-wider">{item.time || 'Just now'}</span>
                          {(importance === "High" || item.strategy === "AI Generated") && (
                             <div className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-black uppercase ring-1 ring-blue-100 shadow-sm ml-2">
@@ -1270,7 +1275,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                          )}
                     </div>
 
-                    {}
+                    {/* 2. Headline */}
                     <a 
                         href={item.url || "#"} 
                         target="_blank" 
@@ -1282,9 +1287,9 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                         </h3>
                     </a>
                     
-                    {}
+                    {/* 3. Smart Tags: Sector | Impact | Type */}
                     <div className="flex flex-wrap items-center gap-2">
-                        {}
+                        {/* High-Fidelity Sector Impact Tags */}
                         {sectors.slice(0, 3).map((sector, idx) => {
                             const name = typeof sector === 'string' ? sector : sector.name;
                             const sImpact = typeof sector === 'string' ? "Neutral" : (sector.impact || "Neutral");
@@ -1299,13 +1304,13 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                                 }`}>
                                     <span>{name}</span>
                                     <span className="text-[11px] leading-none mb-0.5 font-normal">
-                                        {isUp ? "â†‘" : isDown ? "â†“" : "â†’"}
+                                        {isUp ? "↑" : isDown ? "↓" : "→"}
                                     </span>
                                 </div>
                             );
                         })}
 
-                        {}
+                        {/* Sentiment Tag */}
                         <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md border ${
                             impact === "Positive" ? "bg-green-50 text-green-700 border-green-100" :
                             impact === "Negative" ? "bg-red-50 text-red-700 border-red-100" :
@@ -1314,19 +1319,19 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                             {impact}
                         </span>
 
-                        {}
+                        {/* Type Tag */}
                         <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md bg-blue-50 text-blue-700 border border-blue-100">
                             {item.category || "General"}
                         </span>
 
-                        {}
+                        {/* Stock Snippets if available */}
                         {(item.affectedStocks || []).length > 0 && <div className="h-3 w-[1px] bg-slate-200 mx-1"></div>}
                         <div className="flex items-center gap-2.5">
                             {(item.affectedStocks || []).slice(0, 3).map((stock, idx) => (
                                 <div key={idx} className="flex items-center gap-1 text-[10px] font-bold">
                                     <span className="text-slate-500">{stock.symbol}</span>
                                     <span className={stock.up ? "text-green-600" : "text-rose-600"}>
-                                        {stock.up ? "â†‘" : "â†“"}{stock.change}
+                                        {stock.up ? "↑" : "↓"}{stock.change}
                                     </span>
                                 </div>
                             ))}
@@ -1334,7 +1339,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                     </div>
                 </div>
 
-                {}
+                {/* Insight Toggle Button */}
                 <div className="flex-shrink-0 md:pl-6 md:border-l border-slate-100">
                     <button 
                         onClick={() => setIsExpanded(!isExpanded)}
@@ -1354,7 +1359,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
             {isExpanded && (
                 <div className="bg-white border-t border-slate-100 p-6 space-y-6 animate-in slide-in-from-top-2 duration-300">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        {}
+                        {/* Left Column: Instant Summaries */}
                         <div className="space-y-6">
                             <div>
                                 <div className="flex items-center gap-2.5 mb-3">
@@ -1376,7 +1381,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                                 </p>
                             </div>
 
-                            {}
+                            {/* Sector Impact Tags */}
                             {sectors.length > 0 && (
                                 <div className="pt-2 pl-5">
                                     <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-4">AFFECTED SECTORS</span>
@@ -1395,7 +1400,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                                                 }`}>
                                                     <span>{name}</span>
                                                     <span className="text-[15px] leading-none mb-0.5 font-normal">
-                                                        {isUp ? "â†‘" : isDown ? "â†“" : "â†’"}
+                                                        {isUp ? "↑" : isDown ? "↓" : "→"}
                                                     </span>
                                                 </div>
                                             );
@@ -1405,7 +1410,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                             )}
                         </div>
 
-                        {}
+                        {/* Right Column: Market Impact Conclusion */}
                         <div className="flex items-end md:justify-end">
                             <div className={`p-6 rounded-3xl border flex gap-6 items-center w-full max-w-[420px] shadow-sm ${
                                 impact === "Positive" ? "bg-green-50/40 border-green-100" :
@@ -1435,7 +1440,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                         </div>
                     </div>
 
-                    {}
+                    {/* Checkpoints footer */}
                     {item.whatToWatch && item.whatToWatch.length > 0 && (
                         <div className="pt-5 border-t border-slate-50 flex items-center gap-5">
                             <span className="text-[11px] font-black text-indigo-500 uppercase tracking-widest whitespace-nowrap">CHECKPOINTS:</span>
@@ -1452,6 +1457,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
 
 
 const InvestorNewsFeed = () => {
+    // Remove static mock data - now strictly live-only
     const [rawNews, setRawNews] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -1460,6 +1466,7 @@ const InvestorNewsFeed = () => {
     const [region, setRegion] = useState("India");
     const [isWatchlistOnly, setIsWatchlistOnly] = useState(false);
 
+    // Toggle multi-select category logic
     const toggleCategory = (cat) => {
         if (cat === "All") {
             setSelectedCategories([]);
@@ -1473,9 +1480,11 @@ const InvestorNewsFeed = () => {
         );
     };
 
+    // Advanced Dynamic Filtering with Sorting
     const displayNews = useMemo(() => {
         let filtered = [...rawNews];
 
+        // 1. Filter by categories (OR logic as requested)
         if (selectedCategories.length > 0) {
             filtered = filtered.filter(item => 
                 selectedCategories.some(cat => 
@@ -1484,6 +1493,7 @@ const InvestorNewsFeed = () => {
             );
         }
 
+        // 2. Maintain strict chronological sorting (Latest First)
         return filtered.sort((a, b) => new Date(b.publishedAt) || 0 - new Date(a.publishedAt) || 0);
     }, [rawNews, selectedCategories]);
 
@@ -1496,6 +1506,7 @@ const InvestorNewsFeed = () => {
             setIsLoading(true);
             setError(null);
             
+            // To support robust frontend filtering, we fetch a broader set of news (All Category)
             const data = await fetchMarketNews({
                 category: "all", 
                 region: region.toLowerCase(),
@@ -1517,6 +1528,7 @@ const InvestorNewsFeed = () => {
     };
 
     useEffect(() => {
+        // Automatically fetch fresh news when critical backend filters change
         loadNews();
     }, [region, assetClass, isWatchlistOnly]);
 
@@ -1526,7 +1538,7 @@ const InvestorNewsFeed = () => {
                 <div className="main-content-area transition-all duration-300 w-full mb-10 max-w-[1400px] mx-auto">
                     
 
-                    {}
+                    {/* 1. LATEST HEADLINES HEADER */}
                     <div className="mb-6 px-1">
                         <div className="flex items-center gap-3 mb-1.5 group">
                             <div className="p-2.5 bg-blue-600 rounded-xl text-white shadow-xl shadow-blue-500/30 ring-4 ring-blue-50 group-hover:scale-110 transition-transform">
@@ -1537,15 +1549,15 @@ const InvestorNewsFeed = () => {
                         <p className="text-slate-500 font-semibold text-[15px] pl-1">Intelligent discovery of signals across global market assets.</p>
                     </div>
 
-                    {}
+                    {/* 2. FILTER BAR / ACTION BUTTONS */}
                     <div className="flex flex-col gap-4 mb-4">
                         <div className="glass-filter-container rounded-[20px] p-4 border border-white/50 shadow-lg shadow-blue-500/5 flex items-center justify-start gap-8 relative z-[100] overflow-visible">
-                            {}
+                            {/* Left: Tabs */}
                             <div className="flex-shrink-0 bg-slate-50/80 p-1 rounded-[14px] border border-slate-100 shadow-inner">
                                 <NewsTypeFilters selected={selectedCategories} onToggle={toggleCategory} />
                             </div>
 
-                            {}
+                            {/* Right: Controls */}
                             <div className="flex items-center gap-10 flex-shrink-0 bg-white/40 px-6 py-2 rounded-2xl border border-white/60 shadow-sm overflow-visible ml-auto">
                                 <div className="flex items-center gap-3">
                                     <span className="section-label whitespace-nowrap">Asset Layer</span>
@@ -1563,7 +1575,7 @@ const InvestorNewsFeed = () => {
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">
-                                        FEED CONTEXT: {region} â€¢ {assetClass}
+                                        FEED CONTEXT: {region} • {assetClass}
                                     </span>
                                     {hasNoRecentUpdates && (
                                         <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 rounded border border-amber-100">
@@ -1661,6 +1673,7 @@ const InvestorNewsFeed = () => {
     );
 };
 
+// Helper components for the dashboard
 
 function InvestorView({ activeModule }) {
     if (activeModule === 'WATCHLIST') {
@@ -1675,10 +1688,11 @@ function InvestorView({ activeModule }) {
         return <InvestorNewsFeed />;
     }
 
+    // Default: DASHBOARD
     return (
         <div className="dashboard-layout fade-in bg-transparent transition-all duration-500 py-4 w-full px-4 md:px-10">
             <div className="main-content-area transition-all duration-300 w-full mb-8">
-                {}
+                {/* Welcome Greeting */}
 
                 <div className="flex justify-between items-center mb-6 px-1">
                     <div>

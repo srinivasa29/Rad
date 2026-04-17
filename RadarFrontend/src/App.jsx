@@ -110,7 +110,6 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/trader" element={<DashboardAliasRoute mode="TRADER" />} />
             <Route path="/dashboard/investor" element={<DashboardAliasRoute mode="INVESTOR" />} />
-            <Route path="/investor-dashboard" element={<DashboardAliasRoute mode="INVESTOR" />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
@@ -134,7 +133,6 @@ function App() {
             <Route path="/reports/export" element={<ReportsExportPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/support" element={<Navigate to="/settings" replace />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/health" element={<Navigate to="/admin" replace />} />
             <Route path="/demo" element={<RealtimeDemoPage />} />

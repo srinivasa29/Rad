@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Activity, TrendingUp, LogOut } from "lucide-react";
 
+// Investor mode profile dropdown with portal support
 const ProfileDropdownPortal = ({ 
   avatarRef, 
   profile, 
@@ -32,6 +33,7 @@ const ProfileDropdownPortal = ({
     localStorage.setItem("mode", mode);
   }, [mode]);
 
+  // Calculate position based on avatar
   useEffect(() => {
     const calculatePosition = () => {
       if (avatarRef?.current) {
@@ -68,6 +70,7 @@ const ProfileDropdownPortal = ({
     };
   }, [avatarRef]);
 
+  // Close on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (
@@ -115,14 +118,14 @@ const ProfileDropdownPortal = ({
         pointerEvents: "auto"
       }}
     >
-      {}
+      {/* Profile Header */}
       <div className="px-4 py-3 border-b bg-blue-50/50">
         <p className="text-xs font-bold text-blue-900">{profile?.username || 'User'}</p>
         <p className="text-[10px] text-blue-600/70 font-medium truncate">{profile?.email || 'user@radar.com'}</p>
       </div>
 
       <div className="py-1">
-        {}
+        {/* My Profile */}
         <a 
           href="/profile" 
           onClick={(e) => {
@@ -157,19 +160,19 @@ const ProfileDropdownPortal = ({
           <span className="flex items-center gap-3">Help & Support</span>
         </button>
 
-        {}
+        {/* Mode Switcher */}
         <div className="border-t border-b border-blue-50 py-3 px-4 bg-blue-50/20 my-1">
           <div className="text-[10px] font-black uppercase tracking-wider mb-2 text-center text-blue-400">
             Choose Your Interface
           </div>
 
           <div className="relative w-full h-10 rounded-full flex items-center p-1 transition-all duration-300 shadow-inner group bg-slate-100 border border-slate-200">
-            {}
+            {/* Animated Slide Background */}
             <div 
               className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full shadow-sm transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform bg-white border border-slate-200 ${mode === "investor" ? "translate-x-0" : "translate-x-full"}`}
             ></div>
 
-            {}
+            {/* Mode Options */}
             <button
               type="button"
               onClick={() => handleSelectMode("investor")}
@@ -190,7 +193,7 @@ const ProfileDropdownPortal = ({
           </div>
         </div>
 
-        {}
+        {/* Sign Out */}
         <div className="mt-1">
           <button 
             onClick={() => {
