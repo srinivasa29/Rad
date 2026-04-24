@@ -1,0 +1,289 @@
+/* Profile.css - Investor Identity Focus */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700;800&display=swap');
+
+.profile-page-root {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #0f172a;
+    padding-bottom: 4rem;
+}
+
+/* Glass Card Base */
+.glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 20px;
+    padding: 1.25rem;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s, box-shadow 0.2s;
+    height: 100%;
+}
+
+.glass-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 40px -12px rgba(37, 99, 235, 0.08);
+}
+
+/* Profile Header Section */
+.profile-header-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    border-radius: 32px;
+    padding: 3rem;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
+    min-height: 180px;
+}
+
+.profile-info-group {
+    display: flex;
+    align-items: center;
+    gap: 2.5rem;
+}
+
+.header-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+
+.avatar-wrapper {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 800;
+    box-shadow: 0 8px 16px rgba(37, 99, 235, 0.2);
+}
+
+.user-meta h1 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0;
+    color: #1e293b;
+}
+
+.user-meta p {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0.2rem 0;
+}
+
+/* Investor DNA Section */
+.dna-hero {
+    background: linear-gradient(135deg, #1e293b, #334155);
+    border-radius: 20px;
+    padding: 1.25rem 2rem;
+    color: white;
+    margin-bottom: 1rem;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dna-hero::after {
+    content: '';
+    position: absolute;
+    top: -50px; right: -50px; width: 350px; height: 350px;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+    z-index: 0;
+}
+
+.dna-content {
+    position: relative;
+    z-index: 1;
+}
+
+.dna-label {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #94a3b8;
+    margin-bottom: 0.75rem;
+    display: block;
+}
+
+.dna-title {
+    font-size: 1.45rem;
+    font-weight: 850;
+    margin-bottom: 0.5rem;
+    line-height: 1.1;
+    background: linear-gradient(to right, #fff, #94a3b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.dna-summary {
+    font-size: 0.9rem;
+    color: #cbd5e1;
+    font-weight: 500;
+    max-width: 700px;
+    line-height: 1.4;
+}
+
+.identity-badges {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.badge-pill {
+    padding: 0.6rem 1.25rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 700;
+    color: white;
+    backdrop-filter: blur(8px);
+}
+
+/* Behavior & Allocation Grid */
+.identity-pair-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+/* Behavior Bars */
+.behavior-bar {
+    margin-bottom: 1.25rem;
+}
+
+.bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+}
+
+.bar-bg {
+    height: 10px;
+    background: #e2e8f0;
+    border-radius: 100px;
+    overflow: hidden;
+}
+
+.bar-fill-inv { background: #3b82f6; }
+.bar-fill-tra { background: #1e293b; }
+
+.behavior-desc {
+    font-size: 0.8rem;
+    color: #64748b;
+    line-height: 1.6;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px dashed #e2e8f0;
+}
+
+/* Activity Items */
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-icon {
+    width: 42px;
+    height: 42px;
+    background: #eff6ff;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3b82f6;
+    flex-shrink: 0;
+}
+
+.activity-info .text {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.activity-info .time {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 0.25rem;
+    font-weight: 600;
+}
+
+/* Risk Profile */
+.risk-summary-text {
+    font-size: 1.35rem;
+    font-weight: 900;
+    color: #1e293b;
+    letter-spacing: -0.01em;
+    line-height: 1.4;
+}
+
+/* Card Header */
+.card-title-wrap {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.card-title-wrap h3 {
+    font-size: 0.85rem;
+    font-weight: 900;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Buttons */
+.switch-mode-btn, .edit-profile-btn, .retake-btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 14px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.retake-btn {
+    background: transparent;
+    color: #3b82f6;
+    border: 1px solid #eff6ff;
+}
+
+.retake-btn:hover {
+    background: #f0f7ff;
+    border-color: #3b82f6;
+}
+
+.switch-mode-btn { background: #eff6ff; color: #3b82f6; border: none; }
+.edit-profile-btn { background: white; color: #475569; border: 1px solid #e2e8f0; }
+
+@media (max-width: 1024px) {
+    .identity-pair-grid {
+        grid-template-columns: 1fr;
+    }
+}

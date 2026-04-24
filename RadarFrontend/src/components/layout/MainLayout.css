@@ -1,0 +1,9 @@
+.dashboard-container .page-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  background-color: #020617;
+  background: #020617;
+}

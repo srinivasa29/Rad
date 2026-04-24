@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "title": "Understanding Market Cap",
+    "category": "Fundamentals",
+    "content": "Market Capitalization refers to the total dollar market value of a company's outstanding shares. Large-cap companies are generally safer, while small-cap companies offer higher risk and reward.",
+    "difficulty": "Beginner"
+  },
+  {
+    "id": 2,
+    "title": "Moving Averages (SMA vs EMA)",
+    "category": "Technical Analysis",
+    "content": "A simple moving average (SMA) calculates the average of a selected range of prices, essentially smoothing out volatility. An exponential moving average (EMA) places greater weight on the most recent data.",
+    "difficulty": "Intermediate"
+  },
+  {
+    "id": 3,
+    "title": "P/E Ratio Explained",
+    "category": "Fundamentals",
+    "content": "The Price-to-Earnings ratio measures a company's current share price relative to its per-share earnings. A high P/E could mean a stock's price is high relative to earnings and possibly overvalued.",
+    "difficulty": "Beginner"
+  },
+  {
+    "id": 4,
+    "title": "RSI Indicator",
+    "category": "Technical Analysis",
+    "content": "The Relative Strength Index (RSI) is a momentum indicator used in technical analysis. An RSI above 70 indicates an asset is overbought, while an RSI below 30 indicates it is oversold.",
+    "difficulty": "Intermediate"
+  }
+]

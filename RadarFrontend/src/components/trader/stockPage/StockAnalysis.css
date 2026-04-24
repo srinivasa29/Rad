@@ -1,0 +1,124 @@
+/* TRADERPRO TERMINAL - HIGH DENSITY DESIGN SYSTEM */
+
+:root {
+    --terminal-bg: #0c0d10;
+    --terminal-panel: #14171a;
+    --terminal-border: #2a2e33;
+    --terminal-border-hover: #363c42;
+    --terminal-accent: #2962ff;
+    --terminal-green: #00c805;
+    --terminal-red: #ff3b30;
+    --terminal-yellow: #ff9f0a;
+    --terminal-text: #d1d4dc;
+    --terminal-text-muted: #787b86;
+    --terminal-radius: 8px;
+    --terminal-font: 'Inter', -apple-system, sans-serif;
+    --terminal-mono: 'JetBrains Mono', monospace;
+}
+
+.trader-terminal-container {
+    padding: 1rem;
+    min-height: 100vh;
+    background: var(--terminal-bg);
+    color: var(--terminal-text);
+    font-family: var(--terminal-font);
+}
+
+.terminal-layout {
+    max-width: 1720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* COMPACT PANEL BASE */
+.terminal-card {
+    background: var(--terminal-panel);
+    border: 1px solid var(--terminal-border);
+    border-radius: var(--terminal-radius);
+    overflow: hidden;
+    transition: border-color 0.2s ease;
+}
+
+.terminal-card:hover {
+    border-color: var(--terminal-border-hover);
+}
+
+/* GRID SYSTEM 65/35 */
+.terminal-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 1rem;
+}
+
+/* TYPOGRAPHY */
+.terminal-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.terminal-price {
+    font-family: var(--terminal-mono);
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.terminal-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--terminal-text-muted);
+}
+
+/* ACTION TAGS */
+.terminal-tag {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.tag-momentum { background: rgba(0, 200, 5, 0.1); color: var(--terminal-green); }
+.tag-trend { background: rgba(41, 98, 255, 0.1); color: var(--terminal-accent); }
+
+/* HORIZONTAL MATRIX ALIGNMENT */
+.terminal-matrix {
+    display: flex;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.matrix-item {
+    flex: 1;
+    padding: 0.75rem;
+    background: rgba(255,255,255,0.02);
+    border-radius: 6px;
+    border: 1px solid var(--terminal-border);
+}
+
+/* STATUS COLORS */
+.terminal-up { color: var(--terminal-green); }
+.terminal-down { color: var(--terminal-red); }
+
+/* CUSTOM SCROLLBAR FOR TERMINAL */
+.terminal-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+.terminal-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.terminal-scrollbar::-webkit-scrollbar-thumb {
+    background: #363c4e;
+    border-radius: 10px;
+}
+
+@media (max-width: 1280px) {
+    .terminal-main-grid {
+        grid-template-columns: 1fr;
+    }
+}
