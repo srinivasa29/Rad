@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MinimalTraderChart from '../components/trader/stockResearch/MinimalTraderChart';
 import { stockResearchMock } from '../data/stockResearchMock';
@@ -328,9 +328,9 @@ export default function TradeTerminalPage({ overrideSymbol, onBack }) {
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                             {[
                                 { label: 'Volume', val: '4.2M' },
-                                { label: 'VWAP', val: '₹2,980.15' },
-                                { label: 'Day High', val: '₹3,005.00' },
-                                { label: 'Day Low', val: '₹2,965.40' },
+                                { label: 'VWAP', val: 'â‚¹2,980.15' },
+                                { label: 'Day High', val: 'â‚¹3,005.00' },
+                                { label: 'Day Low', val: 'â‚¹2,965.40' },
                             ].map(stat => (
                                 <div key={stat.label}>
                                     <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</div>

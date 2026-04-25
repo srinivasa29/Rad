@@ -159,7 +159,24 @@ const ChartPane = ({ symbol, timeframe, chartType, indicators, basePrice, active
     mainSeriesRef.current = series;
 
     const rawData = buildOhlcv(symbol, basePrice, timeframe);
-    series.setData(chartType === 'heikin' ? buildHeikinAshi(rawData) : rawData);
+    const lineData = rawData.map(({ time, close }) => ({ time, value: close }));
+    const chartData =
+      chartType === 'heikin'
+        ? buildHeikinAshi(rawData)
+        : chartType === 'area' || chartType === 'line'
+          ? lineData
+          : rawData;
+    series.setData(chartData);
+    chart.timeScale().applyOptions({
+      rightOffset: 0,
+      fixLeftEdge: true,
+      fixRightEdge: true,
+    });
+    chart.timeScale().setVisibleLogicalRange({
+      from: 0,
+      to: Math.max(chartData.length - 1, 1),
+    });
+    chart.timeScale().fitContent();
 
     // ── Indicator Support (Overlays) ──
     if (indicators.ema) {
@@ -190,7 +207,16 @@ const ChartPane = ({ symbol, timeframe, chartType, indicators, basePrice, active
 
     chartRef.current = chart;
 
-    const handleResize = () => { if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth, height: containerRef.current.clientHeight }); };
+    const handleResize = () => {
+      if (containerRef.current) {
+        chart.applyOptions({ width: containerRef.current.clientWidth, height: containerRef.current.clientHeight });
+        chart.timeScale().setVisibleLogicalRange({
+          from: 0,
+          to: Math.max(chartData.length - 1, 1),
+        });
+        chart.timeScale().fitContent();
+      }
+    };
     window.addEventListener('resize', handleResize);
 
     return () => { window.removeEventListener('resize', handleResize); chart.remove(); };
@@ -481,11 +507,6 @@ const ImmersiveTraderTerminal = ({ symbol: initialSymbol = "RELIANCE", basePrice
   const [compareList, setCompareList] = useState([]);
   const [activeDropdown, setActiveDropdown] = useState(null); 
   const [layout, setLayout] = useState('1'); 
-  const [notifications, setNotifications] = useState([
-    { id: 1, type: 'alert', text: 'RELIANCE crossed 2,900.00', time: '2m ago', read: false },
-    { id: 2, type: 'news', text: 'NIFTY 50 hits new all-time high', time: '15m ago', read: false },
-    { id: 3, type: 'system', text: 'Market closing in 10 minutes', time: '50m ago', read: true }
-  ]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -676,72 +697,11 @@ const ImmersiveTraderTerminal = ({ symbol: initialSymbol = "RELIANCE", basePrice
             {isFullscreen ? <Maximize size={18} className="rotate-180" /> : <Maximize2 size={18} />}
           </button>
 
-          <Dropdown 
-            label="" 
-            icon={Bell} 
-            align="right" 
-            isOpen={activeDropdown === 'notifs'} 
-            onToggle={() => {
-              setActiveDropdown(activeDropdown === 'notifs' ? null : 'notifs');
-              setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-            }}
-          >
-            <div className="w-64 space-y-6">
-              <div className="flex justify-between items-center px-1">
-                <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Alerts</div>
-                <button onClick={() => setNotifications([])} className="text-[8px] font-black text-cyan-400 uppercase tracking-widest hover:text-white transition-colors">Clear All</button>
-              </div>
-              <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-                {notifications.length === 0 ? (
-                  <div className="py-8 text-center text-[10px] text-slate-600 font-bold">No active alerts</div>
-                ) : notifications.map(n => (
-                  <div key={n.id} className={`p-3 rounded-2xl border transition-all ${n.read ? 'bg-white/5 border-white/5' : 'bg-cyan-500/5 border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.05)]'}`}>
-                    <div className="flex justify-between items-start mb-1">
-                      <div className={`text-[8px] font-black uppercase tracking-widest ${n.type === 'alert' ? 'text-rose-400' : 'text-cyan-400'}`}>{n.type}</div>
-                      <div className="text-[8px] font-bold text-slate-500">{n.time}</div>
-                    </div>
-                    <div className="text-[10px] font-bold text-white leading-snug">{n.text}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Dropdown>
         </div>
       </header>
 
       {/* ── Main Content Area ── */}
       <main className="flex-1 flex overflow-hidden relative">
-        <aside className="absolute left-6 top-1/2 -translate-y-1/2 z-[100] pointer-events-none">
-          <div className="bg-[#020617]/40 backdrop-blur-3xl border border-white/10 rounded-3xl p-1.5 flex flex-col gap-1.5 shadow-[0_0_50px_rgba(0,0,0,0.5)] pointer-events-auto">
-            {[
-              { id: 'cursor', icon: MousePointer2, label: 'Selection Tool (V)' },
-              { id: 'trend', icon: TrendingUp, label: 'Trendline (T)' },
-              { id: 'ray', icon: ArrowUpRight, label: 'Ray Extension' },
-              { id: 'fib', icon: Layers, label: 'Fibonacci Levels' },
-              { id: 'horz', icon: Minus, label: 'Horizontal Level' },
-              { id: 'vert', icon: GripVertical, label: 'Time Marker' },
-              { id: 'rect', icon: Square, label: 'Price Zone' },
-              { id: 'brush', icon: Brush, label: 'Free Annotate' },
-              { id: 'text', icon: Type, label: 'Text Note' },
-              { id: 'eraser', icon: Trash2, label: 'Clear Canvas' }
-            ].map((tool) => (
-              <button 
-                key={tool.id} 
-                onClick={() => setActiveTool(tool.id)} 
-                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-300 group relative ${activeTool === tool.id ? 'bg-cyan-500 text-black shadow-[0_0_25px_rgba(6,182,212,0.6)] scale-110 z-10' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
-              >
-                <tool.icon size={20} strokeWidth={2.5} />
-                <div className="absolute left-full ml-5 px-3 py-2 rounded-xl bg-[#020617] border border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-400 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0 whitespace-nowrap z-[200] shadow-[0_0_30px_rgba(0,0,0,0.8)] pointer-events-none">
-                  <div className="flex items-center gap-3">
-                    {tool.label}
-                    <div className="w-1 h-1 rounded-full bg-cyan-500" />
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </aside>
-
         {/* Center Workspace (Dynamic Grid) */}
         <div className={`flex-1 grid gap-1 p-1 bg-black/40 overflow-hidden ${getLayoutGrid()}`}>
           {Array.from({ length: getChartCount() }).map((_, i) => (
@@ -777,7 +737,6 @@ const ImmersiveTraderTerminal = ({ symbol: initialSymbol = "RELIANCE", basePrice
             { id: 'watchlist', icon: Eye, label: 'Watchlist' },
             { id: 'news', icon: Newspaper, label: 'Market News' },
             { id: 'calendar', icon: Calendar, label: 'Economic Calendar' },
-            { id: 'portfolio', icon: Briefcase, label: 'Portfolio' },
             { id: 'settings', icon: Settings, label: 'Settings' }
           ].map(item => (
             <button key={item.id} onClick={() => { setSidebarTab(item.id); setSidebarOpen(true); }} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all group relative ${sidebarTab === item.id && sidebarOpen ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/30' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
@@ -807,16 +766,6 @@ const ImmersiveTraderTerminal = ({ symbol: initialSymbol = "RELIANCE", basePrice
                   <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 flex gap-4 items-center">
                     <div className="text-[10px] font-mono font-black text-slate-400 w-12">{e.time}</div>
                     <div className="flex-1"><div className="text-[10px] font-bold text-white">{e.event}</div><div className={`text-[8px] font-black uppercase tracking-widest ${e.color}`}>{e.impact} Impact</div></div>
-                  </div>
-                ))}
-
-                {sidebarTab === 'portfolio' && [
-                  { s: 'HDFC', qty: 45, pnl: '+4,230', color: 'text-emerald-400' },
-                  { s: 'INFY', qty: 120, pnl: '-1,120', color: 'text-rose-400' }
-                ].map((p, i) => (
-                  <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 flex justify-between items-center">
-                    <div><div className="text-[11px] font-black text-white">{p.s}</div><div className="text-[8px] text-slate-500 font-bold uppercase">{p.qty} Shares</div></div>
-                    <div className="text-right"><div className={`text-[10px] font-black ${p.color}`}>{p.pnl}</div><div className="text-[8px] text-slate-500 font-bold uppercase">Invested</div></div>
                   </div>
                 ))}
 

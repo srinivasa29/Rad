@@ -167,13 +167,8 @@ const RealTimeScanner = () => {
 
   const generateAlertMessage = (scanType, symbol) => {
     const messages = {
-<<<<<<< HEAD
       'price-breakout': `${symbol} breaking above resistance at ₹{price}`,
       'price-breakdown': `${symbol} breaking below support at ₹{price}`,
-=======
-      'price-breakout': `${symbol} breaking above resistance at â‚¹{price}`,
-      'price-breakdown': `${symbol} breaking below support at â‚¹{price}`,
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
       'volume-spike': `${symbol} volume spike: 2.5x average`,
       'rsi-extreme': `${symbol} RSI at 75 (overbought)`,
       'gap-up': `${symbol} gapped up 3.2% at open`,
@@ -399,11 +394,7 @@ const RealTimeScanner = () => {
                           <div className="text-sm opacity-80">{alert.message}</div>
                           
                           <div className="flex items-center gap-4 mt-2 text-xs opacity-70">
-<<<<<<< HEAD
-                            <span>₹{alert.price.toFixed(2)}</span>
-=======
-                            <span>â‚¹{alert.price.toFixed(2)}</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                            <span>?{alert.price.toFixed(2)}</span>
                             <span>Vol: {(alert.volume / 1000000).toFixed(2)}M</span>
                             <span>{alert.timestamp.toLocaleTimeString()}</span>
                           </div>

@@ -33,17 +33,10 @@ const mockReadyMade = [
 ];
 
 const mockResults = [
-<<<<<<< HEAD
-    { id: 'RELIANCE', name: 'Reliance Industries', price: '₹2,942.10', change: '+1.2%', isPositive: true, mcap: '19.4T', sector: 'Energy', why: 'Strong 200-DMA support with institutional accumulation.', tags: ['Value', 'Growth'], confidence: 92, yield: '0.8%', beta: 0.95, volume: '4.4M', pe: 26.4, roe: '14.2%', trend: [2850, 2870, 2890, 2920, 2942] },
-    { id: 'TCS', name: 'Tata Consultancy Services', price: '₹3,810.50', change: '-0.4%', isPositive: false, mcap: '13.6T', sector: 'IT Services', why: 'Consolidating near major Fibonacci support level.', tags: ['Blue Chip'], confidence: 85, yield: '1.2%', beta: 0.72, volume: '1.2M', pe: 29.1, roe: '28.5%', trend: [3850, 3840, 3820, 3815, 3810] },
-    { id: 'HDFCBANK', name: 'HDFC Bank', price: '₹1,615.80', change: '+2.1%', isPositive: true, mcap: '12.1T', sector: 'Banking', why: 'Breakout above horizontal resistance with volume spike.', tags: ['Momentum', 'Finance'], confidence: 88, yield: '1.1%', beta: 1.04, volume: '12.2M', pe: 18.2, roe: '17.1%', trend: [1550, 1570, 1585, 1600, 1615] },
-    { id: 'INFY', name: 'Infosys Ltd', price: '₹1,540.00', change: '+0.8%', isPositive: true, mcap: '6.4T', sector: 'IT Services', why: 'Price above all major EMAs, bullish bias.', tags: ['Momentum'], confidence: 90, yield: '1.5%', beta: 1.15, volume: '2.6M', pe: 24.5, roe: '26.8%', trend: [1510, 1520, 1535, 1530, 1540] },
-=======
-    { id: 'RELIANCE', name: 'Reliance Industries', price: 'â‚¹2,942.10', change: '+1.2%', isPositive: true, mcap: '19.4T', sector: 'Energy', why: 'Strong 200-DMA support with institutional accumulation.', tags: ['Value', 'Growth'], confidence: 92, yield: '0.8%', beta: 0.95, volume: '4.4M', pe: 26.4, roe: '14.2%', trend: [2850, 2870, 2890, 2920, 2942] },
-    { id: 'TCS', name: 'Tata Consultancy Services', price: 'â‚¹3,810.50', change: '-0.4%', isPositive: false, mcap: '13.6T', sector: 'IT Services', why: 'Consolidating near major Fibonacci support level.', tags: ['Blue Chip'], confidence: 85, yield: '1.2%', beta: 0.72, volume: '1.2M', pe: 29.1, roe: '28.5%', trend: [3850, 3840, 3820, 3815, 3810] },
-    { id: 'HDFCBANK', name: 'HDFC Bank', price: 'â‚¹1,615.80', change: '+2.1%', isPositive: true, mcap: '12.1T', sector: 'Banking', why: 'Breakout above horizontal resistance with volume spike.', tags: ['Momentum', 'Finance'], confidence: 88, yield: '1.1%', beta: 1.04, volume: '12.2M', pe: 18.2, roe: '17.1%', trend: [1550, 1570, 1585, 1600, 1615] },
-    { id: 'INFY', name: 'Infosys Ltd', price: 'â‚¹1,540.00', change: '+0.8%', isPositive: true, mcap: '6.4T', sector: 'IT Services', why: 'Price above all major EMAs, bullish bias.', tags: ['Momentum'], confidence: 90, yield: '1.5%', beta: 1.15, volume: '2.6M', pe: 24.5, roe: '26.8%', trend: [1510, 1520, 1535, 1530, 1540] },
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+    { id: 'RELIANCE', name: 'Reliance Industries', price: '?2,942.10', change: '+1.2%', isPositive: true, mcap: '19.4T', sector: 'Energy', why: 'Strong 200-DMA support with institutional accumulation.', tags: ['Value', 'Growth'], confidence: 92, yield: '0.8%', beta: 0.95, volume: '4.4M', pe: 26.4, roe: '14.2%', trend: [2850, 2870, 2890, 2920, 2942] },
+    { id: 'TCS', name: 'Tata Consultancy Services', price: '?3,810.50', change: '-0.4%', isPositive: false, mcap: '13.6T', sector: 'IT Services', why: 'Consolidating near major Fibonacci support level.', tags: ['Blue Chip'], confidence: 85, yield: '1.2%', beta: 0.72, volume: '1.2M', pe: 29.1, roe: '28.5%', trend: [3850, 3840, 3820, 3815, 3810] },
+    { id: 'HDFCBANK', name: 'HDFC Bank', price: '?1,615.80', change: '+2.1%', isPositive: true, mcap: '12.1T', sector: 'Banking', why: 'Breakout above horizontal resistance with volume spike.', tags: ['Momentum', 'Finance'], confidence: 88, yield: '1.1%', beta: 1.04, volume: '12.2M', pe: 18.2, roe: '17.1%', trend: [1550, 1570, 1585, 1600, 1615] },
+    { id: 'INFY', name: 'Infosys Ltd', price: '?1,540.00', change: '+0.8%', isPositive: true, mcap: '6.4T', sector: 'IT Services', why: 'Price above all major EMAs, bullish bias.', tags: ['Momentum'], confidence: 90, yield: '1.5%', beta: 1.15, volume: '2.6M', pe: 24.5, roe: '26.8%', trend: [1510, 1520, 1535, 1530, 1540] },
 ];
 
 const strategies = [
@@ -58,11 +51,7 @@ const strategies = [
 
 const allFilters = [
     { id: 'mcap', label: 'Market Cap', icon: BarChart3, options: ['Large', 'Mid', 'Small', 'Micro'] },
-<<<<<<< HEAD
-    { id: 'price', label: 'Price', icon: Banknote, options: ['Any', '< ₹500', '₹500 - ₹2k', '> ₹2k'] },
-=======
-    { id: 'price', label: 'Price', icon: Banknote, options: ['Any', '< â‚¹500', 'â‚¹500 - â‚¹2k', '> â‚¹2k'] },
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+    { id: 'price', label: 'Price', icon: Banknote, options: ['Any', '< ?500', '?500 - ?2k', '> ?2k'] },
     { id: 'change', label: 'Change %', icon: TrendingUp, options: ['Any', '> 0%', '> 2%', '> 5%', '< 0%'] },
     { id: 'sector', label: 'Sector', icon: Search, options: ['All', 'IT', 'Finance', 'FMCG', 'Auto', 'Energy', 'Healthcare'] },
     { id: 'roe', label: 'ROE', icon: Activity, options: ['Any', '> 10%', '> 15%', '> 20%'] },

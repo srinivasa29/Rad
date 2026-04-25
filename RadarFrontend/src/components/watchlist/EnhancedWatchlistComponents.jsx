@@ -1,5 +1,5 @@
-import React from 'react';
-import { Newspaper, TrendingUp, TrendingDown, Minus, Bell } from 'lucide-react';
+﻿import React from 'react';
+import { Braces, FileText, Newspaper, TrendingUp, TrendingDown, Minus, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 
@@ -143,7 +143,7 @@ export const ExportMenu = ({ onExportCSV, onExportJSON, onClose }) => {
           onClick={onExportCSV}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left text-sm text-slate-300 hover:bg-cyan-500/10 hover:text-cyan-300 transition-colors"
         >
-          <span className="text-xs">ðŸ“„</span>
+          <FileText className="h-3.5 w-3.5" />
           <div className="flex-1">
             <div className="font-medium">Export as CSV</div>
             <div className="text-[10px] text-slate-500">Excel-compatible format</div>
@@ -153,7 +153,7 @@ export const ExportMenu = ({ onExportCSV, onExportJSON, onClose }) => {
           onClick={onExportJSON}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left text-sm text-slate-300 hover:bg-cyan-500/10 hover:text-cyan-300 transition-colors"
         >
-          <span className="text-xs">ðŸ“‹</span>
+          <Braces className="h-3.5 w-3.5" />
           <div className="flex-1">
             <div className="font-medium">Export as JSON</div>
             <div className="text-[10px] text-slate-500">Developer format</div>

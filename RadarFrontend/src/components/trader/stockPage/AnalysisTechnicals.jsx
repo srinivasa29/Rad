@@ -44,11 +44,7 @@ export default function AnalysisTechnicals() {
                             <div key={i} className="flex justify-between items-center py-3 border-b border-slate-800 last:border-0">
                                 <span className="text-[14px] font-bold text-slate-400">{node.label}</span>
                                 <span className={`terminal-value text-lg font-bold ${node.type === 'res' ? 'rs-down' : node.type === 'sup' ? 'rs-up' : 'text-slate-200'}`}>
-<<<<<<< HEAD
-                                    ₹{node.val}
-=======
                                     â‚¹{node.val}
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                                 </span>
                             </div>
                         ))}
@@ -68,11 +64,7 @@ export default function AnalysisTechnicals() {
                     ].map((ma, i) => (
                         <div key={i} className="p-4 bg-white/[0.02] border border-slate-800 rounded">
                             <span className="rs-label-sm block mb-1">{ma.label}</span>
-<<<<<<< HEAD
-                            <span className="text-[14px] font-bold text-slate-200 block mb-1">₹{ma.val}</span>
-=======
                             <span className="text-[14px] font-bold text-slate-200 block mb-1">â‚¹{ma.val}</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                             <span className={`text-[10px] font-black uppercase ${ma.pos ? 'rs-up' : 'rs-down'}`}>
                                 {ma.pos ? 'Above' : 'Below'} Price
                             </span>

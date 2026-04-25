@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+﻿import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, CrosshairMode, LineStyle } from 'lightweight-charts';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -35,19 +35,11 @@ const TIMEFRAMES = [
 ];
 
 const CHART_TYPES = [
-<<<<<<< HEAD
-  { id: 'candlestick', label: 'Candlestick', icon: '📊' },
-  { id: 'line', label: 'Line', icon: '📈' },
-  { id: 'area', label: 'Area', icon: '🏔️' },
-  { id: 'bars', label: 'Bars', icon: '📉' },
-  { id: 'heikinashi', label: 'Heikin Ashi', icon: '🎴' },
-=======
-  { id: 'candlestick', label: 'Candlestick', icon: 'ðŸ“Š' },
-  { id: 'line', label: 'Line', icon: 'ðŸ“ˆ' },
-  { id: 'area', label: 'Area', icon: 'ðŸ”ï¸' },
-  { id: 'bars', label: 'Bars', icon: 'ðŸ“‰' },
-  { id: 'heikinashi', label: 'Heikin Ashi', icon: 'ðŸŽ´' },
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+  { id: 'candlestick', label: 'Candlestick', icon: 'C' },
+  { id: 'line', label: 'Line', icon: 'L' },
+  { id: 'area', label: 'Area', icon: 'A' },
+  { id: 'bars', label: 'Bars', icon: 'B' },
+  { id: 'heikinashi', label: 'Heikin Ashi', icon: 'H' },
 ];
 
 const INDICATORS = [
@@ -304,11 +296,7 @@ const AdvancedTradingChart = ({
                 {currentPrice && (
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-2xl font-mono font-bold text-white">
-<<<<<<< HEAD
                       ₹{currentPrice.toFixed(2)}
-=======
-                      â‚¹{currentPrice.toFixed(2)}
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                     </span>
                     <span className={`flex items-center gap-1 text-sm font-semibold ${
                       priceChange.value >= 0 ? 'text-emerald-400' : 'text-rose-400'

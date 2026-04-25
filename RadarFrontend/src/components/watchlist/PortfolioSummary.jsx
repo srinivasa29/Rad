@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, PieChart, Activity, Shield } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
@@ -76,7 +76,7 @@ const PortfolioSummary = ({ stocks }) => {
           >
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.2em] mb-2">Portfolio value</p>
             <div className="space-y-2">
-              <p className="text-3xl font-black text-white">â‚¹{stats.totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+              <p className="text-3xl font-black text-white">₹{stats.totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
               <div className="flex items-center gap-1.5 text-sm font-semibold text-cyan-300">
                 <TrendingUp size={16} />
                 Frontend snapshot
@@ -96,7 +96,7 @@ const PortfolioSummary = ({ stocks }) => {
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.2em] mb-2">Daily P&amp;L</p>
             <div className="space-y-1">
               <p className={`text-3xl font-black ${stats.totalChange > 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                {stats.totalChange > 0 ? '+' : ''}â‚¹{Math.abs(stats.totalChange).toFixed(2)}
+                {stats.totalChange > 0 ? '+' : ''}₹{Math.abs(stats.totalChange).toFixed(2)}
               </p>
               <div className={`flex items-center gap-1.5 text-sm font-semibold ${stats.totalPercent > 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
                 {stats.totalPercent > 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}

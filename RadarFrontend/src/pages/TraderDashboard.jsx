@@ -1,10 +1,6 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-<<<<<<< HEAD
-import { Activity, Maximize2, TrendingDown, TrendingUp, Search, Newspaper, Globe, Zap, ExternalLink, Monitor, HelpCircle, MessageCircle, Phone, Mail } from "lucide-react";
-=======
 import { Activity, Maximize2, TrendingDown, TrendingUp, Search, Newspaper, Globe, Zap, ExternalLink, Monitor } from "lucide-react";
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
 import { motion } from "framer-motion";
 import {
   ResponsiveContainer,
@@ -120,7 +116,7 @@ const FALLBACK_RESEARCH_INSIGHTS = [
     details: [
       { name: "Bias", value: "Bullish", note: "Score 71", color: "#42C0A5" },
       { name: "RSI", value: "61.2", note: "Momentum", color: "#42C0A5" },
-      { name: "MACD Î”", value: "0.82", note: "Signal spread", color: "#42C0A5" },
+      { name: "MACD Delta", value: "0.82", note: "Signal spread", color: "#42C0A5" },
       { name: "Volume", value: "Above Average", note: "Participation", color: "#42C0A5" },
     ],
     note: "Fallback research view while backend insight scan is unavailable.",
@@ -136,7 +132,7 @@ const FALLBACK_RESEARCH_INSIGHTS = [
     details: [
       { name: "Bias", value: "Neutral", note: "Score 63", color: "#f0b429" },
       { name: "RSI", value: "53.8", note: "Momentum", color: "#f0b429" },
-      { name: "MACD Î”", value: "0.18", note: "Signal spread", color: "#42C0A5" },
+      { name: "MACD Delta", value: "0.18", note: "Signal spread", color: "#42C0A5" },
       { name: "Volume", value: "Average", note: "Participation", color: "#8b909a" },
     ],
     note: "Fallback insight card. Confirm with live backend feed before execution.",
@@ -185,15 +181,9 @@ const FALLBACK_SUMMARY = {
 };
 
 const getBiasMeta = (bias) => {
-<<<<<<< HEAD
-  if (bias === "bullish") return { label: "Bullish", color: "#42C0A5", symbol: "↑" };
-  if (bias === "bearish") return { label: "Bearish", color: "#ed5750", symbol: "↓" };
-  return { label: "Neutral", color: "#8b909a", symbol: "→" };
-=======
-  if (bias === "bullish") return { label: "Bullish", color: "#42C0A5", symbol: "â†‘" };
-  if (bias === "bearish") return { label: "Bearish", color: "#ed5750", symbol: "â†“" };
-  return { label: "Neutral", color: "#8b909a", symbol: "â†’" };
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+  if (bias === "bullish") return { label: "Bullish", color: "#42C0A5", symbol: "UP" };
+  if (bias === "bearish") return { label: "Bearish", color: "#ed5750", symbol: "DN" };
+  return { label: "Neutral", color: "#8b909a", symbol: "NT" };
 };
 
 const getImpactColor = (impact) => {
@@ -490,11 +480,7 @@ const SectorHeatmap = () => {
           <h3 className="tr-card-title">Sector Heatmap</h3>
         </div>
         <span className={`tr-pill ${isLoading ? "text-amber-400 bg-amber-400/10" : "text-[#42C0A5] bg-[#42C0A5]/10"}`}>
-<<<<<<< HEAD
-          {isLoading ? "● SYNCING" : "● LIVE"}
-=======
-          {isLoading ? "â— SYNCING" : "â— LIVE"}
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+          {isLoading ? "SYNCING" : "LIVE"}
         </span>
       </div>
       <div className="flex-1 p-3 grid grid-cols-3 gap-2">
@@ -663,16 +649,10 @@ const TrendStrengthPanel = () => {
   const marketBiasColor = marketBias === "Bullish" ? "#42C0A5" : marketBias === "Bearish" ? "#ed5750" : "#8b909a";
 
   const stateToGlyph = {
-<<<<<<< HEAD
-    bullish: "↑",
-    bearish: "↓",
-    neutral: "→",
-=======
-    bullish: "â†‘",
-    bearish: "â†“",
-    neutral: "â†’",
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
-    unknown: "-",
+    bullish: "UP",
+    bearish: "DN",
+    neutral: "NT",
+    unknown: "--",
   };
 
   return (
@@ -690,11 +670,7 @@ const TrendStrengthPanel = () => {
         {hasError ? (
           <span className="tr-pill text-[#f0b429] bg-[#f0b429]/10">OFFLINE</span>
         ) : matrixRows.length > 0 ? (
-<<<<<<< HEAD
-          <span className="tr-pill text-[#42C0A5] bg-[#42C0A5]/10">● LIVE</span>
-=======
-          <span className="tr-pill text-[#42C0A5] bg-[#42C0A5]/10">â— LIVE</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+          <span className="tr-pill text-[#42C0A5] bg-[#42C0A5]/10">LIVE</span>
         ) : (
           <span className="tr-pill text-[#8b909a] bg-white/5">NO DATA</span>
         )}
@@ -776,27 +752,15 @@ const TrendStrengthPanel = () => {
       <div className="px-2.5 py-1.5 border-t border-white/10 flex items-center justify-between" style={{ background: "rgba(255,255,255,0.03)" }}>
         <div className="flex items-center gap-2 text-[9px]">
           <div className="flex items-center gap-1">
-<<<<<<< HEAD
-            <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold" style={{ background: "rgba(61,178,107,0.2)", color: "#42C0A5" }}>↑</span>
+            <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold" style={{ background: "rgba(61,178,107,0.2)", color: "#42C0A5" }}>UP</span>
             <span className="text-[#5d606b]">Bullish</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold" style={{ background: "rgba(237,87,80,0.2)", color: "#ed5750" }}>↓</span>
+            <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold" style={{ background: "rgba(237,87,80,0.2)", color: "#ed5750" }}>DN</span>
             <span className="text-[#5d606b]">Bearish</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "#8b909a" }}>→</span>
-=======
-            <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold" style={{ background: "rgba(61,178,107,0.2)", color: "#42C0A5" }}>â†‘</span>
-            <span className="text-[#5d606b]">Bullish</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold" style={{ background: "rgba(237,87,80,0.2)", color: "#ed5750" }}>â†“</span>
-            <span className="text-[#5d606b]">Bearish</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "#8b909a" }}>â†’</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+            <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "#8b909a" }}>NT</span>
             <span className="text-[#5d606b]">Neutral</span>
           </div>
         </div>
@@ -864,11 +828,7 @@ const GapLists = () => {
               <div className="w-1.5 h-6 rounded-full" style={{ background: accentColor, boxShadow: `0 0 6px ${accentColor}` }} />
               <div>
                 <div className="font-bold text-white text-xs tracking-wide">{normalizeDisplaySymbol(item.symbol)}</div>
-<<<<<<< HEAD
-                <div className="text-[10px] font-mono" style={{ color: "#5d6b7a" }}>₹{Number(item.price || 0).toLocaleString()}</div>
-=======
-                <div className="text-[10px] font-mono" style={{ color: "#5d6b7a" }}>â‚¹{Number(item.price || 0).toLocaleString()}</div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                <div className="text-[10px] font-mono" style={{ color: "#5d6b7a" }}>Rs {Number(item.price || 0).toLocaleString()}</div>
               </div>
             </div>
             <span className="font-mono text-sm font-black px-2 py-0.5 rounded-md" style={{ color: accentColor, background: `${accentColor}15` }}>
@@ -1497,7 +1457,7 @@ const SignalEnginePanel = () => {
               details: [
                 { name: "Bias", value: biasMeta.label, note: `Score ${summary?.score?.score ?? "--"}`, color: biasMeta.color },
                 { name: "RSI", value: Number(leadIndicators.rsi || 0).toFixed(1), note: "Momentum", color: leadIndicators.rsi >= 60 ? "#42C0A5" : leadIndicators.rsi <= 40 ? "#ed5750" : "#f0b429" },
-                { name: "MACD Î”", value: macdDelta.toFixed(2), note: "Signal spread", color: macdDelta >= 0 ? "#42C0A5" : "#ed5750" },
+                { name: "MACD Delta", value: macdDelta.toFixed(2), note: "Signal spread", color: macdDelta >= 0 ? "#42C0A5" : "#ed5750" },
                 { name: "Volume", value: formatVolumeStatus(leadIndicators.volumeStatus), note: "Participation", color: "#42C0A5" },
               ],
               note: leadPattern?.description || `${normalizeDisplaySymbol(symbol)} technical snapshot sourced from backend summary API.`,
@@ -1601,11 +1561,7 @@ const SignalEnginePanel = () => {
         {isFallback ? (
           <span className="tr-pill text-[#f0b429] bg-[#f0b429]/10">FALLBACK</span>
         ) : (
-<<<<<<< HEAD
-          <span className="tr-pill text-[#42C0A5] bg-[#42C0A5]/10">● LIVE</span>
-=======
-          <span className="tr-pill text-[#42C0A5] bg-[#42C0A5]/10">â— LIVE</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+          <span className="tr-pill text-[#42C0A5] bg-[#42C0A5]/10">LIVE</span>
         )}
       </div>
     </div>
@@ -1761,11 +1717,7 @@ const CatalystPanel = () => {
           item?.actual && item.actual !== "-" ? `Actual ${item.actual}` : null,
           item?.forecast && item.forecast !== "-" ? `Forecast ${item.forecast}` : null,
           item?.previous && item.previous !== "-" ? `Prev ${item.previous}` : null,
-<<<<<<< HEAD
-        ].filter(Boolean).join(" · ");
-=======
-        ].filter(Boolean).join(" Â· ");
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+        ].filter(Boolean).join(" | ");
         return (
         <div
           key={idx}
@@ -1779,11 +1731,7 @@ const CatalystPanel = () => {
           }}
         >
           <div className="flex items-start gap-2">
-<<<<<<< HEAD
-            <span className="text-base mt-0.5 flex-shrink-0">{String(item.impact).toLowerCase().includes("high") ? "⚠️" : String(item.impact).toLowerCase().includes("med") ? "🕒" : "📌"}</span>
-=======
-            <span className="text-base mt-0.5 flex-shrink-0">{String(item.impact).toLowerCase().includes("high") ? "âš ï¸" : String(item.impact).toLowerCase().includes("med") ? "ðŸ•’" : "ðŸ“Œ"}</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+            <span className="text-base mt-0.5 flex-shrink-0">{String(item.impact).toLowerCase().includes("high") ? "[!]" : String(item.impact).toLowerCase().includes("med") ? "[~]" : "[i]"}</span>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start gap-1">
                 <span className="text-[15px] text-white font-semibold leading-tight">{item.event}</span>
@@ -1801,20 +1749,12 @@ const CatalystPanel = () => {
                 <span className="text-[11px] font-mono text-[#7b8190]">{formatCalendarDate(item.date)}</span>
                 {metadata ? (
                   <>
-<<<<<<< HEAD
-                    <span className="text-[#2a2e39]">·</span>
-=======
-                    <span className="text-[#2a2e39]">Â·</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                    <span className="text-[#2a2e39]">|</span>
                     <span className="text-[11px] text-[#7b8190]">{metadata}</span>
                   </>
                 ) : (
                   <>
-<<<<<<< HEAD
-                    <span className="text-[#2a2e39]">·</span>
-=======
-                    <span className="text-[#2a2e39]">Â·</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                    <span className="text-[#2a2e39]">|</span>
                     <span className="text-[11px] text-[#7b8190]">Verified event schedule</span>
                   </>
                 )}
@@ -2123,19 +2063,11 @@ const FODashboard = () => {
   const callOi = contracts
     .filter((contract) => String(contract.type).toLowerCase().includes("call"))
     .map((contract) => contract.oi)
-<<<<<<< HEAD
-    .join(" · ") || "--";
+    .join(" | ") || "--";
   const putOi = contracts
     .filter((contract) => String(contract.type).toLowerCase().includes("put"))
     .map((contract) => contract.oi)
-    .join(" · ") || "--";
-=======
-    .join(" Â· ") || "--";
-  const putOi = contracts
-    .filter((contract) => String(contract.type).toLowerCase().includes("put"))
-    .map((contract) => contract.oi)
-    .join(" Â· ") || "--";
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+    .join(" | ") || "--";
   const longCount = dashboard?.buildup?.long?.length || 0;
   const shortCount = dashboard?.buildup?.short?.length || 0;
   const normalizedPcr = Number.isFinite(pcr) ? Math.max(0, Math.min(100, Math.round(pcr * 50))) : 0;
@@ -2148,11 +2080,7 @@ const FODashboard = () => {
     <div className="tr-card-header">
       <h3 className="tr-card-title">F&O INSIGHTS</h3>
       <div className="flex gap-2 items-center">
-<<<<<<< HEAD
-        <span className="tr-pill text-[#42C0A5] bg-[#42C0A5]/10">● CHAIN</span>
-=======
-        <span className="tr-pill text-[#42C0A5] bg-[#42C0A5]/10">â— CHAIN</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+        <span className="tr-pill text-[#42C0A5] bg-[#42C0A5]/10">CHAIN</span>
       </div>
     </div>
     <div className="grid grid-cols-2 gap-2 h-full p-2">
@@ -2554,11 +2482,7 @@ const NewsFlash = ({ variant = "full" }) => {
                   <div className="flex items-center gap-2 flex-wrap">
                     {isBreaking && (
                       <span className="rounded-full border border-red-500/25 bg-red-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-red-400">
-<<<<<<< HEAD
-                        🔥 Breaking
-=======
-                        ðŸ”¥ Breaking
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                        BREAKING
                       </span>
                     )}
                     {tag && (
@@ -2802,102 +2726,6 @@ const ResearchToolPanel = () => {
   );
 };
 
-<<<<<<< HEAD
-const HelpSupportView = () => {
-  const faqs = [
-    {
-      question: "How do I search and open a symbol quickly?",
-      answer: "Use the top search bar (Ctrl+K), type a symbol or name, and press Enter to open the stock page instantly.",
-    },
-    {
-      question: "How do I create alerts from the trader workflow?",
-      answer: "Open a symbol page and use the alerts panel to configure trigger price, direction, and notification type.",
-    },
-    {
-      question: "Why is data delayed or unavailable for some widgets?",
-      answer: "Data may fall back to cached responses when market APIs are rate-limited or temporarily unavailable.",
-    },
-    {
-      question: "How do I switch between Investor and Trader mode?",
-      answer: "Click your profile avatar in the top-right corner and use the interface toggle to switch mode.",
-    },
-  ];
-
-  return (
-    <MainLayout>
-      <div className="dashboard-layout flex flex-col w-full">
-        <div className="flex-1 overflow-y-auto main-content-area">
-          <div className="tr-dashboard-stage">
-            <div className="trader-dashboard-container">
-              <section className="tr-surface-card tr-panel-shell p-6 md:p-8">
-                <div className="flex items-start gap-4">
-                  <div className="h-12 w-12 rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 flex items-center justify-center">
-                    <HelpCircle size={24} />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Help & Support</h1>
-                    <p className="mt-2 text-sm text-slate-300 max-w-3xl">
-                      Quick guidance for trader workflows, alerts, scanners, and market modules. Reach support if you need account or technical help.
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="trader-dashboard-grid">
-                <div className="trader-left-column">
-                  <div className="tr-surface-card tr-panel-shell p-6">
-                    <h2 className="text-lg font-black text-white mb-4">Frequently Asked Questions</h2>
-                    <div className="space-y-3">
-                      {faqs.map((item) => (
-                        <div key={item.question} className="rounded-xl border border-white/10 bg-white/5 p-4">
-                          <p className="text-sm font-bold text-slate-100">{item.question}</p>
-                          <p className="text-sm text-slate-300 mt-1 leading-relaxed">{item.answer}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <aside className="trader-right-column">
-                  <div className="tr-surface-card tr-panel-shell p-5">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-300 mb-3">Contact Support</h3>
-                    <div className="space-y-3 text-sm">
-                      <div className="flex items-center gap-2 text-slate-200">
-                        <Mail size={14} className="text-cyan-300" />
-                        <span>support@radartrading.com</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-200">
-                        <Phone size={14} className="text-emerald-300" />
-                        <span>+91 1800-000-1947</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-200">
-                        <MessageCircle size={14} className="text-amber-300" />
-                        <span>Live chat: 9:15 AM - 6:30 PM IST</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="tr-surface-card tr-panel-shell p-5">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-300 mb-3">Troubleshooting</h3>
-                    <ul className="space-y-2 text-sm text-slate-300">
-                      <li>Refresh dashboard if prices are stale for more than 30 seconds.</li>
-                      <li>Check internet stability before using live scanner modules.</li>
-                      <li>Re-login if profile or notification sync appears outdated.</li>
-                      <li>Clear browser cache if charts fail to render after updates.</li>
-                    </ul>
-                  </div>
-                </aside>
-              </section>
-            </div>
-          </div>
-        </div>
-      </div>
-    </MainLayout>
-  );
-};
-
-=======
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
 function ResearchView({ activeModule, onRequestModuleChange }) {
   const navigate = useNavigate();
   const [expandedChart, setExpandedChart] = useState(null);
@@ -2996,13 +2824,6 @@ function ResearchView({ activeModule, onRequestModuleChange }) {
     );
   }
 
-<<<<<<< HEAD
-  if (activeModule === "HELP_SUPPORT") {
-    return <HelpSupportView />;
-  }
-
-=======
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
   if (activeModule === "MULTI-CHART") {
     return (
       <div className="dashboard-layout flex flex-col w-full">
@@ -3134,36 +2955,6 @@ function ResearchView({ activeModule, onRequestModuleChange }) {
 
               <aside className="trader-right-column">
                 <div className="tr-surface-card tr-panel-shell tr-panel-shell--sidebar">
-                  <div className="tr-panel-heading">
-                    <div>
-                      <div className="tr-panel-kicker">Watchlist</div>
-                      <div className="tr-panel-title">Open watchlist module</div>
-                    </div>
-                  </div>
-                  <div className="tr-watchlist-bridge flex flex-col gap-4">
-                    <div>
-                      <p className="text-sm text-[#9FB2CF] leading-relaxed">
-                        This dashboard keeps focus on analysis panels. Open Watchlist to view symbols, notes, and live watch controls.
-                      </p>
-                    </div>
-                    <div>
-                      <button
-                        onClick={() => {
-                          if (typeof onRequestModuleChange === "function") {
-                            onRequestModuleChange("WATCHLIST");
-                            return;
-                          }
-                          navigate("/dashboard?module=WATCHLIST");
-                        }}
-                        className="w-full h-9 rounded-lg border border-[#2d9dd6] bg-[#12344d] text-[#b6e6ff] text-sm font-semibold hover:bg-[#184868] transition-colors"
-                      >
-                        Open Watchlist
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="tr-surface-card tr-panel-shell tr-panel-shell--sidebar">
                   <TrendStrengthPanel />
                 </div>
 
@@ -3200,21 +2991,13 @@ function ResearchView({ activeModule, onRequestModuleChange }) {
             <div className="chart-modal-panel">
             <div className="chart-modal-header">
               <div className="chart-modal-title">
-<<<<<<< HEAD
-                {expandedChart} — Full Screen
-=======
-                {expandedChart} â€” Full Screen
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                {expandedChart} - Full Screen
               </div>
               <button
                 className="chart-modal-close"
                 onClick={() => setExpandedChart(null)}
               >
-<<<<<<< HEAD
-                ✕ Close
-=======
-                âœ• Close
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                Close
               </button>
             </div>
             <div className="chart-modal-body">
@@ -3266,3 +3049,4 @@ function ResearchView({ activeModule, onRequestModuleChange }) {
 
 
 export default ResearchView;
+

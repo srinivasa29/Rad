@@ -186,10 +186,7 @@ const InvestorMode = ({ onToggleMode }) => {
                 setActiveModule={setActiveModule} 
                 onToggleMode={onToggleMode} 
             />
-<<<<<<< HEAD
-=======
             <SharedTickerTape variant="investor" />
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
             <main className="content fade-in transition-all duration-300">
                 <InvestorView activeModule={activeModule} />
             </main>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+﻿import React, { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Grid,
@@ -18,27 +18,15 @@ import AdvancedTradingChart from './AdvancedTradingChart';
 
 
 const LAYOUTS = [
-<<<<<<< HEAD
-  { id: '1x1', label: '1 Chart', rows: 1, cols: 1, icon: '⬜' },
-  { id: '1x2', label: '1×2', rows: 1, cols: 2, icon: '▯' },
-  { id: '2x1', label: '2×1', rows: 2, cols: 1, icon: '▭' },
-  { id: '2x2', label: '2×2', rows: 2, cols: 2, icon: '⊞' },
-  { id: '1x3', label: '1×3', rows: 1, cols: 3, icon: '☰' },
-  { id: '3x1', label: '3×1', rows: 3, cols: 1, icon: '⋮' },
-  { id: '2x3', label: '2×3', rows: 2, cols: 3, icon: '⊡' },
-  { id: '3x2', label: '3×2', rows: 3, cols: 2, icon: '⊟' },
-  { id: '3x3', label: '3×3', rows: 3, cols: 3, icon: '⊞' },
-=======
-  { id: '1x1', label: '1 Chart', rows: 1, cols: 1, icon: 'â¬œ' },
-  { id: '1x2', label: '1Ã—2', rows: 1, cols: 2, icon: 'â–¯' },
-  { id: '2x1', label: '2Ã—1', rows: 2, cols: 1, icon: 'â–­' },
-  { id: '2x2', label: '2Ã—2', rows: 2, cols: 2, icon: 'âŠž' },
-  { id: '1x3', label: '1Ã—3', rows: 1, cols: 3, icon: 'â˜°' },
-  { id: '3x1', label: '3Ã—1', rows: 3, cols: 1, icon: 'â‹®' },
-  { id: '2x3', label: '2Ã—3', rows: 2, cols: 3, icon: 'âŠ¡' },
-  { id: '3x2', label: '3Ã—2', rows: 3, cols: 2, icon: 'âŠŸ' },
-  { id: '3x3', label: '3Ã—3', rows: 3, cols: 3, icon: 'âŠž' },
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+  { id: '1x1', label: '1 Chart', rows: 1, cols: 1, icon: '1x1' },
+  { id: '1x2', label: '1x2', rows: 1, cols: 2, icon: '1x2' },
+  { id: '2x1', label: '2x1', rows: 2, cols: 1, icon: '2x1' },
+  { id: '2x2', label: '2x2', rows: 2, cols: 2, icon: '2x2' },
+  { id: '1x3', label: '1x3', rows: 1, cols: 3, icon: '1x3' },
+  { id: '3x1', label: '3x1', rows: 3, cols: 1, icon: '3x1' },
+  { id: '2x3', label: '2x3', rows: 2, cols: 3, icon: '2x3' },
+  { id: '3x2', label: '3x2', rows: 3, cols: 2, icon: '3x2' },
+  { id: '3x3', label: '3x3', rows: 3, cols: 3, icon: '3x3' },
 ];
 
 const DEFAULT_SYMBOLS = ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'BHARTIARTL', 'ITC', 'KOTAKBANK'];
@@ -150,11 +138,7 @@ const MultiChartWorkspace = () => {
           </h1>
           {syncEnabled && (
             <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-semibold border border-cyan-400/30">
-<<<<<<< HEAD
-              🔗 Sync Enabled
-=======
-              ðŸ”— Sync Enabled
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+              Sync Enabled
             </span>
           )}
         </div>
@@ -278,11 +262,7 @@ const MultiChartWorkspace = () => {
                               {workspace.name}
                             </div>
                             <div className="text-xs text-slate-500">
-<<<<<<< HEAD
-                              {workspace.layout} • {workspace.charts.length} charts
-=======
-                              {workspace.layout} â€¢ {workspace.charts.length} charts
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                              {workspace.layout} | {workspace.charts.length} charts
                             </div>
                           </button>
                           <button

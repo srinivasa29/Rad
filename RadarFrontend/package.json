@@ -23,10 +23,7 @@
     "react-router-dom": "^7.12.0",
     "react-sparklines": "^1.7.0",
     "recharts": "^3.6.0",
-<<<<<<< HEAD
-=======
     "socket.io-client": "^4.8.3",
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
 import './MarketTicker.css';
 import { fetchMarketData, fetchMarketHistory } from '../../api/marketApi';
-<<<<<<< HEAD
-=======
 import { useSocket } from '../../hooks/useSocket';
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
 
 const displaySymbol = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
 const formatPercent = (value) => {
@@ -98,40 +95,18 @@ const MarketTicker = () => {
   const [error, setError] = useState(false);
   const [rotationOffset, setRotationOffset] = useState(0);
 
-<<<<<<< HEAD
-  useEffect(() => {
-    let isMounted = true;
-
-    const load = async () => {
-=======
   const { on } = useSocket(['ticker']);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadInitial = async () => {
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
       try {
         if (isMounted) {
           setError(false);
           setIsLoading(true);
         }
         const res = await fetchMarketData({ type: 'STOCK', sort: 'gainers' });
-<<<<<<< HEAD
-        const [benchmarks, movers] = await Promise.all([
-          getBenchmarksFromHistory(),
-          Promise.resolve(
-            (Array.isArray(res) ? res : [])
-              .map((item) => normalizeTickerRow(item))
-              .filter((item) => item.symbol)
-          ),
-        ]);
-
-        const benchmarkSymbols = new Set(benchmarks.map((item) => item.symbol));
-        const cleanMovers = movers.filter((item) => !benchmarkSymbols.has(item.symbol));
-        const rotatedMovers = rotateRows(cleanMovers, cleanMovers.length, rotationOffset);
-        const mergedRows = ensureMinimumRows([...benchmarks, ...rotatedMovers], 20);
-=======
         const benchmarks = await getBenchmarksFromHistory();
         const movers = (Array.isArray(res) ? res : [])
               .map((item) => normalizeTickerRow(item))
@@ -141,35 +116,10 @@ const MarketTicker = () => {
         const cleanMovers = movers.filter((item) => !benchmarkSymbols.has(item.symbol));
         const rotated = rotateRows(cleanMovers, cleanMovers.length, rotationOffset);
         const mergedRows = ensureMinimumRows([...benchmarks, ...rotated], 20);
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
 
         if (mergedRows.length > 0 && isMounted) {
           setStocks(mergedRows);
           setLastUpdatedAt(new Date());
-<<<<<<< HEAD
-          setRotationOffset((prev) => prev + 1);
-        }
-      } catch (err) {
-          console.error("Ticker fetch failed:", err);
-          if (isMounted) {
-            setError(true);
-          }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    load();
-    const intervalId = setInterval(load, 30000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(intervalId);
-    };
-  }, []);
-=======
         }
       } catch (err) {
           console.error("Ticker initial load failed:", err);
@@ -217,7 +167,6 @@ const MarketTicker = () => {
       isMounted = false;
     };
   }, [on]);
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
 
   const tickerSequence = stocks.map((item, idx) => ({
     key: `${item.symbol}-${idx}`,

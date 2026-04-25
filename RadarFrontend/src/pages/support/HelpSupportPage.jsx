@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ContactForm from './components/ContactForm';
@@ -56,34 +56,6 @@ const HelpSupportPage = () => {
             <ContactInfo />
           </div>
         </div>
-
-        {/* Report Issue Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-          className="help-report-issue-section"
-        >
-          <div className="report-issue-card">
-            <div className="report-issue-header">
-              <h3 className="report-issue-title">Report a Detailed Issue</h3>
-              <p className="report-issue-text">
-                For complex issues, please fill out our detailed form
-              </p>
-            </div>
-            <motion.a
-              href="https://docs.google.com/forms/d/e/1FAIpQLScdAzOH-scxXFr4VjVwidnLvcjM5RRhwAr5NJ2uTVtswCQpHg/viewform?usp=publish-editor"
-              target="_blank"
-              rel="noopener noreferrer"
-              whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(34, 211, 238, 0.4)' }}
-              whileTap={{ scale: 0.95 }}
-              className="report-issue-btn"
-            >
-              <ExternalLink size={18} />
-              Open Google Form
-            </motion.a>
-          </div>
-        </motion.div>
 
         {/* FAQ Section */}
         <div className="help-faq-container">

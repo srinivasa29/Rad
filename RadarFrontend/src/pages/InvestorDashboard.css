@@ -4,13 +4,8 @@
 
 
 .dashboard-container.investor-theme {
-<<<<<<< HEAD
-    background-color: #f8fafc !important;
-    background: var(--investor-bg, #f8fafc) !important;
-=======
     background-color: #f0f7ff !important;
     background: linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%) !important;
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
     color: #1e293b;
     --bg-primary: transparent;
     --bg-card: #ffffff;
@@ -63,22 +58,6 @@
 
 
 .investor-theme .navbar {
-<<<<<<< HEAD
-    background: rgba(255, 255, 255, 0.6) !important;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.4) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.4) !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-    border-radius: 1rem;
-    margin: 0.75rem auto 0.5rem;
-    padding: 0 1.5rem;
-    height: 72px;
-    width: 96%;
-    max-width: 1500px;
-    position: sticky;
-    top: 0.75rem;
-=======
     background: rgba(255, 255, 255, 0.95) !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -91,67 +70,29 @@
     width: 96%;
     max-width: 1500px;
     position: relative;
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
     display: flex;
     align-items: center;
     z-index: 1000;
     justify-content: space-between;
-<<<<<<< HEAD
-    gap: 1.5rem;
-}
-
-/* Ticker Animation */
-@keyframes ticker {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
-}
-
-.animate-ticker {
-    animation: ticker 40s linear infinite;
-}
-
-.ticker-scroll:hover {
-    animation-play-state: paused;
-}
-
-/* Custom Scrollbar */
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
-}
-.no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-=======
 }
 
 .dashboard-container.investor-theme {
     min-height: 100vh;
     overflow-y: auto;
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
 }
 
 .investor-theme .brand-name {
     font-size: 1.5rem;
-<<<<<<< HEAD
-    font-weight: 950;
-    color: #3E84F6 !important;
-    letter-spacing: -0.06em;
-    text-shadow: 0 0 15px rgba(62, 132, 246, 0.1);
-=======
     font-weight: 900;
     color: #3E84F6 !important;
     letter-spacing: -0.06em;
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
     text-transform: uppercase;
     line-height: 1;
 }
 
 
-<<<<<<< HEAD
-=======
 
 
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
 .investor-theme .main-content-area {
     padding-top: 1rem;
 }

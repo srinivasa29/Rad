@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
+  Bell,
   ChevronRight,
+  Eye,
   Plus,
   Search,
   SlidersHorizontal,
@@ -208,11 +210,7 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
         const nextRows = prevRows.map((row, idx) => {
           if (!indices.has(idx)) return row;
 
-<<<<<<< HEAD
           const change = 1 + (Math.random() * 0.003 - 0.0015); // +/-0.15% fluctuation
-=======
-          const change = 1 + (Math.random() * 0.003 - 0.0015); // Â±0.15% fluctuation
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
           const nextPrice = row.price * change;
           const tickDir = nextPrice > row.price ? 'up' : 'down';
           nextTickState[row.symbol] = tickDir;
@@ -573,11 +571,7 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
                              animate={{ color: "#fff" }}
                              className="text-lg font-black tracking-tighter"
                            >
-<<<<<<< HEAD
                              ₹{row.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-=======
-                             â‚¹{row.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                            </motion.span>
                          </div>
 
@@ -603,11 +597,7 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
                                   <Sparkline data={row.chart} color={isPositive ? "#10b981" : "#f43f5e"} />
                                </div>
                             ) : (
-<<<<<<< HEAD
-                               <span className="text-[11px] font-bold text-slate-300">₹{row.vwapVal || row.peRatio}</span>
-=======
-                               <span className="text-[11px] font-bold text-slate-300">â‚¹{row.vwapVal || row.peRatio}</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                               <span className="text-[11px] font-bold text-slate-300">{activeTab === 'Fundamentals' ? row.peRatio : `₹${row.vwapVal}`}</span>
                             )}
                          </div>
 
@@ -645,33 +635,21 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
                                  className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-cyan-900/10 border border-cyan-400/10 text-cyan-300/60 hover:text-cyan-300 hover:bg-cyan-900/30"
                                  title="Set Alert"
                                >
-<<<<<<< HEAD
-                                 <span className="text-xs">🔔</span>
-=======
-                                 <span className="text-xs">ðŸ””</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                                  <Bell size={14} />
                                </button>
                                <button
                                  onClick={(e) => { e.stopPropagation(); openSymbol(row); }}
                                  className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-white/[0.03] border border-white/10 text-slate-400 hover:text-white hover:border-white/30"
                                  title="View"
                                >
-<<<<<<< HEAD
-                                 <span className="text-sm">›</span>
-=======
-                                 <span className="text-sm">â€º</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                                  <Eye size={15} />
                                </button>
                                <button
                                  onClick={(e) => handleDeleteSymbol(e, row.symbol)}
                                  className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-rose-900/20 border border-rose-400/30 text-rose-300 hover:text-rose-200 hover:bg-rose-900/35"
                                  title="Delete"
                                >
-<<<<<<< HEAD
-                                 <span className="text-xs">✕</span>
-=======
-                                 <span className="text-xs">âœ•</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+                                  <Trash2 size={14} />
                                </button>
                             </div>
                          </div>

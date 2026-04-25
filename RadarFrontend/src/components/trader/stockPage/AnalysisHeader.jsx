@@ -11,11 +11,7 @@ export default function AnalysisHeader({ stock, onBack }) {
                 {}
                 <div className="flex items-center gap-3">
                     <button onClick={onBack} className="p-1 px-2 border border-blue-500/20 rounded bg-blue-500/5 text-[10px] font-black text-blue-500 uppercase hover:bg-blue-500/10 transition-all">
-<<<<<<< HEAD
-                        ← Back
-=======
                         â† Back
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                     </button>
                     <div className="h-4 w-[1px] bg-white/5"></div>
                     <div className="flex flex-col">
@@ -36,11 +32,7 @@ export default function AnalysisHeader({ stock, onBack }) {
                 {}
                 <div className="flex items-center gap-4">
                     <div className="flex flex-col">
-<<<<<<< HEAD
-                        <span className="terminal-price text-white">₹{stock.price.toLocaleString()}</span>
-=======
                         <span className="terminal-price text-white">â‚¹{stock.price.toLocaleString()}</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                         <div className={`flex items-center gap-1 text-[11px] font-black ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {isPositive ? '+' : ''}{stock.changePercent.toFixed(2)}% (+{stock.change.toFixed(2)})
                         </div>

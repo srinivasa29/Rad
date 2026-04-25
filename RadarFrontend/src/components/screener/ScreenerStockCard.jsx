@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   TrendingUp,
@@ -153,7 +153,7 @@ const ScreenerStockCard = ({ stock, isSelected, onSelect, onOpenResearch, index 
         {}
         <div className="mb-4 pb-4 border-b border-slate-700/50">
           <div className="flex items-baseline justify-between mb-2">
-            <div className="text-3xl font-bold text-white">â‚¹{stock.price.toFixed(2)}</div>
+            <div className="text-3xl font-bold text-white">₹{stock.price.toFixed(2)}</div>
             <div
               className={`flex items-center gap-1 text-lg font-bold ${
                 isPositive ? 'text-emerald-400' : 'text-rose-400'
@@ -191,15 +191,15 @@ const ScreenerStockCard = ({ stock, isSelected, onSelect, onOpenResearch, index 
           <div className="grid grid-cols-3 gap-2 text-xs">
             <div>
               <p className="text-slate-500 uppercase tracking-wide">Entry</p>
-              <p className="text-slate-100 font-semibold">â‚¹{Number(stock.entry || stock.price).toFixed(2)}</p>
+              <p className="text-slate-100 font-semibold">₹{Number(stock.entry || stock.price).toFixed(2)}</p>
             </div>
             <div>
               <p className="text-slate-500 uppercase tracking-wide">Target</p>
-              <p className="text-slate-100 font-semibold">â‚¹{Number(stock.target || stock.price).toFixed(2)}</p>
+              <p className="text-slate-100 font-semibold">₹{Number(stock.target || stock.price).toFixed(2)}</p>
             </div>
             <div>
               <p className="text-slate-500 uppercase tracking-wide">Stop Loss</p>
-              <p className="text-slate-100 font-semibold">â‚¹{Number(stock.stopLoss || stock.price).toFixed(2)}</p>
+              <p className="text-slate-100 font-semibold">₹{Number(stock.stopLoss || stock.price).toFixed(2)}</p>
             </div>
           </div>
         </div>

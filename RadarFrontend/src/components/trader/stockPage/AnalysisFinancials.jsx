@@ -14,11 +14,7 @@ export default function AnalysisFinancials() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {}
                 <div className="rs-card-minimal">
-<<<<<<< HEAD
-                    <h3 className="rs-label-sm uppercase mb-6 tracking-widest">Revenue & Net Income (₹B)</h3>
-=======
                     <h3 className="rs-label-sm uppercase mb-6 tracking-widest">Revenue & Net Income (â‚¹B)</h3>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={mockFinancials}>
@@ -38,11 +34,7 @@ export default function AnalysisFinancials() {
 
                 {}
                 <div className="rs-card-minimal">
-<<<<<<< HEAD
-                    <h3 className="rs-label-sm uppercase mb-6 tracking-widest">EPS Growth (₹)</h3>
-=======
                     <h3 className="rs-label-sm uppercase mb-6 tracking-widest">EPS Growth (â‚¹)</h3>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={mockFinancials}>
@@ -67,11 +59,7 @@ export default function AnalysisFinancials() {
                     <table className="w-full text-left">
                         <thead>
                             <tr className="border-b border-slate-800">
-<<<<<<< HEAD
-                                <th className="py-4 rs-label-sm">Metric (₹B)</th>
-=======
                                 <th className="py-4 rs-label-sm">Metric (â‚¹B)</th>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                                 <th className="py-4 rs-label-sm text-right">FY 2023</th>
                                 <th className="py-4 rs-label-sm text-right">FY 2022</th>
                                 <th className="py-4 rs-label-sm text-right">Growth (%)</th>

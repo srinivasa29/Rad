@@ -33,11 +33,7 @@ const SIGNAL_TABS = [
   { id: "momentum", label: "Momentum", icon: <Zap className="h-4 w-4" /> },
   { id: "breakout", label: "Breakout", icon: <Flame className="h-4 w-4" /> },
   { id: "pullback", label: "Pullback", icon: <RefreshCw className="h-4 w-4" /> },
-<<<<<<< HEAD
-  { id: "fakeout", label: "Fakeout 🚨", icon: <AlertTriangle className="h-4 w-4 text-amber-500" /> },
-=======
-  { id: "fakeout", label: "Fakeout ðŸš¨", icon: <AlertTriangle className="h-4 w-4 text-amber-500" /> },
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
+  { id: "fakeout", label: "Fakeout", icon: <AlertTriangle className="h-4 w-4 text-amber-500" /> },
 ];
 
 const DEFAULT_FILTERS = {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, Bell, ChevronRight, Star, Trash2, TrendingDown, TrendingUp, Newspaper } from 'lucide-react';
 import { NewsBadge, SentimentDisplay } from './EnhancedWatchlistComponents';
@@ -29,7 +29,7 @@ const compactCurrency = (value) => {
   return amount.toFixed(0);
 };
 
-const formatMoney = (value) => `â‚¹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatMoney = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const makeSeed = (text) => String(text || '').split('').reduce((sum, character) => sum + character.charCodeAt(0), 0);
 
@@ -314,7 +314,7 @@ const WatchlistTable = ({
                   <button type="button" onClick={() => onSort(column.key)} className="group inline-flex items-center gap-1.5 transition-colors hover:text-cyan-200">
                     <span>{column.label}</span>
                     {sortConfig.key === column.key && (
-                      <span className="text-cyan-300">{sortConfig.direction === 'asc' ? 'â†‘' : 'â†“'}</span>
+                      <span className="text-cyan-300">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </button>
                 ) : (

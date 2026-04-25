@@ -25,7 +25,6 @@ const ContactForm = () => {
     e.preventDefault();
     setLoading(true);
 
-    // Simulate API call
     setTimeout(() => {
       setLoading(false);
       setSubmitted(true);
@@ -36,7 +35,6 @@ const ContactForm = () => {
         message: '',
       });
 
-      // Reset success message after 3 seconds
       setTimeout(() => {
         setSubmitted(false);
       }, 3000);
@@ -51,19 +49,18 @@ const ContactForm = () => {
       className="help-contact-form"
     >
       <h3 className="form-title">Send us a Message</h3>
-      
+
       {submitted && (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="form-success-message"
         >
-          ✓ Message sent! We'll get back to you soon.
+          Message sent! We'll get back to you soon.
         </motion.div>
       )}
 
       <form onSubmit={handleSubmit} className="contact-form-container">
-        {/* Full Name */}
         <div className="form-group">
           <label htmlFor="fullName" className="form-label">
             Full Name
@@ -80,7 +77,6 @@ const ContactForm = () => {
           />
         </div>
 
-        {/* Email */}
         <div className="form-group">
           <label htmlFor="email" className="form-label">
             Email Address
@@ -97,7 +93,6 @@ const ContactForm = () => {
           />
         </div>
 
-        {/* Topic Dropdown */}
         <div className="form-group">
           <label htmlFor="topic" className="form-label">
             Topic
@@ -116,7 +111,6 @@ const ContactForm = () => {
           </select>
         </div>
 
-        {/* Message */}
         <div className="form-group">
           <label htmlFor="message" className="form-label">
             Message
@@ -133,7 +127,6 @@ const ContactForm = () => {
           />
         </div>
 
-        {/* Submit Button */}
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
@@ -151,9 +144,8 @@ const ContactForm = () => {
           )}
         </motion.button>
 
-        {/* Helper Text */}
         <p className="form-helper-text">
-          💡 We usually respond within 24 hours
+          We usually respond within 24 hours.
         </p>
       </form>
     </motion.div>

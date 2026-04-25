@@ -29,11 +29,7 @@ export default function AnalysisSidebar({ stock }) {
                     <div className="flex items-start gap-2">
                         <div className="mt-1 w-1 h-1 rounded-full bg-emerald-500"></div>
                         <p className="text-[10px] leading-relaxed text-slate-400 font-medium">
-<<<<<<< HEAD
-                            <span className="text-white font-bold">Breakout Confirmed:</span> Price closing above ₹2,850 supply base with high volume.
-=======
                             <span className="text-white font-bold">Breakout Confirmed:</span> Price closing above â‚¹2,850 supply base with high volume.
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                         </p>
                     </div>
                     <div className="flex items-start gap-2">

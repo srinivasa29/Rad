@@ -42,14 +42,9 @@ import {
 import Header from '../components/common/Header';
 import './InvestorStockPage.css';
 import { useEffect } from 'react';
-<<<<<<< HEAD
-import { useParams } from 'react-router-dom';
-import axios from 'axios';
-=======
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useSocket } from '../hooks/useSocket';
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
 
 const chartData = [
   { time: '9:30', price: 480, open: 470, high: 490, low: 465, close: 480 },
@@ -68,8 +63,6 @@ const financialsData = [
   { name: '2024', revenue: 1708, profit: 245 },
 ];
 
-<<<<<<< HEAD
-=======
 const METRIC_DESCRIPTIONS = {
     'Valuation Metrics': 'Key ratios used to determine if a stock is fairly priced, undervalued, or overvalued.',
     'Profitability': 'Metrics measuring the company\'s ability to generate earnings relative to its revenue, operating costs, and balance sheet assets.',
@@ -100,7 +93,6 @@ const METRIC_DESCRIPTIONS = {
 };
 
 
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
 const InvestorStockPage = () => {
   const { symbol = 'JINDRILL' } = useParams();
   const [activeTab, setActiveTab] = useState('Overview');
@@ -117,23 +109,6 @@ const InvestorStockPage = () => {
   const [newsImpactData, setNewsImpactData] = useState(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
   const [errorMetrics, setErrorMetrics] = useState(null);
-<<<<<<< HEAD
-
-  useEffect(() => {
-    const fullBackground = 'linear-gradient(180deg, #f0f9ff 0%, #e1effe 100%)';
-    document.body.style.backgroundColor = '#f0f9ff';
-    document.body.style.backgroundImage = fullBackground;
-    document.body.style.backgroundAttachment = 'fixed';
-    document.body.style.backgroundSize = 'cover';
-    
-    return () => {
-      document.body.style.backgroundColor = '';
-      document.body.style.backgroundImage = '';
-      document.body.style.backgroundAttachment = '';
-      document.body.style.backgroundSize = '';
-    };
-  }, []);
-=======
   
   // Real-time states
   const [livePrice, setLivePrice] = useState(562.90);
@@ -238,7 +213,6 @@ const InvestorStockPage = () => {
       fetchInsightsData();
     }
   }, [symbol, term, activeTab]);
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
 
   useEffect(() => {
     const fetchDynamicData = async () => {
@@ -402,32 +376,19 @@ const InvestorStockPage = () => {
                 >
                   <Bookmark size={18} />
                 </button>
-<<<<<<< HEAD
-                <button className="advanced-chart-btn">
-                  <TrendingUp size={16} />
-                  Advanced Chart
-                </button>
-=======
                 <Link to={`/advanced-charts?symbol=${symbol}`} className="advanced-chart-btn">
                   <TrendingUp size={16} />
                   Advanced Chart
                 </Link>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
               </div>
             </div>
 
             <div className="card-price-section">
-<<<<<<< HEAD
-              <span className="card-price-main">â‚¹562.90</span>
-              <span className="card-price-change">+77.00 (15.84%)</span>
-              <span className="card-price-time">Live â€¢ Real-time Data</span>
-=======
               <span className="card-price-main">₹{livePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               <span className={`card-price-change ${liveChange.pct >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                 {liveChange.pct >= 0 ? '+' : ''}{Number(liveChange.val).toFixed(2)} ({liveChange.pct}%)
               </span>
               <span className="card-price-time">Live • Updated at {lastUpdate}</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
             </div>
 
             <div className="chart-body">
@@ -442,12 +403,8 @@ const InvestorStockPage = () => {
             </div>
 
             <div className="card-footer-controls">
-<<<<<<< HEAD
-              <div className="time-filters-group">
-=======
               <div className="time-filters-container">
                 <div className="time-filters-group">
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                 {['1D', '1W', '1M', '3M', '6M', '1Y', '5Y', 'All'].map(filter => (
                   <button 
                     key={filter}
@@ -457,10 +414,7 @@ const InvestorStockPage = () => {
                     {filter}
                   </button>
                 ))}
-<<<<<<< HEAD
-=======
                 </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
               </div>
 
               <div className="control-divider"></div>
@@ -525,26 +479,15 @@ const InvestorStockPage = () => {
                         <span className="po-range-label">Today's Range</span>
                       </div>
                       <div className="po-visual-track-wrap">
-<<<<<<< HEAD
-                        <span className="po-limit-price">â‚¹485.00</span>
-                        <div className="po-track-main today-gradient">
-                          <div className="po-marker-assembly" style={{ left: '85%' }}>
-                            <div className="po-floating-price">â‚¹562.90 â€¢ Current</div>
-=======
                         <span className="po-limit-price">Ã¢â€šÂ¹485.00</span>
                         <div className="po-track-main today-gradient">
                           <div className="po-marker-assembly" style={{ left: '85%' }}>
                             <div className="po-floating-price">₹{livePrice.toFixed(2)} • Current</div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                             <div className="po-marker-v-line"></div>
                             <div className="po-marker-dot"></div>
                           </div>
                         </div>
-<<<<<<< HEAD
-                        <span className="po-limit-price">â‚¹570.00</span>
-=======
                         <span className="po-limit-price">Ã¢â€šÂ¹570.00</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                       </div>
                     </div>
 
@@ -554,21 +497,13 @@ const InvestorStockPage = () => {
                         <span className="po-context-indicator">Near 52W High</span>
                       </div>
                       <div className="po-visual-track-wrap">
-<<<<<<< HEAD
-                        <span className="po-limit-price">â‚¹212.10</span>
-=======
                         <span className="po-limit-price">Ã¢â€šÂ¹212.10</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                         <div className="po-track-main fiftytwo-gradient">
                           <div className="po-marker-assembly" style={{ left: '92%' }}>
                             <div className="po-marker-dot marker-muted"></div>
                           </div>
                         </div>
-<<<<<<< HEAD
-                        <span className="po-limit-price">â‚¹585.00</span>
-=======
                         <span className="po-limit-price">Ã¢â€šÂ¹585.00</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                       </div>
                     </div>
                   </div>
@@ -578,22 +513,14 @@ const InvestorStockPage = () => {
                       <div className="ps-icon-circle bg-blue-soft"><Clock size={16} /></div>
                       <div className="ps-data">
                         <span className="ps-label">Open</span>
-<<<<<<< HEAD
-                        <span className="ps-value">â‚¹492.10</span>
-=======
                         <span className="ps-value">Ã¢â€šÂ¹492.10</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                       </div>
                     </div>
                     <div className="po-stat-card-luxury">
                       <div className="ps-icon-circle bg-green-soft"><TrendingUp size={16} /></div>
                       <div className="ps-data">
                         <span className="ps-label">Prev Close</span>
-<<<<<<< HEAD
-                        <span className="ps-value">â‚¹485.90</span>
-=======
                         <span className="ps-value">Ã¢â€šÂ¹485.90</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                       </div>
                     </div>
                     <div className="po-stat-card-luxury">
@@ -607,11 +534,7 @@ const InvestorStockPage = () => {
                       <div className="ps-icon-circle bg-orange-soft"><ShieldCheck size={16} /></div>
                       <div className="ps-data">
                         <span className="ps-label">Circuit Range</span>
-<<<<<<< HEAD
-                        <span className="ps-value text-sm-luxury">â‚¹450 â€“ â‚¹675</span>
-=======
                         <span className="ps-value text-sm-luxury">Ã¢â€šÂ¹450 Ã¢â‚¬â€œ Ã¢â€šÂ¹675</span>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                       </div>
                     </div>
                   </div>
@@ -620,11 +543,7 @@ const InvestorStockPage = () => {
 
               <div className="key-metrics-compact-row animate-fade-in">
                 {[
-<<<<<<< HEAD
-                  { label: 'Market Cap', val: 'â‚¹1,708 Cr', tag: 'Mid Cap', hint: 'Top 250 Company', type: 'neutral' },
-=======
                   { label: 'Market Cap', val: 'Ã¢â€šÂ¹1,708 Cr', tag: 'Mid Cap', hint: 'Top 250 Company', type: 'neutral' },
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                   { label: 'P/E Ratio', val: '9.2', tag: 'Undervalued', hint: 'Below Industry Avg', type: 'green' },
                   { label: 'ROE', val: '14.7%', tag: 'Strong', hint: 'Consistent returns', type: 'green' },
                   { label: 'Debt to Equity', val: '0.12', tag: 'Low Risk', hint: 'Very healthy', type: 'green' },
@@ -710,11 +629,7 @@ const InvestorStockPage = () => {
                               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} dy={10} />
                               <Tooltip cursor={{fill: '#f8fafc', radius: 4}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 15px rgba(0,0,0,0.05)' }} />
                               <Bar 
-<<<<<<< HEAD
-                                name={finTab === 'Shareholding' ? 'Ownership %' : `${finTab} (â‚¹ Cr)`} 
-=======
                                 name={finTab === 'Shareholding' ? 'Ownership %' : `${finTab} (Ã¢â€šÂ¹ Cr)`} 
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                                 dataKey="value" 
                                 fill={finTab === 'Profit' ? '#10b981' : '#3b82f6'} 
                                 radius={[6, 6, 0, 0]} 
@@ -829,331 +744,6 @@ const InvestorStockPage = () => {
 
           {activeTab === 'Signals' && (
             <div className="signals-tab-content animate-fade-in">
-<<<<<<< HEAD
-              {}
-              <div className="signal-summary-card shadow-premium">
-                <div className="ss-top-row">
-                  <div className="ss-sentiment-box">
-                    <span className="ss-sub">Current Sentiment</span>
-                    <h2 className="ss-main-label text-green">Strongly Bullish</h2>
-                  </div>
-                  <div className="ss-score-box">
-                    <div className="ss-score-circle">
-                      <span className="ss-score-num">8.2</span>
-                      <span className="ss-score-max">/10</span>
-                    </div>
-                    <span className="ss-score-label">Strong Setup</span>
-                  </div>
-                </div>
-
-                <div className="ss-meter-container">
-                  <div className="ss-meter-labels">
-                    <span>Bearish</span>
-                    <span>Neutral</span>
-                    <span>Bullish</span>
-                  </div>
-                  <div className="ss-meter-track">
-                    <div className="ss-meter-fill" style={{ width: '82%' }}></div>
-                    <div className="ss-meter-thumb" style={{ left: '82%' }}></div>
-                  </div>
-                </div>
-
-                <div className="ss-explanation-box">
-                  <Zap size={16} className="text-amber-500" />
-                  <p>Momentum indicators suggest a bullish continuation with strong trend support at the 50-day moving average.</p>
-                </div>
-              </div>
-
-              {}
-              <div className="signals-timeframe-bar">
-                {['Short Term', 'Medium Term', 'Long Term'].map(t => (
-                  <button key={t} className={`st-pill ${t === 'Short Term' ? 'active' : ''}`}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-
-              {}
-              <div className="signals-grid">
-                {}
-                <div className="sig-category-card">
-                  <div className="rc-header">
-                    <div className="rc-header-left">
-                      <TrendingUp className="rc-icon" />
-                      <h3>Trend Signals</h3>
-                    </div>
-                  </div>
-                  <div className="sig-list">
-                    {[
-                      { name: 'MA Trend', val: 'Moving Avg', status: 'BULLISH', s: 'green', imp: 'Price is sustaining above 50 & 200 DMA' },
-                      { name: 'Price vs 200DMA', val: 'â‚¹488.20', status: 'STRONG', s: 'green', imp: 'Trading 15% above the long-term baseline' },
-                      { name: 'Trend Strength', val: 'ADX: 28', status: 'BULLISH', s: 'green', imp: 'Trend is gaining significant strength' },
-                    ].map((s, i) => (
-                      <div key={i} className="sig-item-card">
-                        <div className="sig-item-top">
-                          <span className="sig-name">{s.name} <Info size={12} className="text-slate-300" /></span>
-                          <span className="sig-val">{s.val}</span>
-                          <span className={`sig-badge tag-${s.s}`}>{s.status}</span>
-                        </div>
-                        <p className="sig-interpretation">{s.imp}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {}
-                <div className="sig-category-card">
-                  <div className="rc-header">
-                    <div className="rc-header-left">
-                      <Zap className="rc-icon" />
-                      <h3>Momentum Signals</h3>
-                    </div>
-                  </div>
-                  <div className="sig-list">
-                    {[
-                      { name: 'RSI (14)', val: '68.5', status: 'OVERBOUGHT', s: 'amber', imp: 'RSI indicates stock is nearing the overbought zone' },
-                      { name: 'MACD', val: 'Crossover', status: 'BULLISH', s: 'green', imp: 'Bullish crossover confirmed on daily chart' },
-                      { name: 'Volume Trend', val: '1.5x Avg', status: 'STRONG', s: 'green', imp: 'Rising volume supporting the upward move' },
-                    ].map((s, i) => (
-                      <div key={i} className="sig-item-card">
-                        <div className="sig-item-top">
-                          <span className="sig-name">{s.name} <Info size={12} className="text-slate-300" /></span>
-                          <span className="sig-val">{s.val}</span>
-                          <span className={`sig-badge tag-${s.s}`}>{s.status}</span>
-                        </div>
-                        <p className="sig-interpretation">{s.imp}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {}
-                <div className="sig-category-card">
-                  <div className="rc-header">
-                    <div className="rc-header-left">
-                      <Activity className="rc-icon" />
-                      <h3>Volatility & Risk</h3>
-                    </div>
-                  </div>
-                  <div className="sig-list">
-                    {[
-                      { name: 'ATR (Volatility)', val: '12.4', status: 'MODERATE', s: 'amber', imp: 'Moderate volatility expected in current range' },
-                      { name: 'Beta', val: '0.92', status: 'LOW RISK', s: 'green', imp: 'Stock is less volatile than the benchmark index' },
-                      { name: 'Price Swings', val: 'Weekly', status: 'STABLE', s: 'green', imp: 'Price action remains stable without erratic gaps' },
-                    ].map((s, i) => (
-                      <div key={i} className="sig-item-card">
-                        <div className="sig-item-top">
-                          <span className="sig-name">{s.name} <Info size={12} className="text-slate-300" /></span>
-                          <span className="sig-val">{s.val}</span>
-                          <span className={`sig-badge tag-${s.s}`}>{s.status}</span>
-                        </div>
-                        <p className="sig-interpretation">{s.imp}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {}
-              <div className="signals-row-flex mb-8">
-                <div className="sig-card-mid flex-equal">
-                  <div className="rc-header">
-                    <div className="rc-header-left">
-                      <BarChart3 className="rc-icon" />
-                      <h3>Key Price Levels</h3>
-                    </div>
-                  </div>
-                  <div className="kl-visual-range">
-                    <div className="kl-track">
-                      <div className="kl-marker kl-s2" style={{ left: '10%' }}><span>â‚¹512 (S2)</span></div>
-                      <div className="kl-marker kl-s1" style={{ left: '30%' }}><span>â‚¹535 (S1)</span></div>
-                      <div className="kl-current-thumb" style={{ left: '72%' }}>
-                        <div className="kl-p-label">â‚¹562.90</div>
-                        <div className="kl-p-dot"></div>
-                      </div>
-                      <div className="kl-marker kl-r1" style={{ left: '85%' }}><span>â‚¹585 (R1)</span></div>
-                      <div className="kl-marker kl-r2" style={{ left: '95%' }}><span>â‚¹612 (R2)</span></div>
-                    </div>
-                  </div>
-                  <div className="kl-interpretation-footer mt-4">
-                    <p className="text-xs text-slate-500 font-medium">
-                      Price is currently <span className="text-blue-600">approaching resistance R1</span>. Strong support cluster observed near â‚¹535.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="sig-card-mid flex-equal">
-                  <div className="rc-header">
-                    <div className="rc-header-left">
-                      <Activity className="rc-icon" />
-                      <h3>Volume Insights</h3>
-                    </div>
-                  </div>
-                  <div className="vi-metrics-row">
-                    <div className="vi-stat-box">
-                      <span className="vi-label">Volume vs Avg</span>
-                      <span className="vi-value">1.58x <small className="text-green">Increasing</small></span>
-                    </div>
-                    <div className="vi-stat-box">
-                      <span className="vi-label">Conviction</span>
-                      <span className="vi-value text-green">Strong</span>
-                    </div>
-                  </div>
-                  <div className="vi-note-box bg-slate-50 p-3 rounded-xl mt-4">
-                    <p className="text-xs leading-relaxed text-slate-600">
-                      Rising volume on price up-moves supports the current trend conviction. Market participation is above average for this session.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {}
-              <div className="signals-row-flex mb-8">
-                <div className="sig-card-mid flex-equal">
-                  <div className="rc-header">
-                    <div className="rc-header-left">
-                      <Sliders className="rc-icon" />
-                      <h3>Price Behavior</h3>
-                    </div>
-                  </div>
-                  <ul className="pb-list">
-                    <li>
-                      <span className="pb-l">Recent Trend</span>
-                      <span className="pb-v text-green">Higher Highs</span>
-                    </li>
-                    <li>
-                      <span className="pb-l">Current Phase</span>
-                      <span className="pb-v">Breakout Testing</span>
-                    </li>
-                    <li>
-                      <span className="pb-l">Conviction Score</span>
-                      <span className="pb-v">High</span>
-                    </li>
-                  </ul>
-                  <p className="text-[11px] text-slate-400 italic mt-3">"Stock forming higher highs, indicating a sustained medium-term uptrend."</p>
-                </div>
-
-                <div className="sig-card-mid flex-equal">
-                  <div className="rc-header">
-                    <div className="rc-header-left">
-                      <ShieldCheck className="rc-icon" />
-                      <h3>Market Participation</h3>
-                    </div>
-                  </div>
-                  <ul className="pb-list">
-                    <li>
-                      <span className="pb-l">Delivery %</span>
-                      <span className="pb-v">48.2%</span>
-                    </li>
-                    <li>
-                      <span className="pb-l">Participation</span>
-                      <span className="pb-v text-green">Institution Led</span>
-                    </li>
-                    <li>
-                      <span className="pb-l">Accumulation</span>
-                      <span className="pb-v text-green">Strong Buy</span>
-                    </li>
-                  </ul>
-                  <p className="text-[11px] text-slate-400 italic mt-3">"Higher delivery volumes suggest structural long-term accumulation interest."</p>
-                </div>
-              </div>
-
-              {}
-              <div className="signals-row-flex mb-8">
-                <div className="sig-card-mid flex-equal">
-                  <div className="rc-header">
-                    <div className="rc-header-left">
-                      <ChevronsUpDown className="rc-icon" />
-                      <h3>Trend Alignment</h3>
-                    </div>
-                  </div>
-                  <div className="ta-alignment-row">
-                    <div className="ta-pill-group">
-                      <div className="ta-pill bg-green">Short Term</div>
-                      <div className="ta-pill bg-blue">Medium Term</div>
-                      <div className="ta-pill bg-green">Long Term</div>
-                    </div>
-                  </div>
-                  <div className="ta-footer mt-4">
-                    <span className="badge-light text-green">SYNCHRONIZED</span>
-                    <p className="text-[12px] text-slate-500 mt-2">Overall trend alignment supports a clear bullish bias across timeframes.</p>
-                  </div>
-                </div>
-
-                <div className="sig-card-mid flex-equal">
-                  <div className="sig-cat-header">
-                    <Clock size={18} className="text-slate-500" />
-                    <h3>Signal Consistency</h3>
-                  </div>
-                  <div className="sc-consistency-view">
-                    <div className="sc-track">
-                      {[1,1,1,1,1,0.5,1].map((s, i) => (
-                        <div key={i} className={`sc-dot ${s === 1 ? 'bg-green' : 'bg-slate-200'}`}></div>
-                      ))}
-                    </div>
-                    <span className="sc-total">86% Bullish</span>
-                  </div>
-                  <p className="text-[12px] text-slate-500 mt-4">Bullish signals have been consistently sustained over the last 5 trading sessions.</p>
-                </div>
-              </div>
-
-              {}
-              <div className="signals-row-flex mb-8">
-                <div className="sig-card-mid risk-alerts-card flex-grow-side">
-                  <div className="rc-header">
-                    <div className="rc-header-left">
-                      <AlertCircle className="rc-icon" />
-                      <h3>Risk Alerts</h3>
-                    </div>
-                  </div>
-                  <div className="risk-alerts-list">
-                    <div className="ra-item alert-amber">
-                      <div className="ra-dot"></div>
-                      <p><strong>Overbought:</strong> RSI (14) is nearing overbought levels at 68.5.</p>
-                    </div>
-                    <div className="ra-item alert-purple">
-                        <div className="ra-dot"></div>
-                        <p><strong>Volatility:</strong> ATR is rising â€” expect sharper intraday moves.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="sig-card-mid flex-grow-main">
-                  <div className="sig-cat-header">
-                    <Clock size={18} className="text-indigo-500" />
-                    <h3>Recent Changes</h3>
-                  </div>
-                  <div className="recent-changes-list">
-                    <div className="rc-item-s">
-                      <span className="rc-time-s">TODAY</span>
-                      <p className="rc-desc-s">Price successfully crossed the <strong>50 DMA (â‚¹542)</strong> with rising volume.</p>
-                    </div>
-                    <div className="rc-item-s">
-                      <span className="rc-time-s">YESTERDAY</span>
-                      <p className="rc-desc-s">MACD Bullish crossover confirmed on the daily timeframe.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {}
-              <div className="sig-meaning-box animate-fade-in">
-                <div className="sm-header">
-                  <Lightbulb className="text-amber-500" size={20} />
-                  <h3>What This Means</h3>
-                </div>
-                <div className="sm-content-layout">
-                  <ul className="sm-list">
-                    <li>The stock is in a strong momentum-driven uptrend, supported by institutional accumulation.</li>
-                    <li>While long-term outlook remains bullish, stay cautious of short-term consolidation near the â‚¹585 resistance.</li>
-                    <li>Trend synchronization across short and long timeframes suggests a high-probability bullish structure.</li>
-                  </ul>
-                  <div className="sm-disclaimer mt-6">
-                    <Info size={14} />
-                    <span>This interpretation is based on historical technical data and algorithmic analysis. Not financial advice.</span>
-                  </div>
-                </div>
-=======
               {/* Overall Sentiment Summary */}
               <div className="overall-sentiment-summary-card shadow-premium mb-10">
                 <div className="oss-header">
@@ -1524,7 +1114,6 @@ const InvestorStockPage = () => {
                     </div>
                   </>
                 )}
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
               </div>
             </div>
           )}
@@ -1537,13 +1126,10 @@ const InvestorStockPage = () => {
                   <div className="ft-title-group">
                     <Activity size={20} className="text-blue-600" />
                     <h2>Company Fundamentals</h2>
-<<<<<<< HEAD
-=======
                     <div className="info-trigger-s ml-2">
                       <HelpCircle size={15} className="text-slate-300" />
                       <div className="ft-dropdown-s">{FUNDAMENTALS_TOOLTIPS.companyFundamentals}</div>
                     </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                   </div>
                   <span className="ft-sub-text">All figures in â‚¹ Cr unless specified</span>
                 </div>
@@ -1618,23 +1204,15 @@ const InvestorStockPage = () => {
                 <div className="ft-title-row">
                   <TrendingUp size={20} className="text-blue-500" />
                   <h2>Detailed Analysis</h2>
-<<<<<<< HEAD
-=======
                   <div className="info-trigger-s ml-2">
                     <HelpCircle size={15} className="text-slate-300" />
                     <div className="ft-dropdown-s">{FUNDAMENTALS_TOOLTIPS.detailedAnalysis}</div>
                   </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                 </div>
                 <p>Granular breakdown of financial metrics and competitive standing.</p>
               </div>
 
               <div className="ft-detailed-layout-grid">
-<<<<<<< HEAD
-                {}
-                <div className="ft-analysis-card">
-                  <div className="fac-header">Valuation Metrics</div>
-=======
                 {/* Valuation Metrics */}
                 <div className="ft-analysis-card">
                   <div className="fac-header flex items-center gap-2">
@@ -1644,7 +1222,6 @@ const InvestorStockPage = () => {
                       <div className="ft-dropdown-s">{FUNDAMENTALS_TOOLTIPS.valuationMetrics}</div>
                     </div>
                   </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                   <div className="fac-list">
                     {[
                       { n: 'P/E (TTM)', v: '9.21', label: 'Undervalued', t: 'green', sub: 'Below Industry Average' },
@@ -1654,9 +1231,6 @@ const InvestorStockPage = () => {
                     ].map((m, i) => (
                       <div key={i} className="fac-item">
                         <div className="fac-left">
-<<<<<<< HEAD
-                          <span className="fac-n">{m.n}</span>
-=======
                           <div className="flex items-center gap-1.5">
                             <span className="fac-n">{m.n}</span>
                             <div className="info-trigger-s">
@@ -1664,7 +1238,6 @@ const InvestorStockPage = () => {
                               <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
                             </div>
                           </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                           <span className="fac-sub">{m.sub}</span>
                         </div>
                         <div className="fac-right">
@@ -1676,11 +1249,6 @@ const InvestorStockPage = () => {
                   </div>
                 </div>
 
-<<<<<<< HEAD
-                {}
-                <div className="ft-analysis-card">
-                  <div className="fac-header">Profitability</div>
-=======
                 {/* Profitability */}
                 <div className="ft-analysis-card">
                   <div className="fac-header flex items-center gap-2">
@@ -1690,7 +1258,6 @@ const InvestorStockPage = () => {
                       <div className="ft-dropdown-s"><strong>Profitability:</strong> {METRIC_DESCRIPTIONS['Profitability']}</div>
                     </div>
                   </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                   <div className="fac-list">
                     {[
                       { n: 'ROE', v: '14.7%', label: 'Strong', t: 'green', sub: 'Efficient equity usage' },
@@ -1700,9 +1267,6 @@ const InvestorStockPage = () => {
                     ].map((m, i) => (
                       <div key={i} className="fac-item">
                         <div className="fac-left">
-<<<<<<< HEAD
-                          <span className="fac-n">{m.n}</span>
-=======
                           <div className="flex items-center gap-1.5">
                             <span className="fac-n">{m.n}</span>
                             <div className="info-trigger-s">
@@ -1710,7 +1274,6 @@ const InvestorStockPage = () => {
                               <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
                             </div>
                           </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                           <span className="fac-sub">{m.sub}</span>
                         </div>
                         <div className="fac-right">
@@ -1722,11 +1285,6 @@ const InvestorStockPage = () => {
                   </div>
                 </div>
 
-<<<<<<< HEAD
-                {}
-                <div className="ft-analysis-card">
-                  <div className="fac-header">Growth Profile</div>
-=======
                 {/* Growth Profile */}
                 <div className="ft-analysis-card">
                   <div className="fac-header flex items-center gap-2">
@@ -1736,7 +1294,6 @@ const InvestorStockPage = () => {
                       <div className="ft-dropdown-s"><strong>Growth:</strong> {METRIC_DESCRIPTIONS['Growth Profile']}</div>
                     </div>
                   </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                   <div className="fac-list">
                     {[
                       { n: 'Rev Growth (3Y)', v: '12.4%', label: 'Stable', t: 'green', sub: 'YoY Revenue CAGR' },
@@ -1745,9 +1302,6 @@ const InvestorStockPage = () => {
                     ].map((m, i) => (
                       <div key={i} className="fac-item">
                         <div className="fac-left">
-<<<<<<< HEAD
-                          <span className="fac-n">{m.n}</span>
-=======
                           <div className="flex items-center gap-1.5">
                             <span className="fac-n">{m.n}</span>
                             <div className="info-trigger-s">
@@ -1755,7 +1309,6 @@ const InvestorStockPage = () => {
                               <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
                             </div>
                           </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                           <span className="fac-sub">{m.sub}</span>
                         </div>
                         <div className="fac-right">
@@ -1767,11 +1320,6 @@ const InvestorStockPage = () => {
                   </div>
                 </div>
 
-<<<<<<< HEAD
-                {}
-                <div className="ft-analysis-card">
-                  <div className="fac-header">Financial Health</div>
-=======
                 {/* Financial Health */}
                 <div className="ft-analysis-card">
                   <div className="fac-header flex items-center gap-2">
@@ -1781,7 +1329,6 @@ const InvestorStockPage = () => {
                       <div className="ft-dropdown-s"><strong>Health:</strong> {METRIC_DESCRIPTIONS['Financial Health']}</div>
                     </div>
                   </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                   <div className="fac-list">
                     {[
                       { n: 'Debt to Equity', v: '0.12', label: 'Very Low', t: 'green', sub: 'Prudent debt management' },
@@ -1790,9 +1337,6 @@ const InvestorStockPage = () => {
                     ].map((m, i) => (
                       <div key={i} className="fac-item">
                         <div className="fac-left">
-<<<<<<< HEAD
-                          <span className="fac-n">{m.n}</span>
-=======
                           <div className="flex items-center gap-1.5">
                             <span className="fac-n">{m.n}</span>
                             <div className="info-trigger-s">
@@ -1800,7 +1344,6 @@ const InvestorStockPage = () => {
                               <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
                             </div>
                           </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                           <span className="fac-sub">{m.sub}</span>
                         </div>
                         <div className="fac-right">
@@ -1812,11 +1355,6 @@ const InvestorStockPage = () => {
                   </div>
                 </div>
 
-<<<<<<< HEAD
-                {}
-                <div className="ft-analysis-card">
-                  <div className="fac-header">Shareholder Metrics</div>
-=======
                 {/* Shareholder Metrics */}
                 <div className="ft-analysis-card">
                   <div className="fac-header d-flex items-center gap-2">
@@ -1826,7 +1364,6 @@ const InvestorStockPage = () => {
                       <div className="ft-dropdown-s"><strong>Shareholders:</strong> {METRIC_DESCRIPTIONS['Shareholder Metrics']}</div>
                     </div>
                   </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                   <div className="fac-list">
                     {[
                       { n: 'EPS (TTM)', v: '54.20', label: 'Rising', t: 'green', sub: 'Last 12 month earnings' },
@@ -1835,9 +1372,6 @@ const InvestorStockPage = () => {
                     ].map((m, i) => (
                       <div key={i} className="fac-item">
                         <div className="fac-left">
-<<<<<<< HEAD
-                          <span className="fac-n">{m.n}</span>
-=======
                           <div className="flex items-center gap-1.5">
                             <span className="fac-n">{m.n}</span>
                             <div className="info-trigger-s">
@@ -1845,7 +1379,6 @@ const InvestorStockPage = () => {
                               <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
                             </div>
                           </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                           <span className="fac-sub">{m.sub}</span>
                         </div>
                         <div className="fac-right">
@@ -1857,12 +1390,6 @@ const InvestorStockPage = () => {
                   </div>
                 </div>
 
-<<<<<<< HEAD
-                {}
-                <div className="ft-analysis-card ft-peer-card">
-                  <div className="fac-header d-flex justify-between">
-                    <span>Peer Comparison</span>
-=======
 
                 {/* Peer Comparison */}
                 <div className="ft-analysis-card ft-peer-card">
@@ -1874,7 +1401,6 @@ const InvestorStockPage = () => {
                         <div className="ft-dropdown-s">{FUNDAMENTALS_TOOLTIPS.peerComparison}</div>
                       </div>
                     </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                     <span className="text-xs font-normal text-slate-400">Industry: Energy Services</span>
                   </div>
                   <div className="peer-comp-table">
@@ -1890,9 +1416,6 @@ const InvestorStockPage = () => {
                       { n: 'Rev Growth', c: '12.4%', i: '9.5%', t: 'green', d: 'up' },
                     ].map((m, idx) => (
                       <div key={idx} className="pct-row">
-<<<<<<< HEAD
-                        <span className="pct-n">{m.n}</span>
-=======
                         <div className="flex items-center gap-2">
                           <span className="pct-n">{m.n}</span>
                           <div className="info-trigger-s">
@@ -1900,7 +1423,6 @@ const InvestorStockPage = () => {
                             <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
                           </div>
                         </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                         <div className="pct-c-cell">
                           <span className="pct-val">{m.c}</span>
                           <div className={`pct-indicator text-${m.t}`}>
@@ -1917,10 +1439,7 @@ const InvestorStockPage = () => {
                     </p>
                   </div>
                 </div>
-<<<<<<< HEAD
-=======
 
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
               </div>
             </div>
           )}
@@ -1963,24 +1482,17 @@ const InvestorStockPage = () => {
                   <div className="ne-section-header">
                     <Clock size={18} className="text-indigo-500" />
                     <h3>Upcoming Events</h3>
-<<<<<<< HEAD
-=======
                     <div className="info-trigger-s ml-2">
                       <HelpCircle size={15} className="text-slate-300" />
                       <div className="ft-dropdown-s">{NEWS_TOOLTIPS.upcomingEvents}</div>
                     </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                   </div>
 
                   <div className="ne-timeline-container shadow-premium">
                     {[
                       { date: '12 May', title: 'Q4 Earnings Release', desc: 'Financial results for the quarter ended March 2024.', tag: 'QUARTERLY RESULTS', icon: 'bar', imp: 'Strong growth expected', s: 'green' },
                       { date: '28 May', title: 'Annual General Meeting', desc: 'Strategic roadmap and expansion plans discussion.', tag: 'AGM', icon: 'users', imp: 'Neutral impact on stock', s: 'amber' },
-<<<<<<< HEAD
-                      { date: '04 Jun', title: 'Dividend Payout', desc: 'Final dividend of â‚¹2.50 per share proposed.', tag: 'DIVIDEND', icon: 'coin', imp: 'Positive for shareholders', s: 'green' },
-=======
                       { date: '04 Jun', title: 'Dividend Payout', desc: 'Final dividend of Ã¢â€šÂ¹2.50 per share proposed.', tag: 'DIVIDEND', icon: 'coin', imp: 'Positive for shareholders', s: 'green' },
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                     ].map((e, idx) => (
                       <div key={idx} className="ne-timeline-item">
                         <div className="ne-t-left">
@@ -2015,22 +1527,15 @@ const InvestorStockPage = () => {
                   <div className="ne-section-header">
                     <TrendingUp size={18} className="text-blue-500" />
                     <h3>Latest News</h3>
-<<<<<<< HEAD
-=======
                     <div className="info-trigger-s ml-2">
                       <HelpCircle size={15} className="text-slate-300" />
                       <div className="ft-dropdown-s">{NEWS_TOOLTIPS.latestNews}</div>
                     </div>
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                   </div>
 
                   <div className="ne-news-stack">
                     {[
-<<<<<<< HEAD
-                      { source: 'Reuters', time: '2h ago', head: 'Jindal Drilling bags new offshore contract worth â‚¹450Cr', desc: 'The contract involves deployment of the jack-up rig "Jindal Pioneer" for a period of 3 years.', imp: 'Positive for long-term growth', s: 'green' },
-=======
                       { source: 'Reuters', time: '2h ago', head: 'Jindal Drilling bags new offshore contract worth Ã¢â€šÂ¹450Cr', desc: 'The contract involves deployment of the jack-up rig "Jindal Pioneer" for a period of 3 years.', imp: 'Positive for long-term growth', s: 'green' },
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                       { source: 'Economic Times', time: '5h ago', head: 'Energy service sector awaits policy clarity on offshore taxes', desc: 'Industry leaders seek rationalization of GST on offshore drilling services in upcoming budget.', imp: 'Short-term volatility expected', s: 'amber' },
                       { source: 'Mint', time: 'Yesterday', head: 'JDIL shares surge 15% on strong volume breakout', desc: 'Technicals suggest strong accumulation by mid-cap focused funds.', imp: 'Momentum expected to continue', s: 'green' },
                     ].map((n, idx) => (

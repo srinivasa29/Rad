@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Zap, Flame, RefreshCw, BarChart3 } from 'lucide-react';
 
@@ -87,7 +87,7 @@ const ScreenerResultsTable = ({ stocks, onOpenResearch }) => {
 
               {}
               <td className="px-6 py-4">
-                <p className="text-sm font-bold text-white">â‚¹{stock.price.toFixed(2)}</p>
+                <p className="text-sm font-bold text-white">₹{stock.price.toFixed(2)}</p>
               </td>
 
               {}

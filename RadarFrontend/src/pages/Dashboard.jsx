@@ -8,8 +8,6 @@ import {
   Filter,
   Newspaper,
   Search,
-  Bell,
-  CheckCircle,
   User,
   Settings,
   HelpCircle,
@@ -78,7 +76,6 @@ const MenuList = ({ onClose }) => (
   <div className="dropdown-menu-list">
     <MenuItem icon={User} label="My Profile" onClick={onClose} />
     <MenuItem icon={Settings} label="Settings" onClick={onClose} />
-    <MenuItem icon={HelpCircle} label="Help & Support" onClick={onClose} />
   </div>
 );
 
@@ -175,17 +172,11 @@ export default function Dashboard() {
   }, [location.search, navigate]);
   useEffect(() => {
     if (!isTraderMode) {
-<<<<<<< HEAD
-      document.body.style.backgroundColor = "";
-      document.body.style.backgroundImage = "none";
-    } else {
-=======
       // Apply Investor Mode "Minimalist Sky" Gradient to body
       document.body.style.backgroundColor = "#f0f9ff";
       document.body.style.backgroundImage = "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f9ff 100%)";
     } else {
       // Apply Trader Mode Dark Background to body
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
       document.body.style.backgroundColor = "#020617";
       document.body.style.backgroundImage = "none";
     }
@@ -338,31 +329,10 @@ export default function Dashboard() {
   };
 
   const handleLogout = () => {
-<<<<<<< HEAD
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-
-      if (typeof document !== "undefined") {
-        document.cookie.split(";").forEach((cookie) => {
-          const name = cookie.split("=")[0].trim();
-          if (name) {
-            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-          }
-        });
-      }
-    } catch (error) {
-      console.error("Logout cleanup failed:", error);
-    } finally {
-      setShowLogoutModal(false);
-      window.location.replace("/");
-    }
-=======
     localStorage.removeItem("token");
     localStorage.removeItem("userMode");
     localStorage.removeItem("mode");
     navigate("/", { state: { skipPreloader: true } });
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
   };
 
   if (!isTraderMode && !isTransitioning) {
@@ -607,74 +577,6 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex items-center gap-4 pl-4 border-l border-white/10">
-<<<<<<< HEAD
-=======
-                  {}
-                  <div className="relative cursor-pointer group" ref={notifRef}>
-                    <button
-                      onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                      className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors"
-                    >
-                      <Bell size={18} className="text-gray-400 group-hover:text-white transition-colors" />
-                      {unreadCount > 0 && (
-                        <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 bg-[#00f3ff] rounded-full text-[9px] font-black text-[#041317] flex items-center justify-center shadow-[0_0_8px_#00f3ff]">
-                          {unreadCount > 9 ? "9+" : unreadCount}
-                        </span>
-                      )}
-                    </button>
-
-                    {}
-                    {isNotificationsOpen && (
-                      <div className="absolute right-0 top-11 w-80 rounded-xl shadow-2xl border border-white/10 py-2 backdrop-blur-xl z-[100] origin-top-right">
-                        {}
-                        <div className="px-4 py-2 border-b border-white/10 flex justify-between items-center">
-                          <h3 className="font-bold text-sm text-white">Notifications</h3>
-                          <button
-                            onClick={markAllNotificationsRead}
-                            disabled={isMarkingNotifications || unreadCount === 0}
-                            className="text-xs text-[#00f3ff] disabled:text-gray-600 hover:text-[#00f3ff]/70 transition-colors"
-                          >
-                            {isMarkingNotifications ? "Saving..." : "Mark read"}
-                          </button>
-                        </div>
-
-                        {}
-                        <div className="max-h-64 overflow-y-auto">
-                          {isLoadingNotifications ? (
-                            <div className="px-4 py-6 text-xs text-gray-500 text-center">Loading notifications...</div>
-                          ) : notifications.length > 0 ? (
-                            notifications.map((notification) => (
-                              <div
-                                key={notification._id || notification.id}
-                                className="px-4 py-3 border-b border-white/5 hover:bg-white/5 cursor-pointer flex gap-3 transition-colors"
-                              >
-                                <div className="mt-0.5 flex-shrink-0">
-                                  <CheckCircle size={14} className={notification.read ? "text-gray-600" : "text-[#00f3ff]"} />
-                                </div>
-                                <div>
-                                  <p className="text-xs font-semibold text-[#E5E7EB]">{notification.title || notification.message}</p>
-                                  {notification.message && notification.title && (
-                                    <p className="text-[11px] text-gray-400 mt-1">{notification.message}</p>
-                                  )}
-                                  <p className="text-[10px] text-gray-500 mt-1">{formatNotificationTime(notification.createdAt)}</p>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="px-4 py-6 text-xs text-gray-500 text-center">No notifications yet.</div>
-                          )}
-                        </div>
-
-                        {}
-                        <div className="px-4 py-2 text-center text-xs text-gray-500 cursor-pointer hover:text-[#3db26b] transition-colors">
-                          View all activity
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {}
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                   <div className="profile-wrapper" ref={profileRef}>
                     <div
                       onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -715,41 +617,6 @@ export default function Dashboard() {
 
       {}
       {showLogoutModal && (
-<<<<<<< HEAD
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#0B0E14]/90 backdrop-blur-sm p-4">
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0, y: 10 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.95, opacity: 0, y: 10 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="relative w-full max-w-[400px] rounded-[24px] bg-[#1A1D24] p-8 shadow-2xl border border-white/5"
-          >
-            <div className="flex flex-col items-center">
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400">
-                <LogOut size={28} strokeWidth={2} />
-              </div>
-
-              <h3 className="text-2xl font-black text-white mb-2">
-                Sign out?
-              </h3>
-              
-              <p className="text-[15px] text-slate-400 mb-8 text-center">
-                Are you sure you want to sign out?
-              </p>
-
-              <div className="flex w-full gap-3">
-                <button
-                  onClick={() => setShowLogoutModal(false)}
-                  className="flex-1 rounded-[14px] bg-[#2A2E39] py-3.5 text-sm font-bold text-white transition-all hover:bg-[#323744] active:scale-[0.98]"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="flex-1 rounded-[14px] bg-gradient-to-r from-[#FF512F] to-[#F09819] py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-500/20 transition-all hover:opacity-90 active:scale-[0.98]"
-                >
-                  Yes, Sign Out
-=======
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -787,7 +654,6 @@ export default function Dashboard() {
                   className="trader-logout-btn trader-logout-btn-primary flex-1 py-3 rounded-xl font-bold text-[#020617] transition-all"
                 >
                   Yes, Logout
->>>>>>> d95aecbc30ebb22d746689c5bb35c7617c0c1627
                 </button>
               </div>
             </div>

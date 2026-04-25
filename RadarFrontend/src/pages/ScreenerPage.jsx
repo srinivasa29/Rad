@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -636,7 +636,7 @@ const ScreenerPage = () => {
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
             <span>Last Updated: {lastUpdated.toLocaleDateString()} {lastUpdated.toLocaleTimeString()}</span>
-            <span>Data provided by Market Terminal 2.0.4 â€¢ prices delayed by 16 seconds</span>
+            <span>Data provided by Market Terminal 2.0.4 | prices delayed by 16 seconds</span>
           </div>
         </div>
       </div>

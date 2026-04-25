@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   createChart,
@@ -79,15 +79,19 @@ const formatAxisTime = (time, timeframe) => {
   if (timestamp === 0) return '';
   const date = new Date(timestamp * 1000);
 
+  if (timeframe === '1W') {
+    return date.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+  }
+
   if (timeframe === '1D') {
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
   }
 
   if (timeframe === '1H' || timeframe === '4H') {
-    return date.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit' });
+    return date.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
   }
 
-  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return date.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
 };
 
 const buildOhlcv = (symbol, basePrice, timeframe) => {
@@ -456,7 +460,7 @@ function ResearchChartViewport({
 
     setOverlayContext({ chart, candleSeries: series, width: rootRef.current.clientWidth });
 
-    // ── Apply Settings ──
+    // â”€â”€ Apply Settings â”€â”€
     chart.applyOptions({
       grid: {
         vertLines: { visible: settings.grid, color: 'rgba(255, 255, 255, 0.02)' },
@@ -525,7 +529,7 @@ function ResearchChartViewport({
 
     const charts = [chart, rsiChart, macdChart].filter(Boolean);
 
-    // ── Interaction Lock ──
+    // â”€â”€ Interaction Lock â”€â”€
     const isDrawing = DRAW_TOOLS.includes(selectedTool);
     charts.forEach(c => {
       c.applyOptions({
@@ -793,6 +797,19 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
   }, [baseReplayRows.length, chartTimeframes, compareRowsByTimeframe, replayIndex, replayOn]);
 
   const primaryRows = useMemo(() => displayedRowsByTimeframe[chartTimeframes[0]] ?? [], [displayedRowsByTimeframe, chartTimeframes]);
+  const simpleRowWindow = useMemo(() => ({
+    '10m': 72,
+    '15m': 72,
+    '30m': 84,
+    '1H': 96,
+    '4H': 90,
+    '1D': 75,
+    '1W': 52,
+  }), []);
+  const simpleRows = useMemo(() => {
+    const windowSize = simpleRowWindow[timeframe] ?? 72;
+    return primaryRows.slice(-windowSize);
+  }, [primaryRows, simpleRowWindow, timeframe]);
   const ema20 = useMemo(() => calcEma(primaryRows, 20), [primaryRows]);
   const ema50 = useMemo(() => calcEma(primaryRows, 50), [primaryRows]);
   const rsi14 = useMemo(() => calcRsi(primaryRows, 14), [primaryRows]);
@@ -895,17 +912,15 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
       priceLineVisible: true,
       lastValueVisible: true,
     });
-    lineSeries.setData(primaryRows.map((row) => ({ time: row.time, value: row.close })));
+    lineSeries.setData(simpleRows.map((row) => ({ time: row.time, value: row.close })));
     
     const performFit = () => {
-      if (mainChart && primaryRows.length > 0) {
+      if (mainChart && simpleRows.length > 0) {
         const timeScale = mainChart.timeScale();
-        // Force flush left by setting logical range from 0
         timeScale.setVisibleLogicalRange({
           from: 0,
-          to: Math.max(primaryRows.length - 1, 10)
+          to: Math.max(simpleRows.length - 1, 10)
         });
-        // fitContent will adjust barSpacing to fill the width
         timeScale.fitContent();
       }
     };
@@ -921,7 +936,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
         setHoveredPoint(null);
         return;
       }
-      const row = primaryRows[getNearestIndex(primaryRows, normalizeChartTime(param.time, primaryRows))] ?? null;
+      const row = simpleRows[getNearestIndex(simpleRows, normalizeChartTime(param.time, simpleRows))] ?? null;
       if (!row) return;
       setHoveredPoint({ panelId: 'simple', timeframe, row, x: param.point?.x ?? 12, y: param.point?.y ?? 12 });
     });
@@ -941,20 +956,20 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
       resizeObserver.disconnect();
       destroySimpleChart();
     };
-  }, [advanced, primaryRows.length, timeframe, symbol]);
+  }, [advanced, simpleRows, timeframe, symbol]);
 
   // Secondary data-driven fitting effect
   useEffect(() => {
-    if (!advanced && chartRef.current && primaryRows.length > 0) {
+    if (!advanced && chartRef.current && simpleRows.length > 0) {
       const timeScale = chartRef.current.timeScale();
-      timeScale.setVisibleLogicalRange({ from: 0, to: primaryRows.length - 1 });
+      timeScale.setVisibleLogicalRange({ from: 0, to: simpleRows.length - 1 });
       timeScale.fitContent();
       // Final backup fit
       setTimeout(() => {
         if (chartRef.current) chartRef.current.timeScale().fitContent();
       }, 500);
     }
-  }, [primaryRows, advanced]);
+  }, [simpleRows, advanced]);
 
   const requestMoreHistory = useCallback((tf) => {
     setHistoryDepthByTimeframe((current) => ({
@@ -1009,14 +1024,14 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
 
   return (
     <div ref={containerRef} className="flex flex-col h-full bg-[#0f172a] text-slate-300 font-sans selection:bg-cyan-500/30 relative">
-      {/* ── Fullscreen Exit Message ── */}
+      {/* â”€â”€ Fullscreen Exit Message â”€â”€ */}
       {isFullscreen && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 bg-black/60 backdrop-blur-xl border border-white/10 rounded-full text-[10px] font-black text-white/80 uppercase tracking-widest animate-in fade-in slide-in-from-top-4 duration-700">
           Press <span className="text-cyan-400">ESC</span> to exit full screen
         </div>
       )}
 
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <div className="flex items-center justify-between px-6 h-12 border-b border-white/5 bg-[#111827]/80 backdrop-blur-md z-40">
         <div className="flex items-center">
           {advanced && (
@@ -1074,7 +1089,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
 
           {advanced && (
             <>
-              {/* ── Timeframe Dropdown ── */}
+              {/* â”€â”€ Timeframe Dropdown â”€â”€ */}
               <div className="relative border-l border-white/5 pl-6 ml-4">
                 <button
                   onClick={() => { setShowTfMenu(!showTfMenu); setShowTypeMenu(false); setShowIndMenu(false); }}
@@ -1103,7 +1118,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
                 )}
               </div>
 
-              {/* ── Chart Type Dropdown ── */}
+              {/* â”€â”€ Chart Type Dropdown â”€â”€ */}
               <div className="relative border-l border-white/5 pl-4 ml-4">
                 <button
                   onClick={() => { setShowTypeMenu(!showTypeMenu); setShowTfMenu(false); setShowIndMenu(false); }}
@@ -1133,13 +1148,13 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
                 )}
               </div>
 
-              {/* ── Indicators Menu ── */}
+              {/* â”€â”€ Indicators Menu â”€â”€ */}
               <div className="relative border-l border-white/5 pl-4 ml-4">
                 <button
                   onClick={() => { setShowIndMenu(!showIndMenu); setShowTfMenu(false); setShowTypeMenu(false); }}
                   className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-black rounded-lg transition-all ${showIndMenu ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
                 >
-                  <span>ƒₓ</span>
+                  <Activity size={14} />
                   <span className="uppercase tracking-widest text-[10px]">Indicators</span>
                 </button>
                 {showIndMenu && (
@@ -1161,7 +1176,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
                 )}
               </div>
 
-              {/* ── Undo/Redo ── */}
+              {/* â”€â”€ Undo/Redo â”€â”€ */}
               <div className="flex items-center gap-1 border-l border-white/5 pl-4 ml-4">
                 <button className="p-1.5 text-slate-500 hover:text-white transition-colors"><RotateCcw size={16} /></button>
                 <button className="p-1.5 text-slate-500 hover:text-white transition-colors rotate-180 scale-y-[-1]"><RotateCcw size={16} /></button>
@@ -1238,7 +1253,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
       </div>
 
       <div className="flex-1 flex min-h-0 relative bg-[#0f172a]">
-        {/* ── Fixed Left Sidebar Toolbar (Advanced Only) ── */}
+        {/* â”€â”€ Fixed Left Sidebar Toolbar (Advanced Only) â”€â”€ */}
         {advanced && (
           <div className="w-14 border-r border-white/5 bg-[#111827]/40 flex flex-col items-center py-4 gap-4 z-40">
             <div className="flex flex-col gap-2">
@@ -1267,7 +1282,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
           </div>
         )}
 
-        {/* ── Main Viewport Area ── */}
+        {/* â”€â”€ Main Viewport Area â”€â”€ */}
         <div className="flex-1 flex flex-col min-w-0 bg-[#0f172a] relative">
           {advanced ? (
             <div className={`grid h-full w-full gap-px bg-white/5 ${
@@ -1303,7 +1318,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
             <div ref={mainRef} className="h-full w-full" />
           )}
 
-          {/* ── Advanced Settings Overlay ── */}
+          {/* â”€â”€ Advanced Settings Overlay â”€â”€ */}
           {showSettings && (
             <div className="absolute top-4 right-4 w-80 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in duration-200">
               <div className="p-5 border-b border-white/5 flex items-center justify-between">
@@ -1369,7 +1384,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
           )}
         </div>
 
-        {/* ── Left Sidebar: Drawing Tools (Advanced Only) ── */}
+        {/* â”€â”€ Left Sidebar: Drawing Tools (Advanced Only) â”€â”€ */}
         {advanced && (
           <div className="w-14 border-r border-white/5 bg-[#0f172a] flex flex-col items-center py-4 gap-4 z-40">
             {[
@@ -1399,7 +1414,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
           </div>
         )}
 
-        {/* ── Center Viewport: Chart Stack ── */}
+        {/* â”€â”€ Center Viewport: Chart Stack â”€â”€ */}
         <div className="flex-1 flex flex-col min-w-0 bg-[#0f172a]">
           {advanced ? (
             <div className="flex-1 flex flex-col min-h-0">
@@ -1463,7 +1478,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
           )}
         </div>
 
-        {/* ── Right Panel: Insights & Signals (Advanced Only) ── */}
+        {/* â”€â”€ Right Panel: Insights & Signals (Advanced Only) â”€â”€ */}
         {advanced && (
           <div className="w-[300px] border-l border-white/5 bg-[#0f172a] flex flex-col z-30 animate-in slide-in-from-right duration-500">
             <div className="p-4 border-b border-white/5 flex items-center justify-between">
@@ -1541,7 +1556,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
         )}
       </div>
 
-      {/* ── Research Footer ── */}
+      {/* â”€â”€ Research Footer â”€â”€ */}
       <div className="h-8 border-t border-white/5 bg-[#111827] flex items-center justify-between px-4 z-40">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
