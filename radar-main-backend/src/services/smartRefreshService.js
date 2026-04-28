@@ -3,7 +3,9 @@
 const freeApiAggregator = require('./freeApiAggregator');
 const incrementalUpdateService = require('./incrementalUpdateService');
 const marketHoursService = require('./marketHoursService');
+const ohlcService = require('./ohlcService');
 const logger = require('../utils/logger');
+const { getActiveSymbols, SEED_SYMBOLS } = require('../utils/symbolRegistry');
 
 class SmartRefreshService {
   constructor() {
@@ -20,7 +22,7 @@ class SmartRefreshService {
     };
 
     this.symbolTiers = {
-      tier1: this.getNifty50Symbols(),
+      tier1: SEED_SYMBOLS, // initialised with seed; replaced from DB after start()
       tier2: [],
       tier3: [],
     };
@@ -45,6 +47,16 @@ class SmartRefreshService {
 
     this.isRunning = true;
     logger.info('Starting smart refresh service');
+
+    // Hydrate tier1 from DB asynchronously; fall back to seed if DB unavailable
+    getActiveSymbols().then(symbols => {
+      if (symbols.length > 0) {
+        this.symbolTiers.tier1 = symbols;
+        logger.info(`SmartRefresh tier1: loaded ${symbols.length} symbols from DB`);
+      }
+    }).catch(err => {
+      logger.warn(`SmartRefresh: could not load DB symbols (${err.message}), using seed`);
+    });
 
     this.startTierRefresh('tier1', this.refreshIntervals.tier1);
     this.startTierRefresh('tier2', this.refreshIntervals.tier2);
@@ -81,7 +93,7 @@ class SmartRefreshService {
         this.stats[`${tier}Refreshes`]++;
         this.stats.totalRefreshes++;
       } catch (error) {
-        logger.error(`Error refreshing ${tier}:`, error.message);
+        logger.error(`Error refreshing ${tier}: ${error.message}`);
         this.stats.errors++;
       }
 
@@ -108,7 +120,38 @@ class SmartRefreshService {
           }
 
           if (tier === 'tier1') {
-            const result = await freeApiAggregator.getQuote(`${symbol}.NS`, {
+            // Crypto gets live prices via Binance — skip quote fetch
+            const symClean = String(symbol).toUpperCase().replace(/USDT$/i,'').replace(/\.(NS|BO)$/i,'');
+            const CRYPTO_SET = new Set(['BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK','AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT','ARB','OP','INJ','SUI','SEI','PEPE','WIF','TON','FLOKI','BONK']);
+            if (CRYPTO_SET.has(symClean) || symbol.toUpperCase().endsWith('USDT')) {
+              this.lastRefresh[tier][symbol] = Date.now();
+              successCount++;
+              continue;
+            }
+
+            // ── DB-FIRST: check if we already have a fresh candle in our database ──
+            // Backfilled candles have a daily timestamp; treat anything from today
+            // OR yesterday (for after-hours) as fresh — no external API needed.
+            const dbSymbol = symClean; // strip .NS/.BO for OHLC lookup
+            try {
+              const latest = await ohlcService.getLatest(dbSymbol, '1d');
+              if (latest.success && latest.data) {
+                const candleAge = Date.now() - new Date(latest.data.timestamp).getTime();
+                const TWO_TRADING_DAYS_MS = 2 * 24 * 60 * 60 * 1000; // 48 h covers weekends
+                if (candleAge <= TWO_TRADING_DAYS_MS) {
+                  // DB has recent data — no API call needed
+                  this.lastRefresh[tier][symbol] = Date.now();
+                  successCount++;
+                  continue;
+                }
+              }
+            } catch (_dbErr) {
+              // DB check failed — fall through to API
+            }
+
+            // DB data is missing or too old — fetch from external API
+            const quoteSym = symbol.endsWith('.NS') || symbol.endsWith('.BO') ? symbol : `${symbol}.NS`;
+            const result = await freeApiAggregator.getQuote(quoteSym, {
               preferredSource: 'auto',
               maxAge: 60000,
             });
@@ -132,7 +175,7 @@ class SmartRefreshService {
 
           await this.sleep(200);
         } catch (error) {
-          logger.error(`Error refreshing ${symbol}:`, error.message);
+          logger.error(`Error refreshing ${symbol}: ${error.message}`);
           failCount++;
         }
       }
@@ -252,19 +295,9 @@ class SmartRefreshService {
   }
 
   
+  /** @deprecated Use symbolRegistry.getActiveSymbols() instead */
   getNifty50Symbols() {
-    return [
-      'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK',
-      'HINDUNILVR', 'ITC', 'SBIN', 'BHARTIARTL', 'KOTAKBANK',
-      'LT', 'AXISBANK', 'ASIANPAINT', 'MARUTI', 'HCLTECH',
-      'BAJFINANCE', 'WIPRO', 'ULTRACEMCO', 'TITAN', 'NESTLEIND',
-      'SUNPHARMA', 'TECHM', 'ONGC', 'NTPC', 'POWERGRID',
-      'M&M', 'TATASTEEL', 'ADANIPORTS', 'BAJAJFINSV', 'JSWSTEEL',
-      'INDUSINDBK', 'TATAMOTORS', 'HINDALCO', 'DIVISLAB', 'COALINDIA',
-      'DRREDDY', 'EICHERMOT', 'CIPLA', 'GRASIM', 'BRITANNIA',
-      'HEROMOTOCO', 'SHREECEM', 'APOLLOHOSP', 'UPL', 'BPCL',
-      'TATACONSUM', 'SBILIFE', 'ADANIENT', 'HDFCLIFE', 'BAJAJ-AUTO',
-    ];
+    return SEED_SYMBOLS;
   }
 
   

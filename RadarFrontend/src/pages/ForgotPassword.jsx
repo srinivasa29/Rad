@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import AuthLayout from '../components/auth/AuthLayout';
+import api from '../api/api';
 
 export default function ForgotPassword() {
     const [email, setEmail] = useState('');
     const [status, setStatus] = useState('idle');
     const [message, setMessage] = useState('');
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (!email) {
             setStatus('error');
@@ -17,10 +18,14 @@ export default function ForgotPassword() {
         }
         setStatus('loading');
 
-        setTimeout(() => {
+        try {
+            const res = await api.post('/auth/forgot-password', { email });
             setStatus('success');
             setMessage('Password reset link sent to ' + email);
-        }, 1500);
+        } catch (error) {
+            setStatus('error');
+            setMessage(error.response?.data?.error || 'Failed to send reset link. Please try again.');
+        }
     };
 
     return (

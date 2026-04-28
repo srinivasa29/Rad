@@ -191,10 +191,10 @@ export const fetchNewsForStock = async (symbol, limit = 20) => {
 };
 
 
-export const fetchMarketNews = async (limit = 20) => {
+export const fetchMarketNews = async (params = { limit: 20 }) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/news`, {
-      params: { limit },
+    const response = await axios.get(`${API_BASE_URL}/news/general`, {
+      params: typeof params === 'number' ? { limit: params } : params,
     });
     return response.data;
   } catch (error) {

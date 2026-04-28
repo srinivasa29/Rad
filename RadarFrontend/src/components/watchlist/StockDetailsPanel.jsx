@@ -110,7 +110,7 @@ const StockDetailsPanel = ({ stock, onClose, onAddAlert, mode = 'research', onRe
           <div className="flex items-baseline justify-between gap-3">
             <div>
               <div className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold mb-1">Spot Price context</div>
-              <span className="block text-4xl font-bold tracking-tight text-white">â‚¹{price.toLocaleString()}</span>
+              <span className="block text-4xl font-bold tracking-tight text-white">₹{price.toLocaleString()}</span>
             </div>
             <div className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-bold ${change > 0 ? 'border-emerald-900/50 bg-emerald-500/5 text-emerald-500/80' : 'border-rose-900/50 bg-rose-500/5 text-rose-500/80'}`}>
               {change > 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
@@ -131,15 +131,15 @@ const StockDetailsPanel = ({ stock, onClose, onAddAlert, mode = 'research', onRe
           </div>
           <div className="rounded-xl border border-white/5 bg-slate-900 p-2.5">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">VWAP</p>
-            <p className="mt-1 text-base font-black text-slate-100">â‚¹{vwap.toFixed(0)}</p>
+            <p className="mt-1 text-base font-black text-slate-100">₹{vwap.toFixed(0)}</p>
           </div>
           <div className="rounded-xl border border-white/5 bg-slate-900 p-2.5">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">52W High</p>
-            <p className="mt-1 text-base font-black text-slate-100">â‚¹{high52w.toFixed(0)}</p>
+            <p className="mt-1 text-base font-black text-slate-100">₹{high52w.toFixed(0)}</p>
           </div>
           <div className="rounded-xl border border-white/5 bg-slate-900 p-2.5">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">52W Low</p>
-            <p className="mt-1 text-base font-black text-slate-100">â‚¹{low52w.toFixed(0)}</p>
+            <p className="mt-1 text-base font-black text-slate-100">₹{low52w.toFixed(0)}</p>
           </div>
         </div>
 
@@ -188,7 +188,7 @@ const StockDetailsPanel = ({ stock, onClose, onAddAlert, mode = 'research', onRe
                         borderRadius: '4px',
                         fontSize: '10px'
                       }}
-                      formatter={(value) => `â‚¹${value.toFixed(2)}`}
+                      formatter={(value) => `₹${value.toFixed(2)}`}
                     />
                     <Area type="monotone" dataKey="price" stroke="#94a3b8" fill="url(#colorPrice)" strokeWidth={1.5} />
                   </AreaChart>
@@ -218,7 +218,7 @@ const StockDetailsPanel = ({ stock, onClose, onAddAlert, mode = 'research', onRe
                   {orderBook.bids.map((bid, i) => (
                     <div key={i} className={`rounded-lg p-2 border border-emerald-900/10 bg-emerald-900/5`}>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-400 font-medium">â‚¹{bid.price.toFixed(1)}</span>
+                        <span className="text-slate-400 font-medium">₹{bid.price.toFixed(1)}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-slate-600 text-[10px]">{bid.quantity}</span>
                           <div className="w-10 h-1 bg-slate-800 rounded-full overflow-hidden">
@@ -240,7 +240,7 @@ const StockDetailsPanel = ({ stock, onClose, onAddAlert, mode = 'research', onRe
                   {orderBook.asks.map((ask, i) => (
                     <div key={i} className={`rounded-lg p-2 border border-rose-900/10 bg-rose-900/5`}>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-400 font-medium">â‚¹{ask.price.toFixed(1)}</span>
+                        <span className="text-slate-400 font-medium">₹{ask.price.toFixed(1)}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-slate-600 text-[10px]">{ask.quantity}</span>
                           <div className="w-10 h-1 bg-slate-800 rounded-full overflow-hidden">
@@ -275,7 +275,7 @@ const StockDetailsPanel = ({ stock, onClose, onAddAlert, mode = 'research', onRe
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-bold text-slate-200">â‚¹{trade.price.toFixed(2)}</p>
+                    <p className="text-xs font-bold text-slate-200">₹{trade.price.toFixed(2)}</p>
                   </div>
                 </div>
               ))}

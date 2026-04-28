@@ -1,56 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './TradingWatchlistGrid.css';
 
-const MOCK_ROWS = [
-  {
-    id: 101,
-    symbol: 'RELIANCE',
-    name: 'Reliance Industries',
-    sector: 'Energy',
-    price: 2845.5,
-    change: 22.6,
-    changePct: 0.8,
-    volume: 3250000,
-    pe: 26.4,
-    notes: 'Breakout retest',
-    open: 2818,
-    dayHigh: 2864,
-    dayLow: 2792,
-    vwap: 2833,
-  },
-  {
-    id: 102,
-    symbol: 'INFY',
-    name: 'Infosys',
-    sector: 'IT',
-    price: 1520.25,
-    change: 28.5,
-    changePct: 1.91,
-    volume: 1950000,
-    pe: 31.2,
-    notes: 'Strong momentum',
-    open: 1492,
-    dayHigh: 1528,
-    dayLow: 1488,
-    vwap: 1511,
-  },
-  {
-    id: 103,
-    symbol: 'HDFCBANK',
-    name: 'HDFC Bank',
-    sector: 'Banking',
-    price: 1618.75,
-    change: -6.7,
-    changePct: -0.41,
-    volume: 2840000,
-    pe: 19.7,
-    notes: 'Range bound',
-    open: 1624,
-    dayHigh: 1631,
-    dayLow: 1609,
-    vwap: 1620,
-  },
-];
+// Empty fallback — real data is provided by the parent via the `stocks` prop
+// (AdvancedWatchlistDashboard loads from the backend; this array is never shown in production)
+const MOCK_ROWS = [];
 
 const COLUMNS = [
   { key: 'symbol', label: 'Symbol', sortable: false },

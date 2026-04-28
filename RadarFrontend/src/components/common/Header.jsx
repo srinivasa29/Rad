@@ -15,6 +15,7 @@ import {
     TrendingUp,
     LogOut,
     Menu,
+    GraduationCap,
 } from "lucide-react";
 import { useHeaderData } from "../../hooks/useHeaderData";
 import { fetchMarketData, fetchTrendingSearches, logSearchQuery } from "../../api/marketApi";
@@ -150,11 +151,12 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                         { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard },
                         { id: 'WATCHLIST', label: 'Watchlist', icon: Star },
                         { id: 'SCREENERS', label: 'Screeners', icon: Filter },
-                        { id: 'NEWS', label: 'News', icon: Newspaper }
+                        { id: 'NEWS', label: 'News', icon: Newspaper },
+                        { id: 'ACADEMY', label: 'Academy', icon: GraduationCap }
                     ].map((item) => (
                         <button
                             key={item.id}
-                            onClick={() => setActiveModule ? setActiveModule(item.id) : navigate('/dashboard?module=' + item.id)}
+                            onClick={() => setActiveModule ? setActiveModule(item.id) : navigate('/investor/dashboard')}
                             className="flex items-center gap-2.5 text-[13px] font-black tracking-tight transition-all duration-300 opacity-100 hover:text-blue-700"
                             style={{ color: '#3E84F6' }}
                         >
@@ -245,7 +247,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                                         {notifications && notifications.length > 0 ? notifications.map((n, i) => (
                                             <div 
                                                 key={i} 
-                                                onClick={() => markSingleRead(n._id)}
+                                                onClick={() => markSingleRead(n._id || n.id)}
                                                 className={`px-4 py-3 border-b border-blue-50 cursor-pointer transition-colors hover:bg-blue-50/50 flex gap-3 ${!n.read ? 'bg-blue-50/30' : ''}`}
                                             >
                                                 <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${!n.read ? 'bg-blue-500' : 'bg-transparent'}`} />
@@ -288,21 +290,21 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                                     {/* Menu Links */}
                                     <div className="py-2.5 bg-white">
                                         <Link 
-                                            to="/profile" 
+                                            to="/investor/profile" 
                                             onClick={() => setIsProfileOpen(false)} 
                                             className="group flex items-center gap-4 px-6 py-3 text-sm font-bold text-[#475569] hover:bg-slate-50 transition-all"
                                         >
                                             <User size={18} className="text-[#64748b]" /> My Profile
                                         </Link>
                                         <Link 
-                                            to="/settings" 
+                                            to="/investor/settings" 
                                             onClick={() => setIsProfileOpen(false)} 
                                             className="group flex items-center gap-4 px-6 py-3 text-sm font-bold text-[#475569] hover:bg-slate-50 transition-all"
                                         >
                                             <Settings size={18} className="text-[#64748b]" /> Settings
                                         </Link>
                                         <Link
-                                            to="/support/investor"
+                                            to="/investor/support"
                                             onClick={() => setIsProfileOpen(false)}
                                             className="group flex items-center gap-4 px-6 py-3 text-sm font-bold text-[#475569] hover:bg-slate-50 transition-all"
                                         >
@@ -323,7 +325,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                                                     localStorage.setItem('mode', 'INVESTOR');
                                                     updateUserMode('INVESTOR').catch(() => {});
                                                     setIsProfileOpen(false);
-                                                    navigate('/dashboard/investor');
+                                                    navigate('/investor/dashboard');
                                                 }}
                                                 className="relative z-10 flex-1 flex items-center justify-center gap-2 h-full bg-white rounded-full shadow-md text-xs font-black text-[#2563EB]"
                                             >
@@ -334,7 +336,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                                                     localStorage.setItem('mode', 'TRADER');
                                                     updateUserMode('TRADER').catch(() => {});
                                                     setIsProfileOpen(false);
-                                                    navigate('/dashboard/trader');
+                                                    navigate('/trader/dashboard');
                                                 }}
                                                 className="relative z-10 flex-1 flex items-center justify-center gap-2 h-full text-xs font-bold text-[#94A3B8]"
                                             >

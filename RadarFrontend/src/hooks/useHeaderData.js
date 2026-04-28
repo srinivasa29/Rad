@@ -99,9 +99,9 @@ export const useHeaderData = () => {
         try {
             setIsLoadingNotifications(true);
             const response = await fetchNotifications();
-            const resolvedNotifications = Array.isArray(response) && response.length > 0
+            const resolvedNotifications = Array.isArray(response)
                 ? response
-                : fallbackNotifications;
+                : [];
 
             setNotifications(resolvedNotifications);
             return resolvedNotifications;

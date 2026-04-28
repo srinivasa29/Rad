@@ -104,11 +104,14 @@
 }
 
 .ticker-wrapper-track--animated {
-  animation: tickerMarquee 160s linear infinite;
+  animation: tickerMarquee var(--ticker-duration, 30s) linear infinite;
 }
 
-.ticker-track:hover {
+/* Freeze completely on hover */
+.ticker-wrapper-track--animated:hover,
+.ticker-center-scroll-wrap:hover .ticker-wrapper-track--animated {
   animation-play-state: paused;
+  cursor: default;
 }
 
 @keyframes tickerMarquee {
@@ -116,7 +119,7 @@
     transform: translateX(0);
   }
   to {
-    transform: translateX(-50%);
+    transform: translateX(-33.333%);
   }
 }
 

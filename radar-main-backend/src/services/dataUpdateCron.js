@@ -3,6 +3,7 @@
 const cron = require('node-cron');
 const incrementalUpdateService = require('./incrementalUpdateService');
 const marketHoursService = require('./marketHoursService');
+const { invalidateSectorCache } = require('./sectorService');
 const logger = require('../utils/logger');
 
 class DataUpdateCron {
@@ -55,12 +56,12 @@ class DataUpdateCron {
       
       logger.info('Cron: Checking if update is needed', {
         isMarketOpen: marketStatus.isOpen,
-        shouldFetch: marketStatus.shouldFetchUpdates,
+        isPostMarket: marketHoursService.isPostMarket(),
         currentTime: marketStatus.currentTime,
       });
 
-      if (!marketStatus.shouldFetchUpdates) {
-        logger.info('Cron: Market closed - skipping update');
+      if (!marketHoursService.isPostMarket()) {
+        logger.info('Cron: Active market hours - skipping heavy backfill to conserve API calls');
         return;
       }
 
@@ -78,6 +79,9 @@ class DataUpdateCron {
           newCandles: result.newCandles,
           time: `${Math.round(result.totalTime / 1000)}s`,
         });
+        // Invalidate sector cache so next request reflects fresh backfilled data
+        invalidateSectorCache();
+        logger.info('Cron: Sector performance cache invalidated');
       } else if (result.skipped) {
         logger.info('Cron: Update skipped', { reason: result.message });
       } else {
@@ -95,11 +99,11 @@ class DataUpdateCron {
       
       logger.info('Running initial data check on startup', {
         isMarketOpen: marketStatus.isOpen,
-        shouldFetch: marketStatus.shouldFetchUpdates,
+        isPostMarket: marketHoursService.isPostMarket(),
       });
 
-      if (marketStatus.shouldFetchUpdates) {
-        logger.info('Market is active - running initial update...');
+      if (marketHoursService.isPostMarket()) {
+        logger.info('Nighttime detected - running initial backfill update...');
         const result = await incrementalUpdateService.updateAllSymbols();
         
         if (result.success && !result.skipped) {
@@ -107,10 +111,12 @@ class DataUpdateCron {
             newCandles: result.newCandles,
             symbolsProcessed: result.symbolsProcessed,
           });
+          // Invalidate sector cache after initial backfill
+          invalidateSectorCache();
         }
       } else {
-        logger.info('Market closed - skipping initial update', {
-          nextOpen: marketStatus.nextOpen,
+        logger.info('Active market hours - skipping initial heavy backfill', {
+          nextClose: marketStatus.nextClose,
         });
       }
     } catch (error) {

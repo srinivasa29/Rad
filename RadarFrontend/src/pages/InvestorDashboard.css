@@ -349,3 +349,24 @@
     border-color: #D1D5DB !important;
     color: #4B5563 !important;
 }
+
+/* Custom Scrollbar Styles for Investor Theme */
+.investor-theme .custom-scrollbar::-webkit-scrollbar {
+    width: 6px !important;
+    height: 6px !important;
+}
+
+.investor-theme .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+
+.investor-theme .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1 !important; /* light slate gray */
+    border-radius: 10px !important;
+    border: 2px solid transparent !important;
+    background-clip: content-box !important;
+}
+
+.investor-theme .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8 !important;
+}

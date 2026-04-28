@@ -4,6 +4,7 @@ const logger = require('../config/logger');
 
 
 
+// ── Nifty 50 (all current constituents) ──────────────────────────────────
 const NIFTY_50_SYMBOLS = [
     'RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'ICICIBANK.NS',
     'HINDUNILVR.NS', 'ITC.NS', 'SBIN.NS', 'BHARTIARTL.NS', 'KOTAKBANK.NS',
@@ -14,7 +15,63 @@ const NIFTY_50_SYMBOLS = [
     'INDUSINDBK.NS', 'TATAMOTORS.NS', 'HINDALCO.NS', 'DIVISLAB.NS', 'COALINDIA.NS',
     'DRREDDY.NS', 'EICHERMOT.NS', 'CIPLA.NS', 'GRASIM.NS', 'BRITANNIA.NS',
     'HEROMOTOCO.NS', 'SHREECEM.NS', 'APOLLOHOSP.NS', 'UPL.NS', 'BPCL.NS',
-    'TATACONSUM.NS', 'SBILIFE.NS', 'ADANIENT.NS', 'HDFCLIFE.NS', 'BAJAJ-AUTO.NS'
+    'TATACONSUM.NS', 'SBILIFE.NS', 'ADANIENT.NS', 'HDFCLIFE.NS', 'BAJAJ-AUTO.NS',
+];
+
+// ── Nifty Next 50 ────────────────────────────────────────────────────────
+const NIFTY_NEXT_50_SYMBOLS = [
+    'ABB.NS', 'ADANIGREEN.NS', 'ADANITRANS.NS', 'AMBUJACEM.NS', 'AUROPHARMA.NS',
+    'BAJAJHLDNG.NS', 'BANKBARODA.NS', 'BEL.NS', 'BERGEPAINT.NS', 'BOSCHLTD.NS',
+    'CANBK.NS', 'CHOLAFIN.NS', 'COLPAL.NS', 'DABUR.NS', 'DMART.NS',
+    'DLF.NS', 'GAIL.NS', 'GODREJCP.NS', 'GODREJPROP.NS', 'HAVELLS.NS',
+    'ICICIGI.NS', 'ICICIPRULI.NS', 'INDHOTEL.NS', 'IOC.NS', 'IRCTC.NS',
+    'JINDALSTEL.NS', 'LICI.NS', 'LUPIN.NS', 'MANKIND.NS', 'MARICO.NS',
+    'MOTHERSON.NS', 'MUTHOOTFIN.NS', 'NAUKRI.NS', 'OBEROIRLTY.NS', 'OFSS.NS',
+    'PAGEIND.NS', 'PATANJALI.NS', 'PEL.NS', 'PERSISTENT.NS', 'PETRONET.NS',
+    'PFC.NS', 'PIDILITIND.NS', 'PIIND.NS', 'PNB.NS', 'RECLTD.NS',
+    'SAIL.NS', 'SIEMENS.NS', 'TORNTPHARM.NS', 'TRENT.NS', 'VEDL.NS',
+];
+
+// ── Nifty Midcap 100 — top picks ────────────────────────────────────────
+const NIFTY_MIDCAP_SYMBOLS = [
+    'ABCAPITAL.NS', 'ABFRL.NS', 'ALKEM.NS', 'APLLTD.NS', 'ASTRAL.NS',
+    'ATUL.NS', 'AUBANK.NS', 'AWHCL.NS', 'BANDHANBNK.NS', 'BSOFT.NS',
+    'CAMS.NS', 'CANFINHOME.NS', 'CASTROLIND.NS', 'CEATLTD.NS', 'CESC.NS',
+    'COFORGE.NS', 'CONCOR.NS', 'CROMPTON.NS', 'CUB.NS', 'DEEPAKFERT.NS',
+    'DIXON.NS', 'EMAMILTD.NS', 'ESCORTS.NS', 'FEDERALBNK.NS', 'FINOLEXIND.NS',
+    'GLENMARK.NS', 'GMRINFRA.NS', 'GRINDWELL.NS', 'HAL.NS', 'HONAUT.NS',
+    'IDBI.NS', 'IDFC.NS', 'IDFCFIRSTB.NS', 'IGL.NS', 'INDIANB.NS',
+    'INDIGO.NS', 'IPCA.NS', 'JKCEMENT.NS', 'JUBLPHARMA.NS', 'KAJARIACER.NS',
+    'KANSAINER.NS', 'KEI.NS', 'KPITTECH.NS', 'LALPATHLAB.NS', 'LAURUSLABS.NS',
+    'LTTS.NS', 'MFSL.NS', 'MINDTREE.NS', 'MRF.NS', 'MUTHOOTFIN.NS',
+];
+
+// ── Extra Sectoral / Thematic picks ────────────────────────────────────
+const SECTORAL_SYMBOLS = [
+    // IT & Tech
+    'COFORGE.NS', 'MPHASIS.NS', 'HEXAWARE.NS', 'NIITTECH.NS', 'ZENSARTECH.NS',
+    'RATEGAIN.NS', 'MASTEK.NS', 'TATAELXSI.NS', 'KFINTECH.NS', 'ANGELONE.NS',
+    // Banking & Finance
+    'RBLBANK.NS', 'KARURVYSYA.NS', 'SOUTHBANK.NS', 'DCBBANK.NS', 'LAKSHVILAS.NS',
+    'CHOLAFIN.NS', 'BAJAJHFL.NS', 'AAVAS.NS', 'HOMEFIRST.NS', 'CREDITACC.NS',
+    // Pharma & Healthcare
+    'ALEMBICLTD.NS', 'NATCOPHARM.NS', 'GRANULES.NS', 'AJANTPHARM.NS', 'JBCHEPHARM.NS',
+    'FORTIS.NS', 'NARAYANHRUL.NS', 'MAXHEALTH.NS', 'METROPOLIS.NS', 'THYROCARE.NS',
+    // Auto & EV
+    'TVSMOTOR.NS', 'BAJAJHIND.NS', 'ASHOKLEY.NS', 'ESCORTS.NS', 'BHEL.NS',
+    'OLECTRA.NS', 'GREENPANEL.NS', 'CRAFTSMAN.NS', 'TIINDIA.NS', 'SWARAJENG.NS',
+    // Consumer & FMCG
+    'VBL.NS', 'RADICO.NS', 'UNITDSPR.NS', 'TASTY.NS', 'HONASA.NS',
+    'SAPPHIRE.NS', 'MANYAVAR.NS', 'ZOMATO.NS', 'NYKAA.NS', 'CAMPUS.NS',
+    // Infra & Real Estate
+    'PRESTIGE.NS', 'SOBHA.NS', 'BRIGADE.NS', 'MAHLIFE.NS', 'LODHA.NS',
+    'NBCC.NS', 'IRCON.NS', 'RITES.NS', 'KEC.NS', 'KALPATPOWR.NS',
+    // Energy & Power
+    'TORNTPOWER.NS', 'TATAPOWER.NS', 'CESC.NS', 'JSWENERGY.NS', 'ADANIPOWER.NS',
+    'NHPC.NS', 'SJVN.NS', 'IREDA.NS', 'RPOWER.NS', 'INDIAGRID.NS',
+    // PSUs
+    'RVNL.NS', 'IRFC.NS', 'HUDCO.NS', 'RAILTEL.NS', 'MAZAGON.NS',
+    'COCHINSHIP.NS', 'GRSE.NS', 'BDL.NS', 'BEML.NS', 'MIDHANI.NS',
 ];
 
 const SENSEX_30_SYMBOLS = [
@@ -23,7 +80,17 @@ const SENSEX_30_SYMBOLS = [
     'LT.BO', 'AXISBANK.BO', 'ASIANPAINT.BO', 'MARUTI.BO', 'HCLTECH.BO',
     'BAJFINANCE.BO', 'WIPRO.BO', 'ULTRACEMCO.BO', 'TITAN.BO', 'NESTLEIND.BO',
     'SUNPHARMA.BO', 'TECHM.BO', 'M&M.BO', 'TATASTEEL.BO', 'NTPC.BO',
-    'POWERGRID.BO', 'INDUSINDBK.BO', 'TATAMOTORS.BO', 'DRREDDY.BO', 'BAJAJFINSV.BO'
+    'POWERGRID.BO', 'INDUSINDBK.BO', 'TATAMOTORS.BO', 'DRREDDY.BO', 'BAJAJFINSV.BO',
+];
+
+// All NSE equity symbols combined (deduped)
+const ALL_NSE_SYMBOLS = [
+    ...new Set([
+        ...NIFTY_50_SYMBOLS,
+        ...NIFTY_NEXT_50_SYMBOLS,
+        ...NIFTY_MIDCAP_SYMBOLS,
+        ...SECTORAL_SYMBOLS,
+    ])
 ];
 
 class HistoricalDataBackfillService {
@@ -188,29 +255,74 @@ class HistoricalDataBackfillService {
     }
 
     
-    async backfillTopIndianStocks(timeframe = '1d', range = '1y') {
-        logger.info('ðŸš€ Starting full Indian stocks backfill');
-
-        const niftyResults = await this.backfillNifty50(timeframe, range);
-        
-
-        return {
-            nifty50: niftyResults,
-            totalSuccess: niftyResults.success.length,
-            totalFailed: niftyResults.failed.length,
-            totalSkipped: niftyResults.skipped.length,
-        };
+    async backfillNiftyNext50(timeframe = '1d', range = '1y') {
+        logger.info('🚀 Starting Nifty Next 50 backfill');
+        return this._backfillList(NIFTY_NEXT_50_SYMBOLS, 'NSE', timeframe, range, 'Nifty Next 50');
     }
 
-    
-    getNifty50Symbols() {
-        return NIFTY_50_SYMBOLS;
+    async backfillMidcap(timeframe = '1d', range = '1y') {
+        logger.info('🚀 Starting Nifty Midcap backfill');
+        return this._backfillList(NIFTY_MIDCAP_SYMBOLS, 'NSE', timeframe, range, 'Midcap 100');
     }
 
-    
-    getSensex30Symbols() {
-        return SENSEX_30_SYMBOLS;
+    async backfillSectoral(timeframe = '1d', range = '1y') {
+        logger.info('🚀 Starting Sectoral stocks backfill');
+        return this._backfillList(SECTORAL_SYMBOLS, 'NSE', timeframe, range, 'Sectoral');
     }
+
+    /**
+     * Backfill the full NSE universe (~200 symbols).
+     * Runs batches of 10 concurrently with 500ms between batches to respect rate limits.
+     */
+    async backfillFullUniverse(timeframe = '1d', range = '1y') {
+        logger.info(`🚀 Starting FULL NSE universe backfill — ${ALL_NSE_SYMBOLS.length} symbols`);
+        const BATCH_SIZE = 10;
+        const results = { success: [], failed: [], skipped: [], total: ALL_NSE_SYMBOLS.length };
+
+        for (let i = 0; i < ALL_NSE_SYMBOLS.length; i += BATCH_SIZE) {
+            const batch = ALL_NSE_SYMBOLS.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.allSettled(
+                batch.map(sym => this.backfillSymbol(sym, 'NSE', timeframe, range))
+            );
+            batchResults.forEach((r, idx) => {
+                const sym = batch[idx];
+                if (r.status === 'rejected') { results.failed.push({ symbol: sym, reason: r.reason?.message }); }
+                else if (r.value?.skipped) { results.skipped.push(sym); }
+                else if (r.value?.success) { results.success.push({ symbol: sym, count: r.value.count }); }
+                else { results.failed.push({ symbol: sym, reason: r.value?.message }); }
+            });
+            logger.info(`  Batch ${Math.floor(i/BATCH_SIZE)+1}: ${results.success.length} ok, ${results.failed.length} fail, ${results.skipped.length} skip`);
+            if (i + BATCH_SIZE < ALL_NSE_SYMBOLS.length) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+
+        logger.info(`✅ Full universe backfill done — success:${results.success.length} fail:${results.failed.length} skip:${results.skipped.length}`);
+        return results;
+    }
+
+    /** Internal helper used by all index-specific backfill methods */
+    async _backfillList(symbolList, exchange, timeframe, range, label) {
+        const results = { success: [], failed: [], skipped: [], total: symbolList.length };
+        for (let i = 0; i < symbolList.length; i++) {
+            const symbol = symbolList[i];
+            logger.info(`[${label}] [${i + 1}/${symbolList.length}] Processing ${symbol}`);
+            const result = await this.backfillSymbol(symbol, exchange, timeframe, range);
+            if (result.skipped) results.skipped.push(symbol);
+            else if (result.success) results.success.push({ symbol, count: result.count });
+            else results.failed.push({ symbol, reason: result.message });
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        logger.info(`✅ ${label} backfill: ${results.success.length} ok, ${results.failed.length} fail, ${results.skipped.length} skip`);
+        return results;
+    }
+
+    getNifty50Symbols() { return NIFTY_50_SYMBOLS; }
+    getNiftyNext50Symbols() { return NIFTY_NEXT_50_SYMBOLS; }
+    getMidcapSymbols() { return NIFTY_MIDCAP_SYMBOLS; }
+    getSectoralSymbols() { return SECTORAL_SYMBOLS; }
+    getAllNseSymbols() { return ALL_NSE_SYMBOLS; }
+    getSensex30Symbols() { return SENSEX_30_SYMBOLS; }
 }
 
 module.exports = new HistoricalDataBackfillService();

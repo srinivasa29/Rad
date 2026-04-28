@@ -2,6 +2,7 @@
 
 const NodeCache = require('node-cache');
 const logger = require('../utils/logger');
+const { getActiveSymbols, SEED_SYMBOLS } = require('../utils/symbolRegistry');
 
 class EnhancedCacheService {
   constructor() {
@@ -38,7 +39,8 @@ class EnhancedCacheService {
       deletes: { quotes: 0, ohlc: 0, company: 0, symbols: 0 },
     };
 
-    this.warmupSymbols = this.getNifty50Symbols();
+    this.warmupSymbols = SEED_SYMBOLS; // replaced from DB on first warmCache() call
+    this._warmupSymbolsLoaded = false;
   }
 
   
@@ -123,7 +125,19 @@ class EnhancedCacheService {
       return { success: false, message: 'No data fetcher' };
     }
 
-    logger.info('Starting cache warm-up for Nifty 50 symbols...');
+    // Reload symbol list from DB on each warm-up
+    if (!this._warmupSymbolsLoaded) {
+      try {
+        const dbSymbols = await getActiveSymbols();
+        if (dbSymbols.length > 0) {
+          this.warmupSymbols = dbSymbols;
+          this._warmupSymbolsLoaded = true;
+          logger.info(`Cache warm-up: using ${dbSymbols.length} symbols from DB`);
+        }
+      } catch (err) {
+        logger.warn(`Cache warm-up: could not load DB symbols (${err.message}), using seed`);
+      }
+    }
     const startTime = Date.now();
     let successCount = 0;
     let failCount = 0;
@@ -228,13 +242,9 @@ class EnhancedCacheService {
   }
 
   
+  /** @deprecated Use symbolRegistry.getActiveSymbols() instead */
   getNifty50Symbols() {
-    return [
-      'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK',
-      'HINDUNILVR', 'ITC', 'SBIN', 'BHARTIARTL', 'KOTAKBANK',
-      'LT', 'AXISBANK', 'ASIANPAINT', 'MARUTI', 'HCLTECH',
-      'BAJFINANCE', 'WIPRO', 'ULTRACEMCO', 'TITAN', 'NESTLEIND',
-    ];
+    return SEED_SYMBOLS;
   }
 
   

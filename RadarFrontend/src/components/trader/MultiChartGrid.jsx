@@ -11,6 +11,8 @@ const BACKEND_SYMBOL_MAP = {
   TCS: "TCS.NS",
   "NIFTY 50": "^NSEI",
   BANKNIFTY: "^NSEBANK",
+  FINNIFTY: "^CNXFIN",
+  MIDCPNIFTY: "^NSEI", // closest available; swap if backend supports NIFTY MIDCAP
 };
 
 const BACKEND_INTERVAL_MAP = {
@@ -25,6 +27,8 @@ const BACKEND_INTERVAL_MAP = {
 const FALLBACK_BASE_PRICE = {
   "NIFTY 50": 22500,
   BANKNIFTY: 48500,
+  FINNIFTY: 23800,
+  MIDCPNIFTY: 12400,
   RELIANCE: 2950,
   HDFCBANK: 1660,
   TCS: 4030,
@@ -59,6 +63,12 @@ const normalizeChartSymbol = (value) => {
   }
   if (upper === "^NSEBANK" || upper === "BANKNIFTY") {
     return "BANKNIFTY";
+  }
+  if (upper === "^CNXFIN" || upper === "FINNIFTY") {
+    return "FINNIFTY";
+  }
+  if (upper === "MIDCPNIFTY" || upper === "NIFTYMIDCAP" || upper === "^NSMIDCP50") {
+    return "MIDCPNIFTY";
   }
 
   return upper.replace(/\.(NS|BO)$/i, "");
@@ -115,25 +125,15 @@ const MultiChartGrid = ({ className, onOpenChart, timeframe = "15m", showIndicat
   const [isLoading, setIsLoading] = useState(true);
   const { activeSymbol } = useAsset();
 
+  // This pack is indices-only — always show the fixed 4 regardless of activeSymbol
+  const INDEX_CHARTS = ["NIFTY 50", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"];
+
   const getChartsToShow = () => {
-    const allCharts = ["NIFTY 50", "BANKNIFTY", "RELIANCE", "HDFCBANK", "TCS", "INFY"];
-    const normalizedActive = normalizeChartSymbol(activeSymbol);
-
-    const base = normalizedActive && !allCharts.includes(normalizedActive)
-      ? [normalizedActive, ...allCharts]
-      : allCharts.filter((s) => s !== normalizedActive);
-
-    if (normalizedActive) {
-      base.unshift(normalizedActive);
-    }
-
-    const deduped = [...new Set(base.filter(Boolean))];
-
     switch (layout) {
-      case "1-grid": return [deduped[0]].filter(Boolean);
-      case "2-grid": return deduped.slice(0, 2);
-      case "4-grid": return deduped.slice(0, 4);
-      default: return deduped.slice(0, 4);
+      case "1-grid": return [INDEX_CHARTS[0]];
+      case "2-grid": return INDEX_CHARTS.slice(0, 2);
+      case "4-grid":
+      default:       return INDEX_CHARTS;
     }
   };
 

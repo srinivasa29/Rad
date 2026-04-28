@@ -2,7 +2,11 @@ import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, TrendingUp, TrendingDown, Layers, Activity, AlertTriangle, Zap, BarChart2 } from 'lucide-react';
 import { fetchTechnicalSummary } from '../api/technicalApi';
+import { fetchWatchlistLiveData } from '../api/watchlistApi';
+import { fetchMarketHistory } from '../api/marketApi';
 import api from '../api/api';
+import { formatPrice } from '../utils/currency';
+
 import TradeDecisionZone from '../components/trader/stockResearch/TradeDecisionZone';
 
 const TraderChartPanel = lazy(() => import('../components/trader/stockResearch/TraderChartPanel'));
@@ -46,20 +50,52 @@ const Spark = ({ d, color = '#22d3ee' }) => {
   );
 };
 
-/* watchlist */
+const InsightsSection = ({ techData }) => {
+  const items = [];
+  
+  if (techData?.score) {
+    const bias = techData.score.bias;
+    if (bias === 'bullish') {
+      items.push({ text: 'Trend alignment is generally positive across intraday structures.', type: 'bull' });
+      items.push({ text: 'Pullbacks are likely to be absorbed near short-term support zones.', type: 'bull' });
+    } else if (bias === 'bearish') {
+      items.push({ text: 'Trend alignment is negative, reflecting short-term weakness.', type: 'bear' });
+      items.push({ text: 'Sector is underperforming the index on a relative strength basis.', type: 'bear' });
+    } else {
+      items.push({ text: 'Trend alignment is currently neutral or mixed.', type: 'neutral' });
+    }
 
+    if (techData.score.score > 65) {
+      items.push({ text: 'Asset is showing strong relative performance and conviction.', type: 'bull' });
+    } else if (techData.score.score < 35) {
+      items.push({ text: 'Asset is underperforming relative to market benchmarks.', type: 'bear' });
+    }
+  }
 
-const InsightsSection = () => {
-  const items = [
-    { text: 'Trend alignment positive across intraday and daily structures.', type: 'bull' },
-    { text: 'Breakout confirmed with strong volume participation above avg.', type: 'bull' },
-    { text: 'Price holding above breakout region with healthy follow-through.', type: 'bull' },
-    { text: 'Momentum indicators aligned, not yet overextended.', type: 'neutral' },
-    { text: 'Sector breadth constructive, supporting continuation.', type: 'neutral' },
-    { text: 'Watch for weakness if RSI drops below 50 on daily.', type: 'caution' },
-    { text: 'Sector underperforming index on relative strength basis.', type: 'bear' },
-    { text: 'Pullbacks absorbed near short-term support zones.', type: 'bull' },
-  ];
+  if (techData?.indicators) {
+    const vol = techData.indicators.volumeStatus;
+    if (vol === 'high_volume' || vol === 'above_average') {
+      items.push({ text: 'Strong volume participation supporting the recent price action.', type: 'bull' });
+    } else if (vol === 'low_volume' || vol === 'below_average') {
+      items.push({ text: 'Volume is declining, indicating a potential lack of directional conviction.', type: 'caution' });
+    }
+
+    const rsi = techData.indicators.rsi;
+    if (rsi > 70) {
+      items.push({ text: `Momentum is heavily overextended (RSI ${rsi}). Pullback risk is high.`, type: 'bear' });
+    } else if (rsi < 30) {
+      items.push({ text: `Oversold territory (RSI ${rsi}). Potential bounce opportunity emerging.`, type: 'bull' });
+    } else if (rsi >= 50) {
+      items.push({ text: 'Momentum indicators are constructive, not yet overextended.', type: 'neutral' });
+    } else {
+      items.push({ text: 'Momentum is weak but not entirely in the oversold zone.', type: 'caution' });
+    }
+  }
+
+  if (items.length === 0) {
+    items.push({ text: 'Not enough technical data to generate actionable insights.', type: 'neutral' });
+  }
+
   const dot = { bull: '#10b981', bear: '#ef4444', caution: '#f59e0b', neutral: '#64748b' };
   const tag = { bull: 'Bullish', bear: 'Bearish', caution: 'Caution', neutral: 'Neutral' };
   const tc = { bull: 'text-emerald-500', bear: 'text-rose-500', caution: 'text-amber-500', neutral: 'text-slate-500' };
@@ -78,15 +114,49 @@ const InsightsSection = () => {
   );
 };
 
-const ActivitySection = () => {
-  const feed = [
-    { time: '14:38', type: 'BREAKOUT', msg: 'Price broke above Rs 2,868 resistance with 1.8x volume surge', color: '#10b981', Icon: TrendingUp },
-    { time: '13:52', type: 'VOL ALERT', msg: 'Unusual volume: 2.3x avg - institutional accumulation signal', color: '#22d3ee', Icon: Activity },
-    { time: '12:15', type: 'CAUTION', msg: 'Fake breakout detected at Rs 2,875 - rejected at upper wick', color: '#f59e0b', Icon: AlertTriangle },
-    { time: '11:30', type: 'SIGNAL', msg: 'EMA 20 crossed above EMA 50 - Golden Cross confirmed', color: '#a78bfa', Icon: Zap },
-    { time: '10:45', type: 'ORB', msg: 'Opening range breakout - first 15m candle above prev high', color: '#22d3ee', Icon: BarChart2 },
-    { time: '10:05', type: 'DIVERGENCE', msg: 'RSI divergence at open - price rose but RSI declined', color: '#f87171', Icon: TrendingDown },
-  ];
+const ActivitySection = ({ techData }) => {
+  const feed = [];
+  const now = new Date();
+  
+  if (techData?.patterns && techData.patterns.length > 0) {
+    techData.patterns.forEach((p, i) => {
+      feed.push({ 
+        time: `${now.getHours()}:${String(Math.max(0, now.getMinutes() - i * 5)).padStart(2,'0')}`, 
+        type: 'PATTERN', 
+        msg: `${p.pattern} detected (${p.confidence}% confidence): ${p.description}`, 
+        color: '#a78bfa', 
+        Icon: Zap 
+      });
+    });
+  }
+
+  if (techData?.indicators) {
+    const vol = techData.indicators.volumeStatus;
+    if (vol === 'high_volume') {
+      feed.push({ time: 'Recent', type: 'VOL ALERT', msg: 'Unusual volume surge: Institutional accumulation or distribution signal', color: '#22d3ee', Icon: Activity });
+    }
+
+    const rsi = techData.indicators.rsi;
+    if (rsi > 70) {
+      feed.push({ time: 'Recent', type: 'CAUTION', msg: 'RSI divergence: Momentum is heavily overbought', color: '#f59e0b', Icon: AlertTriangle });
+    } else if (rsi < 30) {
+      feed.push({ time: 'Recent', type: 'OPPORTUNITY', msg: 'RSI oversold: Asset trading in deep discount zone', color: '#10b981', Icon: TrendingDown });
+    }
+  }
+
+  if (techData?.score) {
+    const bias = techData.score.bias;
+    if (bias === 'bullish') {
+      feed.push({ time: 'Today', type: 'SIGNAL', msg: 'Price maintaining strong bullish structure above key MAs', color: '#10b981', Icon: TrendingUp });
+    } else if (bias === 'bearish') {
+      feed.push({ time: 'Today', type: 'SIGNAL', msg: 'Price broke below key short-term supports', color: '#ef4444', Icon: TrendingDown });
+    }
+  }
+
+  if (feed.length === 0) {
+    feed.push({ time: 'Today', type: 'INFO', msg: 'No significant technical activity detected in the current session.', color: '#64748b', Icon: Activity });
+  }
+
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {feed.map(({ time, type, msg, color, Icon }, i) => (
@@ -107,14 +177,29 @@ const ActivitySection = () => {
   );
 };
 
-const PerformanceSection = ({ data }) => {
-  const sparks = {
-    '1D': [100, 99, 101, 100, 102, 101, 103],
-    '1W': [100, 101, 103, 102, 104, 103, 106],
-    '1M': [100, 103, 106, 105, 109, 108, 112],
-    '6M': [100, 108, 115, 112, 120, 118, 123],
-    '1Y': [100, 112, 125, 118, 134, 128, 140],
+const PerformanceSection = ({ stock, techData }) => {
+  const chg = stock?.changePercent || 0;
+  
+  const generateSpark = (baseChg, variance) => {
+    return Array(7).fill(0).map((_, i) => 100 + baseChg + (Math.sin(i) * variance));
   };
+
+  const sparks = {
+    '1D': generateSpark(chg, 1),
+    '1W': generateSpark(chg * 2, 3),
+    '1M': generateSpark(chg * 4, 6),
+    '6M': generateSpark(chg * 10, 12),
+    '1Y': generateSpark(chg * 15, 20),
+  };
+
+  const benchmarks = {
+    '1D': `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`,
+    '1W': `${(chg * 2) > 0 ? '+' : ''}${(chg * 2).toFixed(2)}%`,
+    '1M': `${(chg * 4) > 0 ? '+' : ''}${(chg * 4).toFixed(2)}%`,
+    '6M': `${(chg * 10) > 0 ? '+' : ''}${(chg * 10).toFixed(2)}%`,
+    '1Y': `${(chg * 15) > 0 ? '+' : ''}${(chg * 15).toFixed(2)}%`,
+  };
+
   const dashboardCardStyle = {
     background: '#0B1D2A',
     borderRadius: '12px',
@@ -124,7 +209,7 @@ const PerformanceSection = ({ data }) => {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {Object.entries(data.performanceBenchmarks ?? {}).map(([label, value]) => {
+        {Object.entries(benchmarks).map(([label, value]) => {
           const positive = String(value).startsWith('+');
           return (
             <div key={label} className="p-4 md:p-5" style={dashboardCardStyle}>
@@ -148,8 +233,8 @@ const PerformanceSection = ({ data }) => {
           <div className="mt-4 divide-y divide-white/6">
             {[
               ['Beta', '1.12', 'text-slate-100'],
-              ['ATR (14)', 'Rs 42.8', 'text-slate-100'],
-              ['Max Drawdown', '-18.4%', 'text-rose-400'],
+              ['ATR (14)', techData?.indicators?.atr ? `Rs ${Number(techData.indicators.atr).toFixed(2)}` : 'N/A', 'text-slate-100'],
+              ['RSI (14)', techData?.indicators?.rsi ? Number(techData.indicators.rsi).toFixed(2) : 'N/A', techData?.indicators?.rsi > 50 ? 'text-emerald-400' : 'text-rose-400'],
               ['Sharpe Ratio', '1.84', 'text-emerald-400'],
             ].map(([label, value, tone]) => (
               <div key={label} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
@@ -181,10 +266,12 @@ const PerformanceSection = ({ data }) => {
   );
 };
 
-const FundamentalsSection = ({ data }) => {
+const FundamentalsSection = ({ stockDetails }) => {
+  const isCompany = !!stockDetails?.pe_ratio;
   const qRev = [8.2, 8.8, 9.1, 9.4, 9.7];
   const qPro = [0.62, 0.7, 0.74, 0.76, 0.79];
   const qtrs = ['Q2FY24', 'Q3FY24', 'Q4FY24', 'Q1FY25', 'Q2FY25'];
+  
   const BarChart = ({ vals, color }) => {
     const mx = Math.max(...vals);
     return (
@@ -199,83 +286,101 @@ const FundamentalsSection = ({ data }) => {
       </div>
     );
   };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
         {[
-          ['P/E', '28.4', '#94a3b8'],
+          ['P/E', stockDetails?.pe_ratio || 'N/A', '#94a3b8'],
+          ['Div%', stockDetails?.dividend_yield ? `${stockDetails.dividend_yield}%` : 'N/A', '#22d3ee'],
+          ['Sector', stockDetails?.sector || 'N/A', '#10b981'],
           ['P/B', '3.12', '#94a3b8'],
           ['ROE', '18.2%', '#10b981'],
-          ['ROCE', '14.8%', '#10b981'],
           ['D/E', '0.45', '#f59e0b'],
-          ['Div%', '1.45%', '#22d3ee'],
         ].map(([l, v, c]) => (
           <div key={l} className="rounded-2xl border border-white/5 p-4 text-center" style={{ background: 'rgba(255,255,255,0.02)' }}>
             <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-500">{l}</div>
-            <div className="text-xl font-black" style={{ color: c }}>{v}</div>
+            <div className="text-[13px] sm:text-[15px] xl:text-xl font-black truncate" style={{ color: c }}>{v}</div>
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card><Lbl>Quarterly Revenue (Rs T)</Lbl><BarChart vals={qRev} color="#22d3ee" /></Card>
-        <Card><Lbl>Quarterly Profit (Rs T)</Lbl><BarChart vals={qPro} color="#10b981" /></Card>
-      </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {Object.entries(data.fundamentals ?? {}).map(([k, v]) => (
-          <div key={k} className="rounded-2xl border border-white/5 p-4" style={{ background: 'rgba(255,255,255,0.02)' }}>
-            <div className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-500 capitalize">{k.replace(/([A-Z])/g, ' $1')}</div>
-            <div className="text-sm font-bold text-white">{String(v)}</div>
+      
+      {isCompany && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Card><Lbl>Quarterly Revenue (Rs T)</Lbl><BarChart vals={qRev} color="#22d3ee" /></Card>
+          <Card><Lbl>Quarterly Profit (Rs T)</Lbl><BarChart vals={qPro} color="#10b981" /></Card>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-3">
+        <div className="rounded-2xl border border-white/5 p-5" style={{ background: 'rgba(255,255,255,0.02)' }}>
+          <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-500">About the Company</div>
+          <div className="text-sm font-medium text-slate-300 leading-relaxed">
+            {stockDetails?.about || 'Detailed fundamental information is not available for this asset.'}
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
 };
 
-const KeyLevelsSignal = ({ keyLevels }) => (
-  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-    <Card>
-      <Lbl>Key Price Levels</Lbl>
-      <div className="space-y-2">
-        {[
-          { badge: 'R2', label: 'Resistance 2', value: keyLevels?.resistance?.r2, color: '#f87171', bg: 'rgba(239,68,68,0.07)' },
-          { badge: 'R1', label: 'Resistance 1', value: keyLevels?.resistance?.r1, color: '#fca5a5', bg: 'rgba(239,68,68,0.10)' },
-          { badge: 'S1', label: 'Support 1', value: keyLevels?.support?.s1, color: '#34d399', bg: 'rgba(16,185,129,0.10)' },
-          { badge: 'S2', label: 'Support 2', value: keyLevels?.support?.s2, color: '#6ee7b7', bg: 'rgba(16,185,129,0.07)' },
-        ].filter((r) => r.value).map(({ badge, label, value, color, bg }) => (
-          <div key={label} className="flex items-center justify-between rounded-xl p-3" style={{ background: bg, border: `1px solid ${color}22` }}>
-            <div className="flex items-center gap-3">
-              <span className="rounded border px-2 py-0.5 text-[9px] font-black" style={{ color, borderColor: `${color}44`, background: `${color}15` }}>{badge}</span>
-              <span className="text-xs font-semibold text-slate-400">{label}</span>
+const KeyLevelsSignal = ({ keyLevels, techData, stock }) => {
+  const breakdown = techData?.score?.breakdown || {};
+  const trendPct = Math.min(100, Math.round(((breakdown.trend || 0) / 20) * 100)) || 50;
+  const oscPct = Math.min(100, Math.round((((breakdown.rsi || 0) + (breakdown.macd || 0)) / 40) * 100)) || 50;
+  const volPct = Math.min(100, Math.round(((breakdown.volume || 0) / 15) * 100)) || 50;
+  const paPct = Math.min(100, Math.round(((breakdown.priceAction || 0) / 25) * 100)) || 50;
+
+  const totalScore = techData?.score?.score || 50;
+  const totalIndicators = 20;
+  const buyCount = Math.round((totalScore / 100) * totalIndicators);
+  const sellCount = Math.round(((100 - totalScore) / 100) * (totalIndicators * 0.7));
+  const neutralCount = totalIndicators - buyCount - sellCount;
+
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <Card>
+        <Lbl>Key Price Levels</Lbl>
+        <div className="space-y-2">
+          {[
+            { badge: 'R2', label: 'Resistance 2', value: keyLevels?.resistance?.r2, color: '#f87171', bg: 'rgba(239,68,68,0.07)' },
+            { badge: 'R1', label: 'Resistance 1', value: keyLevels?.resistance?.r1, color: '#fca5a5', bg: 'rgba(239,68,68,0.10)' },
+            { badge: 'S1', label: 'Support 1', value: keyLevels?.support?.s1, color: '#34d399', bg: 'rgba(16,185,129,0.10)' },
+            { badge: 'S2', label: 'Support 2', value: keyLevels?.support?.s2, color: '#6ee7b7', bg: 'rgba(16,185,129,0.07)' },
+          ].filter((r) => r.value).map(({ badge, label, value, color, bg }) => (
+            <div key={label} className="flex items-center justify-between rounded-xl p-3" style={{ background: bg, border: `1px solid ${color}22` }}>
+              <div className="flex items-center gap-3">
+                <span className="rounded border px-2 py-0.5 text-[9px] font-black" style={{ color, borderColor: `${color}44`, background: `${color}15` }}>{badge}</span>
+                <span className="text-xs font-semibold text-slate-400">{label}</span>
+              </div>
+              <span className="font-mono text-base font-black" style={{ color }}>{formatPrice(value, stock?.type, stock?.symbol)}</span>
             </div>
-            <span className="font-mono text-base font-black" style={{ color }}>Rs {value}</span>
+          ))}
+        </div>
+      </Card>
+      <Card>
+        <Lbl>Signal Strength</Lbl>
+        <Bar label={`Moving Averages (${breakdown.trend || 0})`} value={trendPct} color="#10b981" />
+        <Bar label={`Oscillators (${(breakdown.rsi || 0) + (breakdown.macd || 0)})`} value={oscPct} color="#22d3ee" />
+        <Bar label={`Price Action (${breakdown.priceAction || 0})`} value={paPct} color="#a78bfa" />
+        <Bar label={`Volume Analysis (${breakdown.volume || 0})`} value={volPct} color="#fb923c" />
+        <div className="mt-4 border-t border-white/5 pt-3">
+          <div className="mb-2 flex justify-between text-[9px] font-bold text-slate-500">
+            <span>Sell {sellCount}</span><span>Neutral {neutralCount}</span><span>Buy {buyCount}</span>
           </div>
-        ))}
-      </div>
-    </Card>
-    <Card>
-      <Lbl>Signal Strength</Lbl>
-      <Bar label="Moving Averages (8/10)" value={80} color="#10b981" />
-      <Bar label="Oscillators (5/6)" value={65} color="#22d3ee" />
-      <Bar label="Chart Patterns (3/4)" value={72} color="#a78bfa" />
-      <Bar label="Volume Analysis" value={85} color="#fb923c" />
-      <div className="mt-4 border-t border-white/5 pt-3">
-        <div className="mb-2 flex justify-between text-[9px] font-bold text-slate-500">
-          <span>Sell 3</span><span>Neutral 5</span><span>Buy 12</span>
+          <div className="flex h-2.5 overflow-hidden rounded-full" style={{ background: '#101828' }}>
+            <div style={{ width: `${(sellCount / totalIndicators) * 100}%`, background: '#ef4444', opacity: 0.7 }} />
+            <div style={{ width: `${(neutralCount / totalIndicators) * 100}%`, background: '#64748b', opacity: 0.5 }} />
+            <div style={{ width: `${(buyCount / totalIndicators) * 100}%`, background: '#10b981', opacity: 0.8 }} />
+          </div>
         </div>
-        <div className="flex h-2.5 overflow-hidden rounded-full" style={{ background: '#101828' }}>
-          <div style={{ width: '15%', background: '#ef4444', opacity: 0.7 }} />
-          <div style={{ width: '25%', background: '#64748b', opacity: 0.5 }} />
-          <div style={{ width: '60%', background: '#10b981', opacity: 0.8 }} />
-        </div>
-      </div>
-    </Card>
-  </div>
-);
+      </Card>
+    </div>
+  );
+};
 
 const TABS = ['Insights', 'Activity', 'Performance', 'Fundamentals'];
 
-// Fallback empty stock shape
 const EMPTY_STOCK = {
   symbol: '', name: '', price: 0, changePercent: 0, volume: 0,
   atr: null, dayRange: null, sentiment: null, exchange: 'NSE',
@@ -288,8 +393,59 @@ export default function TraderStockPage({ overrideSymbol, onBack }) {
   const [loading, setLoading] = useState(true);
   const [stock, setStock] = useState({ ...EMPTY_STOCK, symbol });
   const [keyLevels, setKeyLevels] = useState({});
+  const [techData, setTechData] = useState(null);
+  const [stockDetails, setStockDetails] = useState({});
   const [tab, setTab] = useState('Insights');
   const [watchlist, setWatchlist] = useState([]);
+  const [marketStatus, setMarketStatus] = useState({ nifty: null, bankNifty: null, isOpen: false });
+  const [assetType, setAssetType] = useState('STOCK');
+
+  // Market status: NSE hours Mon-Fri 09:15-15:30 IST
+  const isMarketOpen = () => {
+    const now = new Date();
+    // IST = UTC + 5:30
+    const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const day = ist.getUTCDay(); // 0=Sun, 6=Sat
+    if (day === 0 || day === 6) return false;
+    const h = ist.getUTCHours();
+    const m = ist.getUTCMinutes();
+    const mins = h * 60 + m;
+    return mins >= 9 * 60 + 15 && mins <= 15 * 60 + 30;
+  };
+
+  // Fetch NIFTY + BANKNIFTY live change %
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const [niftyRes, bankRes] = await Promise.allSettled([
+          fetchMarketHistory('^NSEI', 'STOCK', '1D'),
+          fetchMarketHistory('^NSEBANK', 'STOCK', '1D'),
+        ]);
+        const calcChange = (res) => {
+          const pts = res.status === 'fulfilled' ? (Array.isArray(res.value?.data) ? res.value.data : []) : [];
+          if (pts.length < 2) return null;
+          const cur = Number(pts[pts.length - 1]?.close || 0);
+          const prev = Number(pts[pts.length - 2]?.close || 0);
+          if (!cur || !prev) return null;
+          return ((cur - prev) / prev) * 100;
+        };
+        if (active) {
+          setMarketStatus({
+            nifty: calcChange(niftyRes),
+            bankNifty: calcChange(bankRes),
+            isOpen: isMarketOpen(),
+          });
+        }
+      } catch (e) {
+        console.warn('Market status fetch failed:', e);
+      }
+    };
+    load();
+    // Refresh every 5 mins
+    const interval = setInterval(load, 5 * 60 * 1000);
+    return () => { active = false; clearInterval(interval); };
+  }, []);
 
   useEffect(() => {
     if (!symbol) return;
@@ -299,15 +455,15 @@ export default function TraderStockPage({ overrideSymbol, onBack }) {
     Promise.allSettled([
       fetchTechnicalSummary('stock', symbol),
       api.get(`/market?symbols=${encodeURIComponent(symbol)}`).catch(() => null),
-      api.get('/market?type=STOCK&limit=10').catch(() => null),
+      fetchWatchlistLiveData(),
     ]).then(([techRes, mktRes, wlRes]) => {
       if (!active) return;
 
       const tech = techRes.status === 'fulfilled' ? techRes.value : null;
       const mktArr = mktRes?.status === 'fulfilled' ? (mktRes.value?.data?.data ?? mktRes.value?.data ?? []) : [];
-      const mkt = Array.isArray(mktArr) ? mktArr[0] : mktArr;
+      const mkt = Array.isArray(mktArr) ? (mktArr.find(s => s.symbol.toUpperCase() === symbol.toUpperCase()) || mktArr[0]) : mktArr;
       
-      const wlArr = wlRes?.status === 'fulfilled' ? (wlRes.value?.data?.data ?? wlRes.value?.data ?? []) : [];
+      const wlArr = wlRes?.status === 'fulfilled' ? wlRes.value : [];
 
       const price = Number(mkt?.price ?? mkt?.ltp ?? tech?.indicators?.ema20 ?? 0);
       const changePercent = Number(mkt?.changePercent ?? mkt?.pChange ?? 0);
@@ -317,12 +473,16 @@ export default function TraderStockPage({ overrideSymbol, onBack }) {
         name: mkt?.name ?? mkt?.companyName ?? `${symbol} Ltd.`,
         price,
         changePercent,
-        volume: mkt?.volume ? `${(Number(mkt.volume) / 1e6).toFixed(2)}M` : '—',
+        volume: mkt?.volume != null && mkt.volume > 0 ? `${(Number(mkt.volume) / 1e6).toFixed(2)}M` : '—',
         atr: tech?.indicators?.atr ? Number(tech.indicators.atr).toFixed(1) : '—',
-        dayRange: mkt?.dayLow && mkt?.dayHigh ? `${mkt.dayLow} – ${mkt.dayHigh}` : '—',
+        dayRange: mkt?.dayLow && mkt?.dayHigh && mkt.dayLow !== mkt.dayHigh ? `${mkt.dayLow} – ${mkt.dayHigh}` : '—',
         sentiment: tech?.score?.bias ?? '—',
         exchange: 'NSE',
       });
+      setAssetType(mkt?.type || 'STOCK');
+
+      setTechData(tech);
+      setStockDetails(mkt?.details || {});
 
       setKeyLevels({
         support: { s1: tech?.indicators?.support ?? null, s2: null },
@@ -363,11 +523,27 @@ export default function TraderStockPage({ overrideSymbol, onBack }) {
           <ChevronLeft size={16} /> Back
         </button>
         <div className="flex items-center gap-4 text-xs font-bold">
-          <span className="text-slate-500">NIFTY</span><span className="text-emerald-400">+0.75%</span>
+          <span className="text-slate-500">NIFTY</span>
+          <span className={marketStatus.nifty !== null ? (marketStatus.nifty >= 0 ? 'text-emerald-400' : 'text-rose-400') : 'text-slate-500'}>
+            {marketStatus.nifty !== null ? `${marketStatus.nifty >= 0 ? '+' : ''}${marketStatus.nifty.toFixed(2)}%` : '—'}
+          </span>
           <div className="h-4 w-px bg-white/10" />
-          <span className="text-slate-500">BANKNIFTY</span><span className="text-rose-400">-0.21%</span>
+          <span className="text-slate-500">BANKNIFTY</span>
+          <span className={marketStatus.bankNifty !== null ? (marketStatus.bankNifty >= 0 ? 'text-emerald-400' : 'text-rose-400') : 'text-slate-500'}>
+            {marketStatus.bankNifty !== null ? `${marketStatus.bankNifty >= 0 ? '+' : ''}${marketStatus.bankNifty.toFixed(2)}%` : '—'}
+          </span>
           <div className="h-4 w-px bg-white/10" />
-          <span className="flex items-center gap-1.5 text-emerald-400"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />Live</span>
+          {marketStatus.isOpen ? (
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+              Live
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-slate-500">
+              <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+              Closed
+            </span>
+          )}
         </div>
       </div>
 
@@ -375,11 +551,13 @@ export default function TraderStockPage({ overrideSymbol, onBack }) {
         <div className="flex items-center gap-4">
           <div>
             <h1 className="text-xl font-black text-white">{stock.symbol}</h1>
-            <p className="text-[10px] font-semibold text-slate-500">{stock.name} · {stock.exchange} · Equity</p>
+            <p className="text-[10px] font-semibold text-slate-500">
+              {stock.name} · {String(assetType).toUpperCase() === 'CRYPTO' ? 'Crypto · USD' : `${stock.exchange} · Equity · INR`}
+            </p>
           </div>
           <div className={`flex items-center gap-1.5 text-2xl font-black ${pos ? 'text-emerald-400' : 'text-rose-400'}`}>
             {pos ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
-            ₹ {Number(stock.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            {formatPrice(stock.price, assetType, stock.symbol)}
             <span className="text-sm">{pos ? '+' : ''}{Number(stock.changePercent).toFixed(2)}%</span>
           </div>
         </div>
@@ -406,7 +584,9 @@ export default function TraderStockPage({ overrideSymbol, onBack }) {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-xs font-bold text-white">{w.symbol}</div>
-                    <div className="text-[10px] text-slate-500">NSE</div>
+                    <div className="text-[10px] text-slate-500">
+                      {String(assetType).toUpperCase() === 'CRYPTO' ? 'CRYPTO' : 'NSE'}
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="text-xs font-bold text-white">{w.price.toFixed(2)}</div>
@@ -429,37 +609,37 @@ export default function TraderStockPage({ overrideSymbol, onBack }) {
                 </div>
               }
             >
-              <TraderChartPanel symbol={stock.symbol} price={stock.price} />
+              <TraderChartPanel symbol={stock.symbol} price={stock.price} assetType={stock.type} />
             </Suspense>
 
             <div className="px-4 space-y-5">
-              <TradeDecisionZone stock={stock} keyLevels={keyLevels} />
-              <KeyLevelsSignal keyLevels={keyLevels} />
+              <TradeDecisionZone stock={stock} keyLevels={keyLevels} techData={techData} />
+              <KeyLevelsSignal keyLevels={keyLevels} techData={techData} stock={stock} />
 
               <div className="overflow-hidden rounded-2xl" style={{ background: '#0B1220', boxShadow: '0 20px 60px rgba(0,0,0,0.8),0 0 0 1px rgba(255,255,255,0.04)' }}>
-              <div className="flex overflow-x-auto border-b border-white/5" style={{ scrollbarWidth: 'none' }}>
-                {TABS.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTab(t)}
-                    className="flex-shrink-0 border-b-2 px-6 py-3.5 text-xs font-bold transition-all"
-                    style={tab === t ? { borderColor: '#22d3ee', color: '#22d3ee', background: 'rgba(34,211,238,0.05)' } : { borderColor: 'transparent', color: '#475569' }}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-              <div className="p-6">
-                {tab === 'Insights' && <InsightsSection />}
-                {tab === 'Activity' && <ActivitySection />}
-                {tab === 'Performance' && <PerformanceSection data={{}} />}
-                {tab === 'Fundamentals' && <FundamentalsSection data={{}} />}
+                <div className="flex overflow-x-auto border-b border-white/5" style={{ scrollbarWidth: 'none' }}>
+                  {TABS.map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTab(t)}
+                      className="flex-shrink-0 border-b-2 px-6 py-3.5 text-xs font-bold transition-all"
+                      style={tab === t ? { borderColor: '#22d3ee', color: '#22d3ee', background: 'rgba(34,211,238,0.05)' } : { borderColor: 'transparent', color: '#475569' }}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <div className="p-6">
+                  {tab === 'Insights' && <InsightsSection techData={techData} />}
+                  {tab === 'Activity' && <ActivitySection techData={techData} />}
+                  {tab === 'Performance' && <PerformanceSection stock={stock} techData={techData} />}
+                  {tab === 'Fundamentals' && <FundamentalsSection stockDetails={stockDetails} />}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
   );
 }

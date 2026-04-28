@@ -1,6 +1,7 @@
 const WebSocket = require('ws');
 const logger = require('../utils/logger');
 
+
 let io;
 let cryptoSocket;
 let cryptoReconnectTimer;
@@ -414,39 +415,22 @@ const startTickerInterval = () => {
         ];
 
         io.to('ticker').emit('indexUpdate', domesticIndices);
-        
-        // Mock stock updates for common symbols if no live provider is active
-        const symbols = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'JINDRILL', 'AAPL', 'TSLA', 'NVDA'];
-        symbols.forEach(sym => {
-            const base = 500 + (Math.random() * 1000);
-            const price = (base + (Math.random() * 10 - 5)).toFixed(2);
-            const change = (Math.random() * 4 - 2).toFixed(2);
-            
-            const event = {
-                symbol: sym,
-                asset: sym,
-                price: Number(price),
-                change: Number(change),
-                timestamp: new Date().toISOString(),
-                source: 'mock'
-            };
-            
-            io.to('ticker').emit('price_update', event);
-            io.to(`symbol:${sym.toLowerCase()}`).emit('price_update', event);
-        });
 
+        // Emit index updates over the generic price_update channel as well
         io.to('ticker').emit('price_update', {
             type: 'indices',
             data: domesticIndices,
             timestamp: new Date().toISOString(),
         });
+
+        // System heartbeat
         io.to('system').emit('system_status', {
             status: 'ok',
             service: 'realtime',
             marketFeed: 'active',
             timestamp: new Date().toISOString(),
         });
-    }, 3000); // 3 seconds for better perceived "realtime"
+    }, 3000);
 };
 
 module.exports = { initRealtimeService };

@@ -4,6 +4,19 @@ const ohlcService = require('./ohlcService');
 const yahooFinanceService = require('./yahooFinanceService');
 const marketHoursService = require('./marketHoursService');
 const logger = require('../utils/logger');
+const Symbol = require('../models/Symbol');
+const OHLC = require('../models/OHLC');
+
+// Crypto symbols must never be sent to Yahoo Finance with .NS suffix
+const CRYPTO_SYMBOLS = new Set([
+    'BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK',
+    'AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT',
+    'ARB','OP','INJ','SUI','SEI','PEPE','WIF','TON','FLOKI','BONK',
+]);
+const isCrypto = (s) => {
+    const clean = String(s || '').toUpperCase().replace(/USDT$/i, '').replace(/\.(NS|BO)$/i, '');
+    return CRYPTO_SYMBOLS.has(clean) || String(s).toUpperCase().endsWith('USDT');
+};
 
 class IncrementalUpdateService {
   constructor() {
@@ -21,18 +34,60 @@ class IncrementalUpdateService {
   }
 
   
+  /**
+   * Fetch active stock symbols from the database.
+   * Falls back to OHLC distinct symbols, then a minimal hardcoded seed list.
+   */
+  async fetchSymbolsFromDB() {
+    try {
+      // Primary: Symbol collection – active equities/ETFs on NSE
+      const dbSymbols = await Symbol.find(
+        { active: true, assetType: { $in: ['equity', 'etf'] }, exchange: { $in: ['NSE', 'BSE', 'UNKNOWN'] } },
+        { symbol: 1, _id: 0 }
+      ).lean();
+
+      if (dbSymbols.length > 0) {
+        const symbols = dbSymbols.map(s => s.symbol.replace(/\.(NS|BO)$/i, ''));
+        logger.info(`fetchSymbolsFromDB: ${symbols.length} symbols from Symbol collection`);
+        return symbols;
+      }
+
+      // Fallback: distinct symbols already in OHLC collection
+      const ohlcSymbols = await OHLC.distinct('symbol', { exchange: { $in: ['NSE', 'BSE'] } });
+      if (ohlcSymbols.length > 0) {
+        logger.info(`fetchSymbolsFromDB: ${ohlcSymbols.length} symbols from OHLC collection`);
+        return ohlcSymbols.map(s => s.replace(/\.(NS|BO)$/i, ''));
+      }
+
+      // Last resort: minimal seed list
+      logger.warn('fetchSymbolsFromDB: No symbols in DB – using seed list');
+      return [
+        'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK',
+        'SBIN', 'ITC', 'LT', 'AXISBANK', 'KOTAKBANK',
+      ];
+    } catch (err) {
+      logger.error(`fetchSymbolsFromDB error: ${err.message}`);
+      return [];
+    }
+  }
+
   async updateAllSymbols(options = {}) {
     const {
-      symbols = this.getNifty50Symbols(),
+      symbols: optionSymbols,
       timeframe = '1d',
       force = false,
     } = options;
 
-    if (!force && !marketHoursService.shouldFetchUpdates()) {
-      logger.info('Market closed - skipping incremental update');
+    // Resolve symbols: use caller-supplied list or query the DB
+    const symbols = (Array.isArray(optionSymbols) && optionSymbols.length > 0)
+      ? optionSymbols
+      : await this.fetchSymbolsFromDB();
+
+    if (!force && !marketHoursService.isPostMarket()) {
+      logger.info('Active market hours - skipping heavy incremental backfill');
       return {
         success: true,
-        message: 'Market closed - no update needed',
+        message: 'Active market hours - no heavy backfill needed',
         skipped: true,
         marketStatus: marketHoursService.getMarketStatus(),
       };
@@ -63,7 +118,7 @@ class IncrementalUpdateService {
           
           await this.sleep(300);
         } catch (error) {
-          logger.error(`Failed to update symbol ${symbol}:`, error.message);
+          logger.error(`Failed to update symbol ${symbol}: ${error.message}`);
           results.push({
             symbol,
             success: false,
@@ -136,13 +191,22 @@ class IncrementalUpdateService {
         };
       }
 
-      const symbolWithSuffix = `${symbol}.NS`; // NSE suffix
-      const newData = await yahooFinanceService.fetchHistoricalData(
+      // Skip crypto — their OHLC is backfilled via Binance, not Yahoo
+      if (isCrypto(symbol)) {
+        return { symbol, success: true, newCandles: 0, message: 'Crypto symbol — skipped (use Binance)' };
+      }
+
+      const symbolWithSuffix = symbol.endsWith('.NS') || symbol.endsWith('.BO')
+        ? symbol
+        : `${symbol}.NS`; // NSE suffix for Indian equities only
+      const response = await yahooFinanceService.fetchCustomRange(
         symbolWithSuffix,
-        timeframe,
         startDate,
-        endDate
+        endDate,
+        timeframe
       );
+
+      const newData = response.data;
 
       if (!newData || newData.length === 0) {
         return {
@@ -174,7 +238,7 @@ class IncrementalUpdateService {
         latestDate: newData[newData.length - 1].timestamp,
       };
     } catch (error) {
-      logger.error(`Error updating symbol ${symbol}:`, error.message);
+      logger.error(`Error updating symbol ${symbol}: ${error.message}`);
       return {
         symbol,
         success: false,
@@ -226,19 +290,10 @@ class IncrementalUpdateService {
   }
 
   
-  getNifty50Symbols() {
-    return [
-      'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK',
-      'HINDUNILVR', 'ITC', 'SBIN', 'BHARTIARTL', 'KOTAKBANK',
-      'LT', 'AXISBANK', 'ASIANPAINT', 'MARUTI', 'HCLTECH',
-      'BAJFINANCE', 'WIPRO', 'ULTRACEMCO', 'TITAN', 'NESTLEIND',
-      'SUNPHARMA', 'TECHM', 'ONGC', 'NTPC', 'POWERGRID',
-      'M&M', 'TATASTEEL', 'ADANIPORTS', 'BAJAJFINSV', 'JSWSTEEL',
-      'INDUSINDBK', 'TATAMOTORS', 'HINDALCO', 'DIVISLAB', 'COALINDIA',
-      'DRREDDY', 'EICHERMOT', 'CIPLA', 'GRASIM', 'BRITANNIA',
-      'HEROMOTOCO', 'SHREECEM', 'APOLLOHOSP', 'UPL', 'BPCL',
-      'TATACONSUM', 'SBILIFE', 'ADANIENT', 'HDFCLIFE', 'BAJAJ-AUTO',
-    ];
+  /** @deprecated Use fetchSymbolsFromDB() instead */
+  async getNifty50Symbols() {
+    // Delegate to the DB-backed method so this legacy shim stays dynamic
+    return this.fetchSymbolsFromDB();
   }
 
   

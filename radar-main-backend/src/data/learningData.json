@@ -1,30 +1,152 @@
 [
   {
-    "id": 1,
-    "title": "Understanding Market Cap",
+    "id": "fundamentals-101",
+    "title": "Market Fundamentals 101",
     "category": "Fundamentals",
-    "content": "Market Capitalization refers to the total dollar market value of a company's outstanding shares. Large-cap companies are generally safer, while small-cap companies offer higher risk and reward.",
-    "difficulty": "Beginner"
+    "difficulty": "Beginner",
+    "icon": "BookMarked",
+    "color": "blue",
+    "description": "Learn the core mechanics of order books, liquidity, and market structure.",
+    "duration": "45 min",
+    "chapters": [
+      {
+        "id": "f-1",
+        "title": "What is Market Capitalization?",
+        "content": "Market Capitalization (Market Cap) is the total dollar market value of a company's outstanding shares of stock. It is calculated by multiplying the current share price by the total number of outstanding shares.\n\n**Formula:** Market Cap = Share Price × Total Shares Outstanding\n\n**Categories:**\n- **Large Cap (>₹20,000 Cr):** Stable companies like Reliance, TCS, HDFC Bank. Lower risk, steady returns.\n- **Mid Cap (₹5,000–₹20,000 Cr):** Growth-oriented companies. Moderate risk and reward.\n- **Small Cap (<₹5,000 Cr):** High risk, high potential reward. Requires careful research.\n\nInvestors use market cap to classify stocks and build diversified portfolios. A large-cap-heavy portfolio is generally more stable during market downturns."
+      },
+      {
+        "id": "f-2",
+        "title": "Understanding P/E Ratio",
+        "content": "The Price-to-Earnings (P/E) ratio measures how much investors are willing to pay for each rupee of a company's earnings.\n\n**Formula:** P/E Ratio = Share Price ÷ Earnings Per Share (EPS)\n\n**Interpretation:**\n- **High P/E (>30):** Market expects high future growth. Stock may be overvalued.\n- **Low P/E (<15):** May indicate undervaluation or slow growth expectations.\n- **Negative P/E:** Company is currently unprofitable.\n\n**Sector Comparison is Key.** A P/E of 25 is cheap for an IT company but expensive for a utility company. Always compare within the same sector.\n\n**Example:** If TCS trades at ₹3,800 and EPS is ₹120, P/E = 3800/120 = **31.67x**"
+      },
+      {
+        "id": "f-3",
+        "title": "Order Books and Liquidity",
+        "content": "An order book is a real-time, continuously updated list of buy and sell orders for a specific security.\n\n**Key Components:**\n- **Bid Price:** The highest price a buyer is willing to pay\n- **Ask Price:** The lowest price a seller will accept\n- **Bid-Ask Spread:** The difference between bid and ask. A narrow spread = high liquidity\n\n**Liquidity** refers to how quickly an asset can be bought or sold without affecting its price.\n\n**Why it matters:**\n- Liquid stocks (like Nifty 50 constituents) can be traded in large volumes without slippage\n- Illiquid stocks can have wide spreads, making entries/exits costly\n- During market stress, liquidity can dry up rapidly even in mid-cap stocks\n\n**Depth of Market (DOM):** Shows the volume of buy/sell orders at various price levels, helping you identify support and resistance zones."
+      }
+    ],
+    "quiz": [
+      {
+        "id": "q-f-1",
+        "question": "A company has a share price of ₹500 and 10 crore outstanding shares. What is its market cap?",
+        "options": ["₹50 Cr", "₹500 Cr", "₹5,000 Cr", "₹50,000 Cr"],
+        "answer": 2,
+        "explanation": "Market Cap = ₹500 × 10,00,00,000 = ₹5,000 Crore. This falls in the Mid Cap category."
+      },
+      {
+        "id": "q-f-2",
+        "question": "A stock has a P/E ratio of 8 compared to its sector average of 22. What does this suggest?",
+        "options": ["The stock is overvalued", "The stock may be undervalued or have poor growth expectations", "The company has no earnings", "The stock is a large cap"],
+        "answer": 1,
+        "explanation": "A P/E significantly below the sector average often signals undervaluation or slower growth expectations. Always investigate why before investing."
+      },
+      {
+        "id": "q-f-3",
+        "question": "What does a narrow bid-ask spread indicate?",
+        "options": ["Low volatility", "High liquidity", "Low trading volume", "Overvalued stock"],
+        "answer": 1,
+        "explanation": "A narrow bid-ask spread means many buyers and sellers are active, making it easy to enter/exit positions without affecting the price — a sign of high liquidity."
+      }
+    ]
   },
   {
-    "id": 2,
-    "title": "Moving Averages (SMA vs EMA)",
+    "id": "technical-analysis",
+    "title": "Technical Analysis Mastery",
     "category": "Technical Analysis",
-    "content": "A simple moving average (SMA) calculates the average of a selected range of prices, essentially smoothing out volatility. An exponential moving average (EMA) places greater weight on the most recent data.",
-    "difficulty": "Intermediate"
+    "difficulty": "Intermediate",
+    "icon": "PlayCircle",
+    "color": "purple",
+    "description": "Master reading price action, volume profiles, and institutional footprints.",
+    "duration": "60 min",
+    "chapters": [
+      {
+        "id": "t-1",
+        "title": "Moving Averages: SMA vs EMA",
+        "content": "Moving averages smooth out price data to identify the direction of the trend.\n\n**Simple Moving Average (SMA):**\nAverages the closing price over N periods. Each period is weighted equally.\n- SMA(20) = Sum of last 20 closes ÷ 20\n- Slower to react to price changes\n\n**Exponential Moving Average (EMA):**\nGives more weight to recent prices, making it more responsive to new information.\n- EMA(20) reacts faster than SMA(20) to price moves\n- Preferred by short-term traders\n\n**Golden Cross vs Death Cross:**\n- **Golden Cross:** 50-day SMA crosses above 200-day SMA → Bullish signal\n- **Death Cross:** 50-day SMA crosses below 200-day SMA → Bearish signal\n\n**Practical use:** When price is above the 200 EMA, stay bullish. When below, be cautious."
+      },
+      {
+        "id": "t-2",
+        "title": "RSI — The Momentum Oscillator",
+        "content": "The Relative Strength Index (RSI) measures the speed and magnitude of price changes on a scale of 0–100.\n\n**Formula:** RSI = 100 − [100 ÷ (1 + RS)], where RS = Average Gain ÷ Average Loss over 14 periods\n\n**Interpretation:**\n- **RSI > 70:** Overbought — price may be due for a pullback\n- **RSI < 30:** Oversold — potential buying opportunity\n- **RSI 40–60:** Neutral zone, trend is moderate\n\n**RSI Divergence (Advanced):**\n- **Bullish Divergence:** Price makes lower lows but RSI makes higher lows → potential reversal up\n- **Bearish Divergence:** Price makes higher highs but RSI makes lower highs → potential reversal down\n\n**Important:** RSI signals are strongest when confirmed by volume and price action. Never use RSI alone."
+      },
+      {
+        "id": "t-3",
+        "title": "Volume Profile and Institutional Footprints",
+        "content": "Volume is the fuel of price moves. Institutional activity leaves distinct volume footprints that retail traders can identify and exploit.\n\n**Key Volume Concepts:**\n- **Volume Spike on Breakout:** Confirms the breakout is genuine, not a fake-out\n- **Low Volume Consolidation:** Market is resting before the next move\n- **Volume Divergence:** Price rises but volume falls → weakening trend\n\n**Volume Profile:**\nShows the amount of volume traded at each price level over a given period.\n- **Point of Control (POC):** Price level with the most volume traded. Acts as a magnet.\n- **Value Area (VA):** Price range where 70% of volume occurred. Defines fair value.\n- **High/Low Volume Nodes:** Areas of acceptance vs. rejection\n\n**Institutional Footprints:**\nLarge funds can't hide their trades. Look for:\n- Large block trades on unusual volume days\n- Accumulation: Stock rises slowly on consistent volume\n- Distribution: Stock falls with high volume — smart money exiting"
+      }
+    ],
+    "quiz": [
+      {
+        "id": "q-t-1",
+        "question": "Which moving average reacts faster to recent price changes?",
+        "options": ["SMA(50)", "SMA(200)", "EMA(20)", "SMA(20)"],
+        "answer": 2,
+        "explanation": "EMA gives more weight to recent prices, making it more responsive than SMA with the same period. EMA(20) will react faster to a sudden price move than SMA(20)."
+      },
+      {
+        "id": "q-t-2",
+        "question": "RSI is at 28 on a 3-month uptrend stock. What should you investigate first?",
+        "options": ["Immediately sell", "Look for bearish divergence", "Look for bullish divergence and volume confirmation", "Ignore — RSI is unreliable"],
+        "answer": 2,
+        "explanation": "RSI below 30 on an uptrend stock may indicate a temporary pullback, not a reversal. Check for bullish divergence and volume confirmation before deciding."
+      },
+      {
+        "id": "q-t-3",
+        "question": "A stock breaks a resistance level on 5x normal volume. What does this signal?",
+        "options": ["Possible fake breakout", "Confirmed breakout with institutional participation", "RSI is overbought", "The stock is overvalued"],
+        "answer": 1,
+        "explanation": "High volume on a breakout confirms that large players are participating, making the breakout more likely to sustain. Low volume breakouts are more prone to failure."
+      }
+    ]
   },
   {
-    "id": 3,
-    "title": "P/E Ratio Explained",
-    "category": "Fundamentals",
-    "content": "The Price-to-Earnings ratio measures a company's current share price relative to its per-share earnings. A high P/E could mean a stock's price is high relative to earnings and possibly overvalued.",
-    "difficulty": "Beginner"
-  },
-  {
-    "id": 4,
-    "title": "RSI Indicator",
-    "category": "Technical Analysis",
-    "content": "The Relative Strength Index (RSI) is a momentum indicator used in technical analysis. An RSI above 70 indicates an asset is overbought, while an RSI below 30 indicates it is oversold.",
-    "difficulty": "Intermediate"
+    "id": "risk-management",
+    "title": "Risk Management Strategies",
+    "category": "Risk Management",
+    "difficulty": "Intermediate",
+    "icon": "Award",
+    "color": "emerald",
+    "description": "Protect your capital with position sizing, hedging, and portfolio math.",
+    "duration": "50 min",
+    "chapters": [
+      {
+        "id": "r-1",
+        "title": "The 1% Rule and Position Sizing",
+        "content": "The single most important rule in trading is capital preservation. The **1% Rule** states: never risk more than 1% of your total capital on a single trade.\n\n**Position Sizing Formula:**\nPosition Size = (Account Risk) ÷ (Entry Price − Stop Loss Price)\n\n**Example:**\n- Account: ₹5,00,000\n- Risk per trade (1%): ₹5,000\n- Entry: ₹200, Stop Loss: ₹190\n- Risk per share: ₹10\n- **Position Size = ₹5,000 ÷ ₹10 = 500 shares**\n\n**Why this matters:**\n- Even 10 consecutive losses only cost you 10% of capital\n- Allows you to stay in the game long enough to find your edge\n- Prevents emotional decision-making driven by oversized positions\n\n**Kelly Criterion (Advanced):** A mathematical formula to optimize position size based on your win rate and average win/loss ratio."
+      },
+      {
+        "id": "r-2",
+        "title": "Stop Loss Strategies",
+        "content": "A stop loss is a pre-determined exit point that limits your loss on a trade.\n\n**Types of Stop Losses:**\n\n**1. Fixed Percentage Stop:**\n- Exit if price falls X% from entry\n- Simple but doesn't account for volatility\n\n**2. ATR-Based Stop (Average True Range):**\n- Stop = Entry − (2 × ATR)\n- Adapts to market volatility automatically\n- Best for volatile stocks\n\n**3. Structure-Based Stop:**\n- Place stop below a key support level or swing low\n- Most logical — stops are invalidated only when the thesis breaks\n\n**4. Trailing Stop:**\n- Moves with price to lock in profits\n- Exit when price retraces by X% from the peak\n\n**Common Mistakes:**\n- Moving stop loss deeper into loss — breaks discipline\n- Setting stops at round numbers (easily hunted by market makers)\n- Using the same stop % for all stocks regardless of volatility"
+      },
+      {
+        "id": "r-3",
+        "title": "Portfolio Diversification and Beta",
+        "content": "Diversification reduces unsystematic (stock-specific) risk by spreading investments across uncorrelated assets.\n\n**Beta — Market Sensitivity:**\n- **Beta = 1:** Stock moves in line with the market\n- **Beta > 1:** More volatile than market (e.g., small caps)\n- **Beta < 1:** Less volatile than market (e.g., FMCG, Pharma)\n- **Beta < 0:** Moves inverse to market (rare — gold ETFs sometimes)\n\n**Portfolio Beta Calculation:**\nWeighted average of individual stock betas\n\n**Diversification Principles:**\n- Across **sectors** (IT, Finance, FMCG, Auto)\n- Across **market caps** (Large + Mid + Small)\n- Across **asset classes** (Equity + Debt + Gold)\n- Across **geographies** (Domestic + International funds)\n\n**Correlation:** Truly diversified portfolios hold assets with low or negative correlation. Two IT stocks don't diversify — they move together.\n\n**Rule of thumb:** 15–20 well-chosen stocks across 5–6 sectors gives near-maximum diversification benefit."
+      }
+    ],
+    "quiz": [
+      {
+        "id": "q-r-1",
+        "question": "You have ₹2,00,000 in your account. Entry at ₹150, stop loss at ₹140. How many shares should you buy (using 1% rule)?",
+        "options": ["200 shares", "100 shares", "50 shares", "20 shares"],
+        "answer": 0,
+        "explanation": "Risk per trade = 1% × ₹2,00,000 = ₹2,000. Risk per share = ₹150 − ₹140 = ₹10. Position Size = ₹2,000 ÷ ₹10 = 200 shares."
+      },
+      {
+        "id": "q-r-2",
+        "question": "Which stop loss type automatically adjusts for a stock's volatility?",
+        "options": ["Fixed percentage stop", "ATR-based stop", "Mental stop", "Round number stop"],
+        "answer": 1,
+        "explanation": "ATR (Average True Range) measures recent volatility. An ATR-based stop widens during high volatility and narrows during low volatility, making it the most adaptive approach."
+      },
+      {
+        "id": "q-r-3",
+        "question": "Your portfolio has 80% in IT stocks and 20% in Finance. Is it well-diversified?",
+        "options": ["Yes, it has two sectors", "No, IT stocks are highly correlated with each other", "Yes, if the IT stocks are different companies", "It depends on the market cap"],
+        "answer": 1,
+        "explanation": "80% in a single sector creates massive concentration risk. IT stocks tend to move together (high correlation), so this portfolio behaves almost like a single bet on the IT sector."
+      }
+    ]
   }
 ]

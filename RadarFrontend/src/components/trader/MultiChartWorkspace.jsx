@@ -1,5 +1,6 @@
-﻿import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import api from '../../api/api';
 import {
   Grid,
   Maximize2,
@@ -29,10 +30,12 @@ const LAYOUTS = [
   { id: '3x3', label: '3x3', rows: 3, cols: 3, icon: '3x3' },
 ];
 
-const DEFAULT_SYMBOLS = ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'BHARTIARTL', 'ITC', 'KOTAKBANK'];
+// Initial placeholder — replaced with live API symbols after mount
+const PLACEHOLDER_SYMBOLS = ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK'];
 
 const MultiChartWorkspace = () => {
   const [layout, setLayout] = useState('2x2');
+  const [availableSymbols, setAvailableSymbols] = useState(PLACEHOLDER_SYMBOLS);
   const [charts, setCharts] = useState([
     { id: 1, symbol: 'RELIANCE', timeframe: '15' },
     { id: 2, symbol: 'TCS', timeframe: '15' },
@@ -46,12 +49,22 @@ const MultiChartWorkspace = () => {
   const [workspaceName, setWorkspaceName] = useState('');
   const [savedWorkspaces, setSavedWorkspaces] = useState([]);
 
+  // Load symbols dynamically from the backend
+  useEffect(() => {
+    api.get('/market/data', { params: { type: 'STOCK', limit: 50 } })
+      .then(res => {
+        const syms = (res.data || []).map(s => s.symbol).filter(Boolean);
+        if (syms.length > 0) setAvailableSymbols(syms);
+      })
+      .catch(() => { /* keep placeholder */ });
+  }, []);
+
   const currentLayout = LAYOUTS.find(l => l.id === layout);
   const totalCharts = currentLayout.rows * currentLayout.cols;
 
   const displayCharts = [...charts];
   while (displayCharts.length < totalCharts) {
-    const nextSymbol = DEFAULT_SYMBOLS[displayCharts.length % DEFAULT_SYMBOLS.length];
+    const nextSymbol = availableSymbols[displayCharts.length % availableSymbols.length];
     displayCharts.push({
       id: Date.now() + displayCharts.length,
       symbol: nextSymbol,
@@ -72,11 +85,11 @@ const MultiChartWorkspace = () => {
   const addChart = useCallback(() => {
     const newChart = {
       id: Date.now(),
-      symbol: DEFAULT_SYMBOLS[charts.length % DEFAULT_SYMBOLS.length],
+      symbol: availableSymbols[charts.length % availableSymbols.length],
       timeframe: '15',
     };
     setCharts(prev => [...prev, newChart]);
-  }, [charts.length]);
+  }, [charts.length, availableSymbols]);
 
   const changeLayout = useCallback((newLayout) => {
     setLayout(newLayout);
@@ -343,7 +356,7 @@ const MultiChartWorkspace = () => {
                     onChange={(e) => updateChart(chart.id, { symbol: e.target.value })}
                     className="px-3 py-1.5 bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-lg text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
-                    {DEFAULT_SYMBOLS.map(symbol => (
+                    {availableSymbols.map(symbol => (
                       <option key={symbol} value={symbol}>{symbol}</option>
                     ))}
                   </select>

@@ -916,7 +916,7 @@ const InvestorAdvancedCharts = () => {
     ]);
     const [alertValue, setAlertValue] = useState('');
     const [alertDelivery, setAlertDelivery] = useState('app');
-    const [watchlist, setWatchlist] = useState(['AAPL', 'MSFT', 'RELIANCE']);
+    const [watchlist, setWatchlist] = useState([]);
     const [companyInfo, setCompanyInfo] = useState(null);
     const [isInfoLoading, setIsInfoLoading] = useState(false);
     const [chartDataMap, setChartDataMap] = useState({});
@@ -966,6 +966,17 @@ const InvestorAdvancedCharts = () => {
         const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
         document.addEventListener('fullscreenchange', handleFsChange);
         return () => document.removeEventListener('fullscreenchange', handleFsChange);
+    }, []);
+
+    // Load watchlist dynamically from backend
+    useEffect(() => {
+        api.get('/watchlist')
+            .then(res => {
+                const items = res.data?.data || res.data || [];
+                const syms = items.map(i => i.symbol || i).filter(Boolean);
+                if (syms.length > 0) setWatchlist(syms);
+            })
+            .catch(() => { /* keep empty — user can add manually */ });
     }, []);
 
 
@@ -1665,7 +1676,7 @@ const InvestorAdvancedCharts = () => {
                                     <div className="space-y-3">
                                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 px-1">Selected Assets</h4>
                                         <div className="space-y-2">
-                                            {['AAPL', 'MSFT', 'GOOGL', 'RELIANCE', 'TCS', 'HDFCBANK'].map(sym => {
+                                            {(watchlist.length > 0 ? watchlist : [baseSymbol]).map(sym => {
                                                 const isSelected = selectedCompareSymbols.includes(sym);
                                                 return (
                                                     <div 
@@ -1677,7 +1688,6 @@ const InvestorAdvancedCharts = () => {
                                                             
                                                             setSelectedCompareSymbols(newSelection);
                                                             
-                                                            // Pass the exact count to create exactly that many sections
                                                             const count = newSelection.length;
                                                             let type = 'grid';
                                                             if (count <= 1) type = 'single';
@@ -1693,7 +1703,7 @@ const InvestorAdvancedCharts = () => {
                                                             </div>
                                                             <div>
                                                                 <h4 className="text-xs font-black text-slate-800">{sym}</h4>
-                                                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">NSE INDIA</p>
+                                                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">From Watchlist</p>
                                                             </div>
                                                         </div>
                                                         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-200'}`}>

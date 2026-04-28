@@ -95,6 +95,21 @@ class MarketHoursService {
     return currentTime >= openTime && currentTime <= closeTime;
   }
 
+  isPostMarket() {
+    const now = new Date();
+    const istTime = this.toIST(now);
+    
+    const currentHour = istTime.getHours();
+    const currentMinute = istTime.getMinutes();
+    const currentTime = currentHour * 60 + currentMinute;
+
+    const postMarket = this.nseHours.postMarket.hour * 60 + this.nseHours.postMarket.minute; // 16:00
+    const preMarket = this.nseHours.preMarket.hour * 60 + this.nseHours.preMarket.minute;    // 9:00
+
+    // Backfill should run during the night: After postMarket OR before preMarket
+    return currentTime >= postMarket || currentTime <= preMarket;
+  }
+
   
   getMarketStatus() {
     const now = new Date();

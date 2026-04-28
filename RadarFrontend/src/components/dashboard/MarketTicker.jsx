@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './MarketTicker.css';
 import { fetchMarketData, fetchMarketHistory } from '../../api/marketApi';
 import { useSocket } from '../../hooks/useSocket';
+import { getCurrencySymbol } from '../../utils/currency';
 
 const displaySymbol = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
 const formatPercent = (value) => {
@@ -17,6 +18,8 @@ const normalizeTickerRow = (item) => {
     symbol: displaySymbol(item?.symbol || item?.name).substring(0, 14),
     price: Number.isFinite(price) ? price.toLocaleString() : '0',
     change: Number.isFinite(change) ? change : 0,
+    isIndex: false,
+    type: item?.type || 'STOCK',
   };
 };
 
@@ -43,6 +46,7 @@ const getBenchmarksFromHistory = async () => {
         symbol: item.label,
         price: current.toLocaleString(undefined, { maximumFractionDigits: 2 }),
         change: Number.isFinite(change) ? change : 0,
+        isIndex: true,
       };
     })
   );
@@ -84,13 +88,7 @@ const MarketTicker = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
 
-  const [stocks, setStocks] = useState([
-    { symbol: 'HDFCBANK', price: '1,650', change: 0.48 },
-    { symbol: 'INFY', price: '1,420', change: -0.21 },
-    { symbol: 'TCS', price: '3,845', change: 0.92 },
-    { symbol: 'NIFTY 50', price: '18,500', change: 0.52 },
-    { symbol: 'BANKNIFTY', price: '44,200', change: 0.35 },
-  ]);
+  const [stocks, setStocks] = useState([]);
 
   const [error, setError] = useState(false);
   const [rotationOffset, setRotationOffset] = useState(0);
@@ -138,7 +136,14 @@ const MarketTicker = () => {
         indices.forEach(idx => {
           const target = next.findIndex(s => s.symbol === idx.name);
           if (target !== -1) {
-            next[target] = { ...next[target], price: idx.value, change: parseFloat(idx.change) };
+            const numericPrice = Number(idx.value);
+            next[target] = {
+              ...next[target],
+              price: Number.isFinite(numericPrice)
+                ? numericPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                : String(idx.value),
+              change: parseFloat(idx.change),
+            };
           }
         });
         return next;
@@ -152,10 +157,13 @@ const MarketTicker = () => {
             const target = prev.findIndex(s => s.symbol === event.symbol || s.symbol === displaySymbol(event.symbol));
             if (target !== -1) {
                 const next = [...prev];
+                const numericPrice = Number(event.price);
                 next[target] = { 
                     ...next[target], 
-                    price: event.price.toLocaleString(undefined, { maximumFractionDigits: 2 }), 
-                    change: event.change 
+                    price: Number.isFinite(numericPrice)
+                      ? numericPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                      : String(event.price),
+                    change: event.change,
                 };
                 return next;
             }
@@ -172,21 +180,33 @@ const MarketTicker = () => {
     key: `${item.symbol}-${idx}`,
     item,
   }));
-  const loopingSequence = [...tickerSequence, ...tickerSequence];
+  // Triple (not double) so the loop feels longer before repeating
+  const loopingSequence = [...tickerSequence, ...tickerSequence, ...tickerSequence];
+  // Scale duration to content: 5s per unique symbol, min 30s
+  const scrollDuration = Math.max(30, tickerSequence.length * 5);
 
   return (
     <div className="market-ticker-shell">
       <div className="market-ticker-container">
-        <div className="ticker-center-scroll-wrap">
+        <div
+          className="ticker-center-scroll-wrap"
+          style={{ '--ticker-duration': `${scrollDuration}s` }}
+        >
           <div className="ticker-center-fade ticker-center-fade--left" aria-hidden="true"></div>
-          <div className="ticker-track ticker-wrapper-track ticker-wrapper-track--animated" role="list" aria-label="Market ticker">
+          <div
+            className="ticker-track ticker-wrapper-track ticker-wrapper-track--animated"
+            role="list"
+            aria-label="Market ticker"
+          >
           {loopingSequence.map((entry, idx) => {
             const s = entry.item;
             const direction = s.change > 0 ? '▲' : s.change < 0 ? '▼' : '•';
             return (
               <div className="ticker-item ticker-item-simple" key={`${entry.key}-${idx}`} role="listitem" aria-hidden={idx >= tickerSequence.length}>
                 <span className="symbol ticker-sym">{s.symbol}</span>
-                <span className="price ticker-val">₹{s.price}</span>
+                <span className="price ticker-val">
+                  {s.isIndex ? '' : getCurrencySymbol(s.type, s.symbol)}{s.price}
+                </span>
                 <span className={`ticker-chg ${s.change > 0 ? 'up green' : s.change < 0 ? 'down red' : ''}`}>
                     <span className="ticker-chg-arrow" aria-hidden="true">{direction}</span>
                     {formatPercent(s.change)}

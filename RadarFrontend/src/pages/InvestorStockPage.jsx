@@ -43,8 +43,11 @@ import Header from '../components/common/Header';
 import './InvestorStockPage.css';
 import { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api from '../api/api';
+import api, { saveToDefaultWatchlist } from '../api/api';
+import { fetchUserWatchlist, removeSymbolFromWatchlist } from '../api/watchlistApi';
 import { useSocket } from '../hooks/useSocket';
+import { formatPrice } from '../utils/currency';
+import { fetchMarketHistory, fetchMarketData } from '../api/marketApi';
 
 
 
@@ -89,9 +92,28 @@ const InvestorStockPage = () => {
   const [isChartLoading, setIsChartLoading] = useState(false);
   const [isAlertOn, setIsAlertOn] = useState(false);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
+  const [watchlistLoading, setWatchlistLoading] = useState(false);
+  const [watchlistId, setWatchlistId] = useState(null);
+  const [toast, setToast] = useState(null); // { msg, type: 'success'|'error' }
+
+  // Fast-path crypto detection from the symbol itself (prevents .NS leakage on first render)
+  // Confirmed/overridden by backend item.type once API responds
+  const KNOWN_CRYPTO_SYMBOLS = new Set([
+    'BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK',
+    'AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT',
+    'ARB','OP','INJ','SUI','SEI','PEPE','WIF','TON','FLOKI','BONK',
+  ]);
+  const isSymbolCrypto = KNOWN_CRYPTO_SYMBOLS.has(String(symbol).toUpperCase().replace(/USDT$/i,'')) ||
+                          String(symbol).toUpperCase().endsWith('USDT');
+
+  // Asset type: starts with fast-path guess, confirmed by backend
+  const [assetType, setAssetType] = useState(isSymbolCrypto ? 'CRYPTO' : 'STOCK');
+  const isCrypto = assetType === 'CRYPTO';
+  const currencyPrefix = isCrypto ? '$' : '₹';
 
   const [financialData, setFinancialData] = useState(null);
   const [newsImpactData, setNewsImpactData] = useState(null);
+  const [quoteData, setQuoteData] = useState(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
   const [errorMetrics, setErrorMetrics] = useState(null);
   
@@ -100,6 +122,8 @@ const InvestorStockPage = () => {
   const [liveChange, setLiveChange] = useState({ val: 0, pct: 0 });
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleTimeString());
   const [historyData, setHistoryData] = useState([]);
+  // Crypto-specific enriched data from backend
+  const [cryptoData, setCryptoData] = useState(null);
 
   // --- Socket.io Integration ---
   const { on, isConnected } = useSocket(['ticker', `symbol:${symbol.toLowerCase()}`]);
@@ -141,8 +165,54 @@ const InvestorStockPage = () => {
   };
 
 
+  // --- Load watchlist membership on mount ---
+  useEffect(() => {
+    const checkWatchlist = async () => {
+      try {
+        const res = await api.get('/watchlist');
+        const lists = res.data || [];
+        if (lists.length > 0) {
+          const first = lists[0];
+          setWatchlistId(first._id);
+          // Model stores items[], each with { symbol: '...' }
+          const syms = (first.items || []).map(s =>
+            String(s?.symbol || s).toUpperCase().replace(/\.(NS|BO)$/i, '')
+          );
+          setIsInWatchlist(syms.includes(symbol.toUpperCase()));
+        }
+      } catch (_) { /* not logged in or no watchlist — silent */ }
+    };
+    checkWatchlist();
+  }, [symbol]);
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleWatchlistToggle = async () => {
+    if (watchlistLoading) return;
+    setWatchlistLoading(true);
+    try {
+      if (isInWatchlist && watchlistId) {
+        await api.delete(`/watchlist/${watchlistId}/remove/${encodeURIComponent(symbol)}`);
+        setIsInWatchlist(false);
+        showToast(`${symbol} removed from watchlist`, 'info');
+      } else {
+        await saveToDefaultWatchlist(symbol);
+        setIsInWatchlist(true);
+        showToast(`${symbol} added to watchlist ✓`, 'success');
+      }
+    } catch (err) {
+      showToast('Failed to update watchlist', 'error');
+    } finally {
+      setWatchlistLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Background is now handled via CSS for better stability
+
     
     on('price_update', (event) => {
       if (event.symbol === symbol || event.asset === symbol) {
@@ -207,36 +277,58 @@ const InvestorStockPage = () => {
         const token = localStorage.getItem('token');
         const config = { headers: { Authorization: `Bearer ${token}` } };
         
-        const [finRes, newsRes, historyRes, liveRes] = await Promise.all([
-          api.get(`/stocks/financials?symbol=${symbol}`),
-          api.get(`/stocks/news?symbol=${symbol}`),
-          api.get(`/stocks/${symbol}/history?interval=1day`),
-          api.get(`/stocks/${symbol}/live`)
+        const activeSymbol = (!isCrypto && exchange === 'NSE' && !symbol.endsWith('.NS')) ? `${symbol}.NS` : symbol;
+
+
+        const [finRes, newsRes, quoteRes] = await Promise.allSettled([
+          api.get(`/stocks/financials?symbol=${activeSymbol}`),
+          api.get(`/stocks/news?symbol=${activeSymbol}`),
+          api.get(`/market/quotes?symbols=${activeSymbol}`)
         ]);
 
-        setFinancialData(finRes.data);
-        setNewsImpactData(newsRes.data);
-        
-        if (historyRes.data?.success) {
-            const raw = historyRes.data.data || [];
-            setHistoryData(raw.map(d => ({
-                time: d.date || d.time,
-                price: d.close,
-                open: d.open,
-                high: d.high,
-                low: d.low,
-                close: d.close
-            })));
+        if (finRes.status === 'fulfilled') setFinancialData(finRes.value.data);
+        if (newsRes.status === 'fulfilled') setNewsImpactData(newsRes.value.data);
+
+        // Primary price source: /api/market/quotes — works for ANY symbol
+        const quoteItem = quoteRes.status === 'fulfilled' ? quoteRes.value.data?.data?.[0] : null;
+        if (quoteItem) {
+          setQuoteData(quoteItem);
+          if (quoteItem.price > 0) {
+            setLivePrice(quoteItem.price);
+            setLiveChange({
+              val: quoteItem.change ?? 0,
+              pct: quoteItem.changePercent ?? 0,
+            });
+          }
         }
 
-        if (liveRes.data?.success && liveRes.data.data) {
-            const lp = liveRes.data.data;
-            setLivePrice(lp.price || lp.ltp || lp.close || 0);
-            setLiveChange({ 
-                val: lp.change || 0, 
-                pct: lp.changePercent || 0 
-            });
+        // Secondary: fetchMarketData for asset-type detection + fallback price
+        try {
+            const searchSymbol = isCrypto ? symbol : activeSymbol;
+            const mkt = await fetchMarketData({ search: searchSymbol });
+            const item = Array.isArray(mkt)
+              ? mkt.find(s => s.symbol.toUpperCase() === symbol.toUpperCase()
+                  || s.symbol.toUpperCase() === activeSymbol.toUpperCase())
+                || mkt[0]
+              : mkt;
+            if (item) {
+                // Only update price if quotes didn't give us one
+                if (!quoteItem?.price || quoteItem.price === 0) {
+                  setLivePrice(item.price || item.ltp || 0);
+                  setLiveChange({
+                    val: item.change || 0,
+                    pct: item.changePercent || 0,
+                  });
+                }
+                // Always update asset type from backend
+                if (item.type) {
+                    setAssetType(String(item.type).toUpperCase());
+                }
+            }
+        } catch(e) {
+            console.warn("fetchMarketData fallback failed:", e.message);
         }
+
 
         setErrorMetrics(null);
       } catch (err) {
@@ -251,6 +343,78 @@ const InvestorStockPage = () => {
     const interval = setInterval(fetchDynamicData, 300000); // 5 min auto-refresh
     return () => clearInterval(interval);
   }, [symbol]);
+
+  // Fetch enriched crypto data from dedicated endpoint when asset is crypto
+  useEffect(() => {
+    if (!isCrypto) return;
+    let active = true;
+    const fetchCrypto = async () => {
+      try {
+        const res = await api.get(`/market/crypto/${symbol.toLowerCase()}`);
+        if (active && res.data?.success && res.data?.data) {
+          const d = res.data.data;
+          setCryptoData(d);
+          // Update live price from crypto endpoint if not yet set via market data
+          if (d.current_price > 0) {
+            setLivePrice(d.current_price);
+            setLiveChange({ val: d.price_change_24h || 0, pct: d.price_change_percentage_24h || 0 });
+          }
+        }
+      } catch (e) {
+        console.warn('Crypto detail fetch failed:', e.message);
+      }
+    };
+    fetchCrypto();
+    const timer = setInterval(fetchCrypto, 30000); // 30s refresh for crypto
+    return () => { active = false; clearInterval(timer); };
+  }, [symbol, isCrypto]);
+
+
+  useEffect(() => {
+    let active = true;
+    const fetchChart = async () => {
+        setIsChartLoading(true);
+        try {
+            let interval = '1D';
+            if (timeFilter === '1D') interval = '5m';
+            else if (timeFilter === '1W') interval = '1h';
+            else if (timeFilter === '1M') interval = '1D';
+            else if (timeFilter === '3M') interval = '1D';
+            else if (timeFilter === '6M') interval = '1W';
+            else if (timeFilter === '1Y') interval = '1W';
+            else if (timeFilter === '5Y') interval = '1M';
+            else if (timeFilter === 'All') interval = '1M';
+
+            // Use raw symbol + CRYPTO type for crypto, add .NS for Indian stocks
+            const chartSymbol = isCrypto
+              ? String(symbol).toUpperCase().endsWith('USDT') ? symbol : `${symbol}USDT`
+              : (exchange === 'NSE' && !symbol.endsWith('.NS') ? `${symbol}.NS` : symbol);
+            const chartType = isCrypto ? 'CRYPTO' : 'STOCK';
+
+            const res = await fetchMarketHistory(chartSymbol, chartType, interval);
+            if (active && res && res.data) {
+                setHistoryData(res.data.map(d => ({
+                    time: timeFilter === '1D' || timeFilter === '1W'
+                        ? new Date(d.timestamp || d.time || d.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : new Date(d.timestamp || d.time || d.date).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+                    price: d.close,
+                    open: d.open,
+                    high: d.high,
+                    low: d.low,
+                    close: d.close,
+                    rangeLowHigh: [d.low, d.high],
+                    rangeOpenClose: [d.open, d.close]
+                })));
+            }
+        } catch(e) {
+            console.error("Chart fetch failed", e);
+        } finally {
+            if (active) setIsChartLoading(false);
+        }
+    };
+    fetchChart();
+    return () => { active = false; };
+  }, [symbol, timeFilter, exchange, isCrypto]);
 
   const getMetricData = () => {
     if (!financialData?.data) return [];
@@ -329,11 +493,12 @@ const InvestorStockPage = () => {
           <Tooltip 
             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: '700' }} 
           />
+          <Line dataKey="price" stroke="transparent" dot={false} isAnimationActive={false} />
           {}
-          <Bar dataKey={(d) => [d.low, d.high]} fill="#cbd5e1" barSize={2} />
+          <Bar dataKey="rangeLowHigh" fill="#cbd5e1" barSize={2} />
           {}
           <Bar 
-            dataKey={(d) => [d.open, d.close]} 
+            dataKey="rangeOpenClose" 
             barSize={14}
             shape={(props) => {
               const { x, y, width, height, payload } = props;
@@ -358,20 +523,42 @@ const InvestorStockPage = () => {
               <div className="header-left-info">
                 <div className="meta-row">
                   <span className="symbol-name">{symbol}</span>
-                  <div className="exchange-switcher">
-                    <button className="ex-arrow-btn" onClick={handleExchangeChange}>
-                      <ChevronLeft size={16} />
-                    </button>
-                    <span className="ex-current">{exchange}</span>
-                    <button className="ex-arrow-btn" onClick={handleExchangeChange}>
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
+                  {/* Hide NSE/BSE switcher for crypto assets */}
+                  {!isCrypto && (
+                    <div className="exchange-switcher">
+                      <button className="ex-arrow-btn" onClick={handleExchangeChange}>
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span className="ex-current">{exchange}</span>
+                      <button className="ex-arrow-btn" onClick={handleExchangeChange}>
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  )}
+                  {isCrypto && (
+                    <span className="ex-current" style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 800, letterSpacing: '0.08em' }}>CRYPTO · USD</span>
+                  )}
                 </div>
                 <h1 className="stock-main-title">{symbol === 'JINDRILL' ? 'Jindal Drilling & Industries' : symbol}</h1>
               </div>
 
-              <div className="header-right-actions">
+              <div className="header-right-actions" style={{ position: 'relative' }}>
+                {/* Watchlist toast */}
+                {toast && (
+                  <div style={{
+                    position: 'absolute', top: '-48px', right: 0,
+                    background: toast.type === 'error' ? '#fee2e2' : toast.type === 'info' ? '#eff6ff' : '#d1fae5',
+                    color: toast.type === 'error' ? '#991b1b' : toast.type === 'info' ? '#1e40af' : '#065f46',
+                    border: `1px solid ${toast.type === 'error' ? '#fca5a5' : toast.type === 'info' ? '#93c5fd' : '#6ee7b7'}`,
+                    borderRadius: '10px', padding: '6px 14px',
+                    fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    animation: 'fadeIn 0.2s ease',
+                    zIndex: 99,
+                  }}>
+                    {toast.msg}
+                  </div>
+                )}
                 <button 
                   className={`icon-action-btn ${isAlertOn ? 'active' : ''}`}
                   onClick={() => setIsAlertOn(!isAlertOn)}
@@ -381,10 +568,12 @@ const InvestorStockPage = () => {
                 </button>
                 <button 
                   className={`icon-action-btn ${isInWatchlist ? 'active' : ''}`}
-                  onClick={() => setIsInWatchlist(!isInWatchlist)}
-                  title="Add to Watchlist"
+                  onClick={handleWatchlistToggle}
+                  title={isInWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist'}
+                  disabled={watchlistLoading}
+                  style={{ opacity: watchlistLoading ? 0.6 : 1 }}
                 >
-                  <Bookmark size={18} />
+                  <Bookmark size={18} fill={isInWatchlist ? 'currentColor' : 'none'} />
                 </button>
                 <Link to={`/advanced-charts?symbol=${symbol}`} className="advanced-chart-btn">
                   <TrendingUp size={16} />
@@ -394,7 +583,9 @@ const InvestorStockPage = () => {
             </div>
 
             <div className="card-price-section">
-              <span className="card-price-main">₹{livePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              <span className="card-price-main">
+                {currencyPrefix}{livePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
               <span className={`card-price-change ${liveChange.pct >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                 {liveChange.pct >= 0 ? '+' : ''}{Number(liveChange.val).toFixed(2)} ({liveChange.pct}%)
               </span>
@@ -489,15 +680,15 @@ const InvestorStockPage = () => {
                         <span className="po-range-label">Today's Range</span>
                       </div>
                       <div className="po-visual-track-wrap">
-                        <span className="po-limit-price">₹{(financialData?.data?.stats?.dayLow || livePrice * 0.98).toFixed(2)}</span>
+                        <span className="po-limit-price">{currencyPrefix}{(financialData?.data?.stats?.dayLow || livePrice * 0.98).toFixed(2)}</span>
                         <div className="po-track-main today-gradient">
                           <div className="po-marker-assembly" style={{ left: '50%' }}>
-                            <div className="po-floating-price">₹{livePrice.toFixed(2)} • Current</div>
+                            <div className="po-floating-price">{currencyPrefix}{livePrice.toFixed(2)} • Current</div>
                             <div className="po-marker-v-line"></div>
                             <div className="po-marker-dot"></div>
                           </div>
                         </div>
-                        <span className="po-limit-price">₹{(financialData?.data?.stats?.dayHigh || livePrice * 1.02).toFixed(2)}</span>
+                        <span className="po-limit-price">{currencyPrefix}{(financialData?.data?.stats?.dayHigh || livePrice * 1.02).toFixed(2)}</span>
                       </div>
                     </div>
 
@@ -507,13 +698,13 @@ const InvestorStockPage = () => {
                         <span className="po-context-indicator">Near 52W High</span>
                       </div>
                       <div className="po-visual-track-wrap">
-                        <span className="po-limit-price">₹{(financialData?.data?.stats?.low52w || livePrice * 0.7).toFixed(2)}</span>
+                        <span className="po-limit-price">{currencyPrefix}{(financialData?.data?.stats?.low52w || livePrice * 0.7).toFixed(2)}</span>
                         <div className="po-track-main fiftytwo-gradient">
                           <div className="po-marker-assembly" style={{ left: '70%' }}>
                             <div className="po-marker-dot marker-muted"></div>
                           </div>
                         </div>
-                        <span className="po-limit-price">₹{(financialData?.data?.stats?.high52w || livePrice * 1.3).toFixed(2)}</span>
+                        <span className="po-limit-price">{currencyPrefix}{(financialData?.data?.stats?.high52w || livePrice * 1.3).toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -523,53 +714,117 @@ const InvestorStockPage = () => {
                       <div className="ps-icon-circle bg-blue-soft"><Clock size={16} /></div>
                       <div className="ps-data">
                         <span className="ps-label">Open</span>
-                        <span className="ps-value">₹{(financialData?.data?.stats?.open || livePrice).toFixed(2)}</span>
+                        <span className="ps-value">{currencyPrefix}{(financialData?.data?.stats?.open || livePrice).toFixed(2)}</span>
                       </div>
                     </div>
                     <div className="po-stat-card-luxury">
                       <div className="ps-icon-circle bg-green-soft"><TrendingUp size={16} /></div>
                       <div className="ps-data">
                         <span className="ps-label">Prev Close</span>
-                        <span className="ps-value">₹{(financialData?.data?.stats?.prevClose || livePrice - liveChange.val).toFixed(2)}</span>
+                        <span className="ps-value">
+                          {currencyPrefix}{
+                            isCrypto
+                              ? (cryptoData?.prev_close > 0 ? cryptoData.prev_close.toFixed(2) : '\u2014')
+                              : (quoteData?.price && quoteData?.change
+                                  ? (quoteData.price - quoteData.change).toFixed(2)
+                                  : (livePrice - liveChange.val).toFixed(2))
+                          }
+                        </span>
                       </div>
                     </div>
                     <div className="po-stat-card-luxury">
                       <div className="ps-icon-circle bg-purple-soft"><Activity size={16} /></div>
                       <div className="ps-data">
                         <span className="ps-label">Volume</span>
-                        <span className="ps-value">{financialData?.data?.stats?.volume?.toLocaleString() || '—'}</span>
+                        <span className="ps-value">{quoteData?.volume?.toLocaleString('en-IN') || '—'}</span>
                       </div>
                     </div>
                     <div className="po-stat-card-luxury">
                       <div className="ps-icon-circle bg-orange-soft"><ShieldCheck size={16} /></div>
                       <div className="ps-data">
-                        <span className="ps-label">Market Cap</span>
-                        <span className="ps-value text-sm-luxury">₹{financialData?.data?.fundamentals?.[0]?.value || '—'} Cr</span>
+                        <span className="ps-label">{isCrypto ? 'Market Cap (USD)' : 'Market Cap'}</span>
+                        <span className="ps-value text-sm-luxury">
+                          {quoteData?.marketCap
+                            ? isCrypto
+                              ? `$${(quoteData.marketCap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 })}B`
+                              : `₹${(quoteData.marketCap / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 0 })} Cr`
+                            : '—'
+                          }
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="key-metrics-compact-row animate-fade-in">
-                {[
-                  { label: 'Market Cap', val: 'Ã¢â€šÂ¹1,708 Cr', tag: 'Mid Cap', hint: 'Top 250 Company', type: 'neutral' },
-                  { label: 'P/E Ratio', val: '9.2', tag: 'Undervalued', hint: 'Below Industry Avg', type: 'green' },
-                  { label: 'ROE', val: '14.7%', tag: 'Strong', hint: 'Consistent returns', type: 'green' },
-                  { label: 'Debt to Equity', val: '0.12', tag: 'Low Risk', hint: 'Very healthy', type: 'green' },
-                  { label: 'Revenue Growth', val: '12.4%', tag: 'Stable', hint: 'YoY Growth', type: 'neutral' },
-                  { label: 'Profit Margin', val: '11.4%', tag: 'Healthy', hint: 'Post-tax earnings', type: 'green' },
-                ].map((m, i) => (
-                  <div key={i} className="km-card">
-                    <span className="km-label">{m.label}</span>
-                    <div className="km-val-box">
-                      <span className="km-value">{m.val}</span>
-                      <span className={`km-status tag-${m.type}`}>{m.tag}</span>
+              {/* ---- METRICS ROW: crypto vs stock ---- */}
+              {isCrypto ? (
+                <div className="key-metrics-compact-row animate-fade-in">
+                  {[
+                    {
+                      label: '24h Volume',
+                      val: cryptoData?.total_volume > 0 ? `$${(cryptoData.total_volume / 1e9).toFixed(2)}B` : (cryptoData?.details?.volume || 'Loading...'),
+                      tag: 'USD', hint: 'Quote volume (USDT)', type: 'neutral'
+                    },
+                    {
+                      label: '24h Trades',
+                      val: cryptoData?.trade_count > 0 ? Number(cryptoData.trade_count).toLocaleString() : '—',
+                      tag: 'Binance', hint: 'Number of trades', type: 'neutral'
+                    },
+                    {
+                      label: 'Category',
+                      val: cryptoData?.category || '—',
+                      tag: 'Crypto', hint: 'Asset class', type: 'neutral'
+                    },
+                    {
+                      label: 'Layer',
+                      val: cryptoData?.layer || '—',
+                      tag: 'Network', hint: 'Blockchain layer', type: 'neutral'
+                    },
+                    {
+                      label: 'Consensus',
+                      val: cryptoData?.consensus || '—',
+                      tag: 'Protocol', hint: 'Validation mechanism', type: 'neutral'
+                    },
+                    {
+                      label: 'Market Cap',
+                      val: cryptoData?.market_cap > 0
+                        ? `$${(cryptoData.market_cap / 1e9).toFixed(1)}B`
+                        : cryptoData?.details?.market_cap || 'N/A',
+                      tag: 'USD', hint: 'Total market value', type: 'neutral'
+                    },
+                  ].map((m, i) => (
+                    <div key={i} className="km-card">
+                      <span className="km-label">{m.label}</span>
+                      <div className="km-val-box">
+                        <span className="km-value">{m.val}</span>
+                        <span className={`km-status tag-${m.type}`}>{m.tag}</span>
+                      </div>
+                      <span className="km-hint">{m.hint}</span>
                     </div>
-                    <span className="km-hint">{m.hint}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="key-metrics-compact-row animate-fade-in">
+                  {[
+                    { label: 'Market Cap', val: quoteData?.marketCap ? `₹${(quoteData.marketCap / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 0 })} Cr` : 'N/A', tag: quoteData?.marketCap > 200000000000 ? 'Large Cap' : 'Mid Cap', hint: 'Company Size', type: 'neutral' },
+                    { label: 'P/E Ratio', val: quoteData?.pe ? quoteData.pe.toString() : 'N/A', tag: quoteData?.valStatus === 'undervalued' ? 'Undervalued' : quoteData?.valStatus === 'overvalued' ? 'Overvalued' : 'Fair Value', hint: 'Trailing 12m', type: quoteData?.valStatus === 'undervalued' ? 'green' : quoteData?.valStatus === 'overvalued' ? 'red' : 'neutral' },
+                    { label: 'ROE', val: quoteData?.roe ? `${quoteData.roe}%` : 'N/A', tag: quoteData?.roe > 15 ? 'Strong' : 'Average', hint: 'Consistent returns', type: quoteData?.roe > 15 ? 'green' : 'neutral' },
+                    { label: 'Debt to Equity', val: quoteData?.debtToEquity != null ? quoteData.debtToEquity.toString() : 'N/A', tag: quoteData?.debtToEquity < 1 ? 'Low Risk' : 'High Risk', hint: 'Capital Structure', type: quoteData?.debtToEquity < 1 ? 'green' : 'red' },
+                    { label: 'Revenue Growth', val: quoteData?.revenueGrowth != null ? `${quoteData.revenueGrowth}%` : 'N/A', tag: quoteData?.revenueGrowth > 10 ? 'High Growth' : 'Stable', hint: 'YoY Growth', type: quoteData?.revenueGrowth > 10 ? 'green' : 'neutral' },
+                    { label: 'Profit Margin', val: quoteData?.profitMargins != null ? `${quoteData.profitMargins}%` : 'N/A', tag: quoteData?.profitMargins > 10 ? 'Healthy' : 'Average', hint: 'Post-tax earnings', type: quoteData?.profitMargins > 10 ? 'green' : 'neutral' },
+                  ].map((m, i) => (
+                    <div key={i} className="km-card">
+                      <span className="km-label">{m.label}</span>
+                      <div className="km-val-box">
+                        <span className="km-value">{m.val}</span>
+                        <span className={`km-status tag-${m.type}`}>{m.tag}</span>
+                      </div>
+                      <span className="km-hint">{m.hint}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="radar-layout-stack animate-fade-in">
                 <div className="radar-card about-company-row">
@@ -579,7 +834,11 @@ const InvestorStockPage = () => {
                       <h3>About {symbol}</h3>
                     </div>
                     <p className="about-text-clean">
-                      {financialData?.data?.description || `${symbol} is an equity instrument listed on the exchange. Detailed company profiling and business operations data is currently being synced from the latest regulatory filings.`}
+                      {financialData?.data?.description || (
+                        isCrypto
+                          ? `${symbol} is a digital asset and cryptocurrency traded globally on crypto exchanges. Price data is sourced from live market feeds in USD.`
+                          : `${symbol} is an equity instrument listed on the exchange. Detailed company profiling and business operations data is currently being synced from the latest regulatory filings.`
+                      )}
                     </p>
                     {financialData?.data?.website && <a href={financialData.data.website} target="_blank" rel="noreferrer" className="text-blue-500 font-bold text-xs mt-2 block uppercase">Visit Website</a>}
                   </div>
@@ -587,15 +846,15 @@ const InvestorStockPage = () => {
                     <div className="meta-grid">
                       <div className="meta-item">
                         <span className="meta-l">Sector</span>
-                        <span className="meta-v">{financialData?.data?.sector || 'Equity'}</span>
+                        <span className="meta-v">{isCrypto ? (cryptoData?.category || 'Cryptocurrency') : (quoteData?.sector || financialData?.data?.sector || 'Equity')}</span>
                       </div>
                       <div className="meta-item">
-                        <span className="meta-l">Industry</span>
-                        <span className="meta-v">{financialData?.data?.industry || 'Services'}</span>
+                        <span className="meta-l">{isCrypto ? 'Layer' : 'Industry'}</span>
+                        <span className="meta-v">{isCrypto ? (cryptoData?.layer || 'Layer 1') : (quoteData?.industry || financialData?.data?.industry || 'Services')}</span>
                       </div>
                       <div className="meta-item">
-                        <span className="meta-l">ISIN</span>
-                        <span className="meta-v">{financialData?.data?.isin || '—'}</span>
+                        <span className="meta-l">{isCrypto ? 'Consensus' : 'ISIN'}</span>
+                        <span className="meta-v">{isCrypto ? (cryptoData?.consensus || 'N/A') : (financialData?.data?.isin || '—')}</span>
                       </div>
                       <div className="meta-item">
                         <span className="meta-l">Last Update</span>
@@ -637,7 +896,7 @@ const InvestorStockPage = () => {
                               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} dy={10} />
                               <Tooltip cursor={{fill: '#f8fafc', radius: 4}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 15px rgba(0,0,0,0.05)' }} />
                               <Bar 
-                                name={finTab === 'Shareholding' ? 'Ownership %' : `${finTab} (Ã¢â€šÂ¹ Cr)`} 
+                                name={finTab === 'Shareholding' ? 'Ownership %' : `${finTab} (₹ Cr)`} 
                                 dataKey="value" 
                                 fill={finTab === 'Profit' ? '#10b981' : '#3b82f6'} 
                                 radius={[6, 6, 0, 0]} 
@@ -1139,7 +1398,7 @@ const InvestorStockPage = () => {
                       <div className="ft-dropdown-s">{FUNDAMENTALS_TOOLTIPS.companyFundamentals}</div>
                     </div>
                   </div>
-                  <span className="ft-sub-text">All figures in â‚¹ Cr unless specified</span>
+                  <span className="ft-sub-text">All figures in ₹ Cr unless specified</span>
                 </div>
 
                 <div className="ft-rich-table-grid">
@@ -1192,233 +1451,282 @@ const InvestorStockPage = () => {
               </div>
 
               <div className="ft-detailed-layout-grid">
-                {/* Valuation Metrics */}
-                <div className="ft-analysis-card">
-                  <div className="fac-header flex items-center gap-2">
-                    <span>Valuation Metrics</span>
-                    <div className="info-trigger-s">
-                      <HelpCircle size={13} className="text-slate-300" />
-                      <div className="ft-dropdown-s">{FUNDAMENTALS_TOOLTIPS.valuationMetrics}</div>
-                    </div>
-                  </div>
-                  <div className="fac-list">
-                    {[
-                      { n: 'P/E (TTM)', v: '9.21', label: 'Undervalued', t: 'green', sub: 'Below Industry Average' },
-                      { n: 'Price to Book', v: '1.45', label: 'Healthy', t: 'green', sub: 'Fair relative to assets' },
-                      { n: 'EV / EBITDA', v: '6.80', label: 'Strong', t: 'green', sub: 'Good cash flow proxy' },
-                      { n: 'PEG Ratio', v: '0.92', label: 'Growth Value', t: 'green', sub: 'Cheap adjusted for growth' },
-                    ].map((m, i) => (
-                      <div key={i} className="fac-item">
-                        <div className="fac-left">
-                          <div className="flex items-center gap-1.5">
-                            <span className="fac-n">{m.n}</span>
-                            <div className="info-trigger-s">
-                              <HelpCircle size={10} className="text-slate-200" />
-                              <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
-                            </div>
-                          </div>
-                          <span className="fac-sub">{m.sub}</span>
-                        </div>
-                        <div className="fac-right">
-                          <span className="fac-v">{m.v}</span>
-                          <span className={`fac-label text-${m.t}`}>{m.label}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {/* ── helpers ───────────────────────────────── */}
+                {(() => {
+                  const q = quoteData || {};
+                  const fmt   = (v, dec = 2) => v != null && !isNaN(v) ? Number(v).toFixed(dec) : null;
+                  const fmtPct= (v) => v != null && !isNaN(v) ? `${Number(v).toFixed(1)}%` : null;
+                  const na    = (v, suffix = '') => v != null ? `${v}${suffix}` : 'N/A';
 
-                {/* Profitability */}
-                <div className="ft-analysis-card">
-                  <div className="fac-header flex items-center gap-2">
-                    <span>Profitability</span>
-                    <div className="info-trigger-s">
-                      <HelpCircle size={13} className="text-slate-300" />
-                      <div className="ft-dropdown-s"><strong>Profitability:</strong> {METRIC_DESCRIPTIONS['Profitability']}</div>
-                    </div>
-                  </div>
-                  <div className="fac-list">
-                    {[
-                      { n: 'ROE', v: '14.7%', label: 'Strong', t: 'green', sub: 'Efficient equity usage' },
-                      { n: 'ROCE', v: '18.2%', label: 'Superior', t: 'green', sub: 'Optimal capital management' },
-                      { n: 'Operating Margin', v: '22.8%', label: 'High', t: 'green', sub: 'Core business efficiency' },
-                      { n: 'Net Profit Margin', v: '11.4%', label: 'Stable', t: 'green', sub: 'Final post-tax margin' },
-                    ].map((m, i) => (
-                      <div key={i} className="fac-item">
-                        <div className="fac-left">
-                          <div className="flex items-center gap-1.5">
-                            <span className="fac-n">{m.n}</span>
-                            <div className="info-trigger-s">
-                              <HelpCircle size={10} className="text-slate-200" />
-                              <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
-                            </div>
-                          </div>
-                          <span className="fac-sub">{m.sub}</span>
-                        </div>
-                        <div className="fac-right">
-                          <span className="fac-v">{m.v}</span>
-                          <span className={`fac-label text-${m.t}`}>{m.label}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  // Valuation
+                  const pe        = fmt(q.pe, 2);
+                  const peLabel   = pe == null ? 'N/A' : q.valStatus === 'undervalued' ? 'Undervalued' : q.valStatus === 'overvalued' ? 'Overvalued' : 'Fair Value';
+                  const peColor   = q.valStatus === 'undervalued' ? 'green' : q.valStatus === 'overvalued' ? 'red' : 'neutral';
+                  const ptb       = fmt(q.priceToBook, 2);
+                  const evEbitda  = fmt(q.evToEbitda, 2);
+                  const pegRatio  = fmt(q.pegRatio, 2);
+                  const beta      = fmt(q.beta, 2);
 
-                {/* Growth Profile */}
-                <div className="ft-analysis-card">
-                  <div className="fac-header flex items-center gap-2">
-                    <span>Growth Profile</span>
-                    <div className="info-trigger-s">
-                      <HelpCircle size={13} className="text-slate-300" />
-                      <div className="ft-dropdown-s"><strong>Growth:</strong> {METRIC_DESCRIPTIONS['Growth Profile']}</div>
-                    </div>
-                  </div>
-                  <div className="fac-list">
-                    {[
-                      { n: 'Rev Growth (3Y)', v: '12.4%', label: 'Stable', t: 'green', sub: 'YoY Revenue CAGR' },
-                      { n: 'Profit Growth', v: '8.9%', label: 'Moderate', t: 'neutral', sub: 'Bottom-line expansion' },
-                      { n: 'EPS Growth', v: '10.2%', label: 'Positive', t: 'green', sub: 'Consistent per-share gain' },
-                    ].map((m, i) => (
-                      <div key={i} className="fac-item">
-                        <div className="fac-left">
-                          <div className="flex items-center gap-1.5">
-                            <span className="fac-n">{m.n}</span>
-                            <div className="info-trigger-s">
-                              <HelpCircle size={10} className="text-slate-200" />
-                              <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
-                            </div>
-                          </div>
-                          <span className="fac-sub">{m.sub}</span>
-                        </div>
-                        <div className="fac-right">
-                          <span className="fac-v">{m.v}</span>
-                          <span className={`fac-label text-${m.t}`}>{m.label}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  // Profitability
+                  const roe       = fmtPct(q.roe);
+                  const roce      = fmtPct(q.roce);
+                  const opMargin  = fmtPct(q.operatingMargins);
+                  const netMargin = fmtPct(q.profitMargins);
 
-                {/* Financial Health */}
-                <div className="ft-analysis-card">
-                  <div className="fac-header flex items-center gap-2">
-                    <span>Financial Health</span>
-                    <div className="info-trigger-s">
-                      <HelpCircle size={13} className="text-slate-300" />
-                      <div className="ft-dropdown-s"><strong>Health:</strong> {METRIC_DESCRIPTIONS['Financial Health']}</div>
-                    </div>
-                  </div>
-                  <div className="fac-list">
-                    {[
-                      { n: 'Debt to Equity', v: '0.12', label: 'Very Low', t: 'green', sub: 'Prudent debt management' },
-                      { n: 'Int. Coverage', v: '14.2', label: 'Superior', t: 'green', sub: 'Safe interest repayments' },
-                      { n: 'Current Ratio', v: '2.45', label: 'Robust', t: 'green', sub: 'Optimal liquidity profile' },
-                    ].map((m, i) => (
-                      <div key={i} className="fac-item">
-                        <div className="fac-left">
-                          <div className="flex items-center gap-1.5">
-                            <span className="fac-n">{m.n}</span>
-                            <div className="info-trigger-s">
-                              <HelpCircle size={10} className="text-slate-200" />
-                              <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
-                            </div>
-                          </div>
-                          <span className="fac-sub">{m.sub}</span>
-                        </div>
-                        <div className="fac-right">
-                          <span className="fac-v">{m.v}</span>
-                          <span className={`fac-label text-${m.t}`}>{m.label}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  // Growth
+                  const revGrowth = fmtPct(q.revenueGrowth);
+                  const epsGrowth = fmtPct(q.epsGrowth);
 
-                {/* Shareholder Metrics */}
-                <div className="ft-analysis-card">
-                  <div className="fac-header d-flex items-center gap-2">
-                    <span>Shareholder Metrics</span>
-                    <div className="info-trigger-s">
-                      <HelpCircle size={13} className="text-slate-300" />
-                      <div className="ft-dropdown-s"><strong>Shareholders:</strong> {METRIC_DESCRIPTIONS['Shareholder Metrics']}</div>
-                    </div>
-                  </div>
-                  <div className="fac-list">
-                    {[
-                      { n: 'EPS (TTM)', v: '54.20', label: 'Rising', t: 'green', sub: 'Last 12 month earnings' },
-                      { n: 'Dividend Yield', v: '0.85%', label: 'Moderate', t: 'neutral', sub: 'Annual yield percentage' },
-                      { n: 'Book Value', v: '388.15', label: 'Strong', t: 'green', sub: 'Asset value per share' },
-                    ].map((m, i) => (
-                      <div key={i} className="fac-item">
-                        <div className="fac-left">
-                          <div className="flex items-center gap-1.5">
-                            <span className="fac-n">{m.n}</span>
-                            <div className="info-trigger-s">
-                              <HelpCircle size={10} className="text-slate-200" />
-                              <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
-                            </div>
-                          </div>
-                          <span className="fac-sub">{m.sub}</span>
-                        </div>
-                        <div className="fac-right">
-                          <span className="fac-v">{m.v}</span>
-                          <span className={`fac-label text-${m.t}`}>{m.label}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  // Financial Health
+                  const dte        = fmt(q.debtToEquity, 2);
+                  const dteLabel   = dte == null ? 'N/A' : Number(dte) < 0.5 ? 'Very Low' : Number(dte) < 1 ? 'Low' : Number(dte) < 2 ? 'Moderate' : 'High';
+                  const dteColor   = dte == null ? 'neutral' : Number(dte) < 1 ? 'green' : 'red';
+                  const intCov     = fmt(q.interestCoverage, 1);
+                  const curRatio   = fmt(q.currentRatio, 2);
+                  const curLabel   = curRatio == null ? 'N/A' : Number(curRatio) >= 2 ? 'Robust' : Number(curRatio) >= 1.5 ? 'Healthy' : 'Weak';
+                  const curColor   = curRatio == null ? 'neutral' : Number(curRatio) >= 1.5 ? 'green' : 'red';
 
+                  // Shareholder
+                  const eps        = fmt(q.eps, 2);
+                  const divYield   = fmtPct(q.dividendYield ? q.dividendYield * 100 : null);
+                  const bookVal    = fmt(q.bookValue, 2);
 
-                {/* Peer Comparison */}
-                <div className="ft-analysis-card ft-peer-card">
-                  <div className="fac-header flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span>Peer Comparison</span>
-                      <div className="info-trigger-s">
-                        <HelpCircle size={13} className="text-slate-300" />
-                        <div className="ft-dropdown-s">{FUNDAMENTALS_TOOLTIPS.peerComparison}</div>
-                      </div>
-                    </div>
-                    <span className="text-xs font-normal text-slate-400">Industry: Energy Services</span>
-                  </div>
-                  <div className="peer-comp-table">
-                    <div className="pct-header">
-                      <span>Metric</span>
-                      <span>Company</span>
-                      <span>Industry Avg</span>
-                    </div>
-                    {[
-                      { n: 'P/E Ratio', c: '9.21', i: '18.4', t: 'green', d: 'down' },
-                      { n: 'ROE', c: '14.7%', i: '11.2%', t: 'green', d: 'up' },
-                      { n: 'Profit Margin', c: '11.4%', i: '8.5%', t: 'green', d: 'up' },
-                      { n: 'Rev Growth', c: '12.4%', i: '9.5%', t: 'green', d: 'up' },
-                    ].map((m, idx) => (
-                      <div key={idx} className="pct-row">
-                        <div className="flex items-center gap-2">
-                          <span className="pct-n">{m.n}</span>
+                  // Peer comparison — use sector from quoteData
+                  const industry   = q.industry || q.sector || '—';
+
+                  const tradeCount= q.tradeCount ? Number(q.tradeCount).toLocaleString() : null;
+                  const category  = q.category || 'N/A';
+                  const layer     = q.layer || 'N/A';
+                  const consensus = q.consensus || 'N/A';
+                  const volUSD    = q.volume ? `$${(Number(q.volume)/1e6).toFixed(1)}M` : 'N/A';
+
+                  const cardMap = (items) => items.map((m, i) => (
+                    <div key={i} className="fac-item">
+                      <div className="fac-left">
+                        <div className="flex items-center gap-1.5">
+                          <span className="fac-n">{m.n}</span>
                           <div className="info-trigger-s">
                             <HelpCircle size={10} className="text-slate-200" />
-                            <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
+                            <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n] || 'Asset telemetry metric.'}</div>
                           </div>
                         </div>
-                        <div className="pct-c-cell">
-                          <span className="pct-val">{m.c}</span>
-                          <div className={`pct-indicator text-${m.t}`}>
-                            {m.d === 'up' ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                          </div>
-                        </div>
-                        <span className="pct-i">{m.i}</span>
+                        <span className="fac-sub">{m.sub}</span>
                       </div>
-                    ))}
-                  </div>
-                  <div className="peer-foot mt-4 border-t pt-3 border-slate-100">
-                    <p className="text-[11px] text-slate-500 leading-relaxed italic">
-                      JINDRILL outperforms industry averages in all core efficiency and growth benchmarks.
-                    </p>
-                  </div>
-                </div>
+                      <div className="fac-right">
+                        <span className="fac-v">{m.v}</span>
+                        <span className={`fac-label text-${m.t || 'neutral'}`}>{m.label}</span>
+                      </div>
+                    </div>
+                  ));
 
+                  if (isCrypto) {
+                    return (
+                      <>
+                        {/* Crypto: Network Performance */}
+                        <div className="ft-analysis-card">
+                          <div className="fac-header flex items-center gap-2">
+                            <Zap size={14} className="text-amber-500" />
+                            <span>Network Performance</span>
+                          </div>
+                          <div className="fac-list">
+                            {cardMap([
+                              { n: '24h Volume',    v: volUSD,      label: 'Volume',     t: 'neutral', sub: 'Total traded value (24h)' },
+                              { n: 'Trade Count',   v: na(tradeCount), label: 'Activity',   t: 'green', sub: 'Number of unique trades' },
+                              { n: 'Price (24h)',   v: na(fmt(q.price, 2), '$'), label: 'Live', t: 'green', sub: 'Current asset price in USD' },
+                            ])}
+                          </div>
+                        </div>
+
+                        {/* Crypto: Project Architecture */}
+                        <div className="ft-analysis-card">
+                          <div className="fac-header flex items-center gap-2">
+                            <Database size={14} className="text-blue-500" />
+                            <span>Project Identity</span>
+                          </div>
+                          <div className="fac-list">
+                            {cardMap([
+                              { n: 'Category',      v: category,    label: 'Type',       t: 'neutral', sub: 'Primary use case' },
+                              { n: 'Network Layer', v: layer,       label: 'Architecture',t: 'neutral', sub: 'Protocol layer depth' },
+                              { n: 'Consensus',     v: consensus,   label: 'Security',   t: 'neutral', sub: 'Network validation method' },
+                            ])}
+                          </div>
+                        </div>
+
+                        {/* Crypto: Market Statistics */}
+                        <div className="ft-analysis-card">
+                          <div className="fac-header flex items-center gap-2">
+                            <Activity size={14} className="text-emerald-500" />
+                            <span>Market Statistics</span>
+                          </div>
+                          <div className="fac-list">
+                            {cardMap([
+                              { n: '24h High',      v: na(fmt(q.high, 2), '$'), label: 'Peak',   t: 'green', sub: 'Highest price in last 24h' },
+                              { n: '24h Low',       v: na(fmt(q.low, 2), '$'),  label: 'Trough', t: 'red',   sub: 'Lowest price in last 24h' },
+                              { n: 'Prev Close',    v: na(fmt(q.previousClose, 2), '$'), label: 'Reset', t: 'neutral', sub: 'Binance daily reset price' },
+                            ])}
+                          </div>
+                        </div>
+
+                        {/* Crypto: Growth Stats */}
+                        <div className="ft-analysis-card">
+                          <div className="fac-header flex items-center gap-2">
+                            <TrendingUp size={14} className="text-violet-500" />
+                            <span>Performance Metrics</span>
+                          </div>
+                          <div className="fac-list">
+                            {cardMap([
+                              { n: '24h Change',    v: na(fmtPct(q.changePercent)), label: Number(q.changePercent) >= 0 ? 'Bullish' : 'Bearish', t: Number(q.changePercent) >= 0 ? 'green' : 'red', sub: 'Percentage delta (24h)' },
+                              { n: 'Volatility',    v: na(fmt(q.beta, 2)), label: 'Relative', t: 'neutral', sub: 'Historical price variance' },
+                            ])}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {/* Valuation Metrics */}
+                      <div className="ft-analysis-card">
+                        <div className="fac-header flex items-center gap-2">
+                          <span>Valuation Metrics</span>
+                          <div className="info-trigger-s">
+                            <HelpCircle size={13} className="text-slate-300" />
+                            <div className="ft-dropdown-s">{FUNDAMENTALS_TOOLTIPS.valuationMetrics}</div>
+                          </div>
+                        </div>
+                        <div className="fac-list">
+                          {cardMap([
+                            { n: 'P/E (TTM)',      v: na(pe),      label: peLabel,  t: peColor,   sub: 'Trailing 12-month earnings' },
+                            { n: 'Price to Book',  v: na(ptb),     label: ptb == null ? 'N/A' : Number(ptb) < 3 ? 'Healthy' : 'Elevated', t: ptb == null ? 'neutral' : Number(ptb) < 3 ? 'green' : 'red', sub: 'Fair relative to assets' },
+                            { n: 'EV / EBITDA',    v: na(evEbitda),label: evEbitda == null ? 'N/A' : Number(evEbitda) < 10 ? 'Strong' : 'Moderate', t: evEbitda == null ? 'neutral' : Number(evEbitda) < 10 ? 'green' : 'neutral', sub: 'Good cash flow proxy' },
+                            { n: 'Beta',           v: na(beta),    label: beta == null ? 'N/A' : Number(beta) < 1 ? 'Low Volatility' : 'High Volatility', t: beta == null ? 'neutral' : Number(beta) < 1 ? 'green' : 'red', sub: 'Market sensitivity' },
+                          ])}
+                        </div>
+                      </div>
+
+                      {/* Profitability */}
+                      <div className="ft-analysis-card">
+                        <div className="fac-header flex items-center gap-2">
+                          <span>Profitability</span>
+                          <div className="info-trigger-s">
+                            <HelpCircle size={13} className="text-slate-300" />
+                            <div className="ft-dropdown-s"><strong>Profitability:</strong> {METRIC_DESCRIPTIONS['Profitability']}</div>
+                          </div>
+                        </div>
+                        <div className="fac-list">
+                          {cardMap([
+                            { n: 'ROE',             v: na(roe),       label: roe == null ? 'N/A' : parseFloat(roe) > 15 ? 'Strong' : 'Average',  t: roe == null ? 'neutral' : parseFloat(roe) > 15 ? 'green' : 'neutral', sub: 'Efficient equity usage' },
+                            { n: 'Operating Margin',v: na(opMargin),  label: opMargin == null ? 'N/A' : parseFloat(opMargin) > 20 ? 'High' : parseFloat(opMargin) > 10 ? 'Stable' : 'Low', t: opMargin == null ? 'neutral' : parseFloat(opMargin) > 15 ? 'green' : 'neutral', sub: 'Core business efficiency' },
+                            { n: 'Net Profit Margin',v: na(netMargin),label: netMargin == null ? 'N/A' : parseFloat(netMargin) > 10 ? 'Healthy' : 'Stable', t: netMargin == null ? 'neutral' : parseFloat(netMargin) > 10 ? 'green' : 'neutral', sub: 'Final post-tax margin' },
+                            { n: 'Beta',            v: na(beta),      label: beta == null ? 'N/A' : Number(beta) < 1 ? 'Defensive' : 'Aggressive', t: 'neutral', sub: '5-yr monthly vs market' },
+                          ])}
+                        </div>
+                      </div>
+
+                      {/* Growth Profile */}
+                      <div className="ft-analysis-card">
+                        <div className="fac-header flex items-center gap-2">
+                          <span>Growth Profile</span>
+                          <div className="info-trigger-s">
+                            <HelpCircle size={13} className="text-slate-300" />
+                            <div className="ft-dropdown-s"><strong>Growth:</strong> {METRIC_DESCRIPTIONS['Growth Profile']}</div>
+                          </div>
+                        </div>
+                        <div className="fac-list">
+                          {cardMap([
+                            { n: 'Rev Growth (3Y)', v: na(revGrowth), label: revGrowth == null ? 'N/A' : parseFloat(revGrowth) > 10 ? 'High Growth' : parseFloat(revGrowth) > 0 ? 'Stable' : 'Declining', t: revGrowth == null ? 'neutral' : parseFloat(revGrowth) > 5 ? 'green' : parseFloat(revGrowth) > 0 ? 'neutral' : 'red', sub: 'YoY Revenue CAGR' },
+                            { n: 'EPS Growth',      v: na(epsGrowth), label: epsGrowth == null ? 'N/A' : parseFloat(epsGrowth) > 10 ? 'Positive' : 'Moderate', t: epsGrowth == null ? 'neutral' : parseFloat(epsGrowth) > 5 ? 'green' : 'neutral', sub: 'Consistent per-share gain' },
+                            { n: 'Profit Margin',   v: na(netMargin), label: netMargin == null ? 'N/A' : parseFloat(netMargin) > 10 ? 'Healthy' : 'Moderate', t: netMargin == null ? 'neutral' : parseFloat(netMargin) > 10 ? 'green' : 'neutral', sub: 'Bottom-line expansion' },
+                          ])}
+                        </div>
+                      </div>
+
+                      {/* Financial Health */}
+                      <div className="ft-analysis-card">
+                        <div className="fac-header flex items-center gap-2">
+                          <span>Financial Health</span>
+                          <div className="info-trigger-s">
+                            <HelpCircle size={13} className="text-slate-300" />
+                            <div className="ft-dropdown-s"><strong>Health:</strong> {METRIC_DESCRIPTIONS['Financial Health']}</div>
+                          </div>
+                        </div>
+                        <div className="fac-list">
+                          {cardMap([
+                            { n: 'Debt to Equity', v: na(dte),    label: dteLabel, t: dteColor,   sub: 'Prudent debt management' },
+                            { n: 'Int. Coverage',  v: na(intCov), label: intCov == null ? 'N/A' : Number(intCov) > 5 ? 'Superior' : Number(intCov) > 2 ? 'Adequate' : 'Weak', t: intCov == null ? 'neutral' : Number(intCov) > 5 ? 'green' : Number(intCov) > 2 ? 'neutral' : 'red', sub: 'Safe interest repayments' },
+                            { n: 'Current Ratio',  v: na(curRatio), label: curLabel, t: curColor,  sub: 'Optimal liquidity profile' },
+                          ])}
+                        </div>
+                      </div>
+
+                      {/* Shareholder Metrics */}
+                      <div className="ft-analysis-card">
+                        <div className="fac-header d-flex items-center gap-2">
+                          <span>Shareholder Metrics</span>
+                          <div className="info-trigger-s">
+                            <HelpCircle size={13} className="text-slate-300" />
+                            <div className="ft-dropdown-s"><strong>Shareholders:</strong> {METRIC_DESCRIPTIONS['Shareholder Metrics']}</div>
+                          </div>
+                        </div>
+                        <div className="fac-list">
+                          {cardMap([
+                            { n: 'EPS (TTM)',     v: na(eps),      label: eps == null ? 'N/A' : Number(eps) > 0 ? 'Rising' : 'Loss', t: eps == null ? 'neutral' : Number(eps) > 0 ? 'green' : 'red', sub: 'Last 12 month earnings' },
+                            { n: 'Dividend Yield',v: na(divYield), label: divYield == null ? 'N/A' : parseFloat(divYield) > 2 ? 'High Yield' : parseFloat(divYield) > 0.5 ? 'Moderate' : 'Low', t: 'neutral', sub: 'Annual yield percentage' },
+                            { n: 'Book Value',    v: na(bookVal),  label: bookVal == null ? 'N/A' : 'Strong', t: bookVal == null ? 'neutral' : 'green', sub: 'Asset value per share' },
+                          ])}
+                        </div>
+                      </div>
+
+                      {/* Peer Comparison */}
+                      <div className="ft-analysis-card ft-peer-card">
+                        <div className="fac-header flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span>Peer Comparison</span>
+                            <div className="info-trigger-s">
+                              <HelpCircle size={13} className="text-slate-300" />
+                              <div className="ft-dropdown-s">{FUNDAMENTALS_TOOLTIPS.peerComparison}</div>
+                            </div>
+                          </div>
+                          <span className="text-xs font-normal text-slate-400">Industry: {industry}</span>
+                        </div>
+                        <div className="peer-comp-table">
+                          <div className="pct-header">
+                            <span>Metric</span><span>Company</span><span>Industry Avg</span>
+                          </div>
+                          {[
+                            { n: 'P/E Ratio',     c: na(pe),        i: '—', t: peColor,   d: q.valStatus === 'undervalued' ? 'down' : 'up' },
+                            { n: 'ROE',           c: na(roe),       i: '—', t: roe != null && parseFloat(roe) > 12 ? 'green' : 'neutral', d: 'up' },
+                            { n: 'Profit Margin', c: na(netMargin), i: '—', t: netMargin != null && parseFloat(netMargin) > 10 ? 'green' : 'neutral', d: 'up' },
+                            { n: 'Rev Growth',    c: na(revGrowth), i: '—', t: revGrowth != null && parseFloat(revGrowth) > 5 ? 'green' : 'neutral', d: 'up' },
+                          ].map((m, idx) => (
+                            <div key={idx} className="pct-row">
+                              <div className="flex items-center gap-2">
+                                <span className="pct-n">{m.n}</span>
+                                <div className="info-trigger-s">
+                                  <HelpCircle size={10} className="text-slate-200" />
+                                  <div className="ft-dropdown-s"><strong>{m.n}:</strong> {METRIC_DESCRIPTIONS[m.n]}</div>
+                                </div>
+                              </div>
+                              <div className="pct-c-cell">
+                                <span className="pct-val">{m.c}</span>
+                                <div className={`pct-indicator text-${m.t}`}>
+                                  {m.d === 'up' ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                                </div>
+                              </div>
+                              <span className="pct-i">{m.i}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="peer-foot mt-4 border-t pt-3 border-slate-100">
+                          <p className="text-[11px] text-slate-500 leading-relaxed italic">
+                            {symbol} fundamentals sourced from Yahoo Finance · {q.fundamentalSource || 'live data'}.
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -1468,7 +1776,7 @@ const InvestorStockPage = () => {
                   </div>
 
                   <div className="ne-timeline-container shadow-premium">
-                    {(newsImpactData?.events || []).map((e, idx) => (
+                    {(newsImpactData?.data?.events || []).map((e, idx) => (
                       <div key={idx} className="ne-timeline-item">
                         <div className="ne-t-left">
                           <span className="ne-t-date">{e.date}</span>
@@ -1492,7 +1800,7 @@ const InvestorStockPage = () => {
                         </div>
                       </div>
                     ))}
-                    {(newsImpactData?.events?.length === 0) && <p className="text-xs p-8 text-slate-400 text-center">No upcoming events found.</p>}
+                    {(newsImpactData?.data?.events?.length === 0) && <p className="text-xs p-8 text-slate-400 text-center">No upcoming events found.</p>}
                   </div>
                 </div>
 
@@ -1508,7 +1816,7 @@ const InvestorStockPage = () => {
                   </div>
 
                   <div className="ne-news-stack">
-                    {(newsImpactData?.articles || newsImpactData?.news || []).map((n, idx) => (
+                    {(newsImpactData?.data?.articles || newsImpactData?.data?.news || []).map((n, idx) => (
                       <div key={idx} className="ne-news-card shadow-premium border-l-[4px] border-l-blue-500">
                         <div className="ne-n-top">
                           <span className="ne-n-tag">NEWS</span>
@@ -1523,7 +1831,7 @@ const InvestorStockPage = () => {
                         </div>
                       </div>
                     ))}
-                    {((newsImpactData?.articles || newsImpactData?.news || []).length === 0) && <p className="text-xs p-8 text-slate-400 text-center">No recent news articles found.</p>}
+                    {((newsImpactData?.data?.articles || newsImpactData?.data?.news || []).length === 0) && <p className="text-xs p-8 text-slate-400 text-center">No recent news articles found.</p>}
                   </div>
                 </div>
               </div>

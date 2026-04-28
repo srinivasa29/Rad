@@ -20,7 +20,8 @@ const authMiddleware = async (req, res, next) => {
 
             next();
         } catch (error) {
-            console.error(error);
+            const reason = error?.name === 'JsonWebTokenError' ? 'invalid signature' : error?.message || 'unknown';
+            console.warn(`[auth] Token rejected (${reason}) — client should re-login`);
             res.status(401).json({ error: 'Not authorized, token failed' });
         }
     } else {

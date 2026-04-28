@@ -21,7 +21,7 @@ const sanitizeMarketRow = (row) => {
 
 export const fetchSectorPerformance = async (period = '1y') => {
     try {
-        const response = await api.get(`/sectors/performance?period=${period}`);
+        const response = await api.get(`/market/sector-performance?period=${period}`);
         return response.data;
     } catch (error) {
         console.warn('Sector performance unavailable, using UI fallback themes:', error?.message || error);

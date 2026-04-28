@@ -43,7 +43,7 @@ export default function TradeTerminalPage({ overrideSymbol, onBack }) {
 
         Promise.allSettled([
             api.get(`/market?symbols=${encodeURIComponent(symbol)}`),
-            api.get('/watchlists'),
+            api.get('/watchlist'),
             api.get(`/market/depth?symbol=${encodeURIComponent(symbol)}`),
         ]).then(([mktRes, wlRes, depthRes]) => {
             if (!active) return;
@@ -60,7 +60,7 @@ export default function TradeTerminalPage({ overrideSymbol, onBack }) {
             // Watchlist
             if (wlRes.status === 'fulfilled') {
                 const wlData = wlRes.value?.data?.data ?? wlRes.value?.data;
-                const syms = (Array.isArray(wlData) ? wlData.flatMap(w => w.symbols ?? w.stocks ?? []) : []).slice(0, 8);
+                const syms = (Array.isArray(wlData) ? wlData.flatMap(w => (w.items ?? []).map(i => i?.symbol ?? i)) : []).slice(0, 8);
                 if (syms.length > 0) {
                     api.get(`/market?symbols=${encodeURIComponent(syms.join(','))}`)
                         .then(r => {
@@ -346,9 +346,9 @@ export default function TradeTerminalPage({ overrideSymbol, onBack }) {
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                             {[
                                 { label: 'Volume', val: '4.2M' },
-                                { label: 'VWAP', val: 'â‚¹2,980.15' },
-                                { label: 'Day High', val: 'â‚¹3,005.00' },
-                                { label: 'Day Low', val: 'â‚¹2,965.40' },
+                                { label: 'VWAP', val: '₹2,980.15' },
+                                { label: 'Day High', val: '₹3,005.00' },
+                                { label: 'Day Low', val: '₹2,965.40' },
                             ].map(stat => (
                                 <div key={stat.label}>
                                     <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</div>

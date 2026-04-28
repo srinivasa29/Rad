@@ -69,13 +69,13 @@ export default function ExecutionPanel() {
                     <span className="text-slate-500 font-bold uppercase flex items-center gap-1.5">
                         <Shield size={12} className="text-emerald-500" /> Max Risk
                     </span>
-                    <span className="font-bold text-slate-300">â‚¹1,250.00</span>
+                    <span className="font-bold text-slate-300">₹1,250.00</span>
                 </div>
                 <div className="flex justify-between items-center text-[10px]">
                     <span className="text-slate-500 font-bold uppercase flex items-center gap-1.5">
                         <Target size={12} className="text-cyan-500" /> Target
                     </span>
-                    <span className="font-bold text-slate-300">â‚¹3,420.00</span>
+                    <span className="font-bold text-slate-300">₹3,420.00</span>
                 </div>
             </div>
         </div>

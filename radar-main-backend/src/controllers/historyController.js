@@ -1,5 +1,6 @@
 const { fetchCryptoHistory } = require('../services/cryptoService');
 const { fetchStockHistory } = require('../services/stockService');
+const ohlcService = require('../services/ohlcService');
 const { fetchForexHistory } = require('../services/forexService');
 const { calculateSMA, calculateRSI, calculateBollinger, calculateMACD } = require('../utils/indicators');
 
@@ -12,7 +13,23 @@ const getHistory = async (req, res) => {
     let rawData = [];
 
     if (type === 'STOCK') {
-        rawData = await fetchStockHistory(symbol.toLowerCase(), interval, { allowSynthetic: !strictLive });
+        try {
+            // Try fetching from local database first to conserve API calls
+            const dbResponse = await ohlcService.getOHLCData({ 
+                symbol: symbol.toUpperCase(), 
+                timeframe: interval, 
+                limit: 150 
+            });
+
+            if (dbResponse.success && dbResponse.data && dbResponse.data.length > 0) {
+                rawData = dbResponse.data;
+            } else {
+                // Fallback to live API only if database is completely empty
+                rawData = await fetchStockHistory(symbol.toLowerCase(), interval, { allowSynthetic: false });
+            }
+        } catch (error) {
+            return res.status(404).json({ error: error.message });
+        }
     } 
     else if (type === 'FOREX') {
         rawData = await fetchForexHistory(symbol.toLowerCase(), interval);

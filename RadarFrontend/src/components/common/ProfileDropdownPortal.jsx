@@ -138,7 +138,7 @@ const ProfileDropdownPortal = ({
           type="button"
           onClick={() => {
             onClose();
-            navigate("/settings");
+            navigate("/investor/settings");
           }}
           className="w-full flex items-center gap-3 text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-blue-50 transition-colors"
         >
@@ -149,7 +149,7 @@ const ProfileDropdownPortal = ({
           type="button"
           onClick={() => {
             onClose();
-            navigate("/support/investor");
+            navigate("/investor/support");
           }}
           className="w-full flex items-center gap-3 text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-blue-50 transition-colors"
         >

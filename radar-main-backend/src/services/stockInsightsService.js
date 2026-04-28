@@ -178,8 +178,11 @@ const classifySentiment = (title) => {
 const getStockNewsSentiment = async (symbol) => {
     const stock = await ensureStockFound(symbol);
     const normalized = stripSuffix(stock.symbol);
+    const isCrypto = ['CRYPTO', 'CRYPTOCURRENCY'].includes(String(stock.type || '').toUpperCase()) || 
+                    ['BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK','AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT','ARB','OP','INJ','SUI','SEI','PEPE','WIF','TON','FLOKI','BONK'].includes(normalized);
 
-    const rawNews = await fetchMarketNews('business', { symbol: normalized, limit: 20 });
+    const category = isCrypto ? 'crypto' : 'business';
+    const rawNews = await fetchMarketNews(category, { symbol: normalized, limit: 20 });
     const rows = (Array.isArray(rawNews) ? rawNews : []).filter((item) => {
         const text = `${item?.title || ''} ${item?.summary || ''} ${item?.description || ''}`.toUpperCase();
         return text.includes(normalized);
@@ -201,6 +204,8 @@ const getStockNewsSentiment = async (symbol) => {
     const aggregate = scored.reduce((acc, row) => acc + Number(row.sentimentScore || 0), 0);
     const avg = scored.length ? aggregate / scored.length : 0;
 
+    const eventsData = await getStockEarningsCalendar(symbol).catch(() => ({ events: [] }));
+
     return {
         symbol: normalizeSymbol(stock.symbol),
         name: stock.name || normalizeSymbol(stock.symbol),
@@ -208,6 +213,7 @@ const getStockNewsSentiment = async (symbol) => {
         aggregateSentiment: avg > 0.15 ? 'positive' : avg < -0.15 ? 'negative' : 'neutral',
         aggregateScore: Number(avg.toFixed(3)),
         articles: scored,
+        events: eventsData.events || [],
     };
 };
 
@@ -223,6 +229,9 @@ const getStockSignals = async (symbol, term = 'medium') => {
 
     const normalized = normalizeSymbol(stock.symbol);
     const ticker = stripSuffix(normalized);
+    const isCrypto = ['CRYPTO', 'CRYPTOCURRENCY'].includes(String(stock.type || '').toUpperCase()) || 
+                    ['BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK','AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT','ARB','OP','INJ','SUI','SEI','PEPE','WIF','TON','FLOKI','BONK'].includes(ticker);
+    
     
     // Deterministic seed based on symbol and term for consistency
     const seed = ticker.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -317,15 +326,15 @@ const getStockSignals = async (symbol, term = 'medium') => {
         signalConsistency: {
             track: [1, 1, 0.5, 1, 1, 1, 0.5, 1, 1, 1],
             score: 85 + (variant % 10),
-            note: 'Strong consistency in bullish triggers over the last 10 periods.'
+            note: `Strong consistency in ${sentimentValue > 70 ? 'bullish' : 'momentum'} triggers over the last 10 periods.`
         },
         riskAlerts: [
             { type: 'warning', label: 'Overbought', desc: 'RSI approaching 70 levels on the daily chart.' },
-            { type: 'safe', label: 'Debt to Equity', desc: 'Company remains virtually debt-free.' }
+            { type: 'safe', label: isCrypto ? 'Liquidity' : 'Debt to Equity', desc: isCrypto ? 'High liquidity depth observed on primary exchanges.' : 'Company remains virtually debt-free.' }
         ],
         recentChanges: [
-            { time: '2h ago', desc: 'MACD <strong>Bullish Crossover</strong> confirmed on 1H chart.' },
-            { time: '5h ago', desc: 'Price broke above <strong>₹560</strong> minor resistance.' }
+            { time: '2h ago', desc: `${names[1]} <strong>Bullish Crossover</strong> confirmed on 1H chart.` },
+            { time: '5h ago', desc: `Price consolidated above <strong>${isCrypto ? '$' : '₹'}${toNumber(stock.price, 560).toLocaleString()}</strong> support zone.` }
         ]
     };
 };

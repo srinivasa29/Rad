@@ -1,5 +1,8 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatPrice as formatCurrency } from '../../../utils/currency';
+import { fetchOHLCForChart } from '../../../api/ohlcApi';
+import { fetchMarketHistory } from '../../../api/marketApi';
 import {
   createChart,
   AreaSeries,
@@ -666,7 +669,7 @@ function ResearchChartViewport({
   );
 }
 
-export default function TraderChartPanel({ symbol, price, variant = 'simple' }) {
+export default function TraderChartPanel({ symbol, price, assetType, variant = 'simple' }) {
   const advanced = variant === 'advanced';
   const navigate = useNavigate();
 
@@ -728,31 +731,70 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
   const activeTimeframes = TRADER_TIMEFRAMES;
   const chartTimeframes = useMemo(() => [timeframe], [timeframe]);
 
-  const rowsByTimeframe = useMemo(
-    () =>
-      Object.fromEntries(
-        chartTimeframes.map((tf) => {
-          const depth = historyDepthByTimeframe[tf] ?? 2;
-          const baseRows = buildOhlcv(symbol, price, tf);
-          const fullRows = Array.from({ length: depth }).reduce((currentRows) => extendHistory(currentRows, tf, 90), baseRows);
-          return [tf, fullRows];
-        }),
-      ),
-    [chartTimeframes, historyDepthByTimeframe, price, symbol],
-  );
+  const [rowsByTimeframe, setRowsByTimeframe] = useState({});
+  const [compareRowsByTimeframe, setCompareRowsByTimeframe] = useState({});
+  const [isChartLoading, setIsChartLoading] = useState(false);
 
-  const compareRowsByTimeframe = useMemo(
-    () =>
-      Object.fromEntries(
-        chartTimeframes.map((tf) => {
-          const depth = historyDepthByTimeframe[tf] ?? 2;
-          const baseRows = buildOhlcv(compareSymbol || 'NIFTY', Number(price || 1000) * 0.82, tf);
-          const fullRows = Array.from({ length: depth }).reduce((currentRows) => extendHistory(currentRows, tf, 90), baseRows);
-          return [tf, fullRows];
-        }),
-      ),
-    [chartTimeframes, compareSymbol, historyDepthByTimeframe, price],
-  );
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setIsChartLoading(true);
+      let mainRes = [];
+      let compRes = [];
+      try {
+        const [main, comp] = await Promise.all([
+          fetchMarketHistory(symbol, assetType, timeframe),
+          compareEnabled ? fetchMarketHistory(compareSymbol || 'NIFTY', 'STOCK', timeframe) : Promise.resolve({ data: [] })
+        ]);
+        mainRes = main;
+        compRes = comp;
+      } catch (err) {
+        console.warn('TraderChartPanel API fallback triggered:', err);
+      }
+
+      if (!active) return;
+      
+      const formatRows = (res) => {
+        const arr = Array.isArray(res) ? res : res?.data || [];
+        return arr.map(d => {
+          let timeVal = new Date(d.timestamp).getTime() / 1000;
+          if (isNaN(timeVal)) timeVal = Number(d.time || d.timestamp);
+          return {
+            time: timeVal,
+            open: Number(d.open),
+            high: Number(d.high),
+            low: Number(d.low),
+            close: Number(d.close),
+            volume: Number(d.volume || 0)
+          };
+        }).filter(d => !isNaN(d.time) && d.time > 0)
+          .sort((a, b) => a.time - b.time)
+          .filter((d, i, arr) => i === 0 || d.time !== arr[i - 1].time); // Lightweight charts requires strictly increasing time
+      };
+
+      const newRows = formatRows(mainRes);
+      if (newRows.length > 0) {
+        setRowsByTimeframe(prev => ({ ...prev, [timeframe]: newRows }));
+      } else {
+        // Fallback for empty data so UI doesn't completely break
+        setRowsByTimeframe(prev => ({ ...prev, [timeframe]: buildOhlcv(symbol, price, timeframe) }));
+      }
+
+      if (compareEnabled) {
+        const newComp = formatRows(compRes);
+        if (newComp.length > 0) {
+          setCompareRowsByTimeframe(prev => ({ ...prev, [timeframe]: newComp }));
+        } else {
+          setCompareRowsByTimeframe(prev => ({ ...prev, [timeframe]: buildOhlcv(compareSymbol || 'NIFTY', Number(price || 1000) * 0.82, timeframe) }));
+        }
+      }
+
+      setIsChartLoading(false);
+    };
+    
+    load();
+    return () => { active = false; };
+  }, [symbol, timeframe, assetType, compareEnabled, compareSymbol, price]);
 
   const baseReplayRows = rowsByTimeframe[timeframe] ?? [];
 
@@ -1050,7 +1092,9 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-base font-black text-white tracking-tight">{symbol}</span>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">NSE</span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                {String(assetType).toUpperCase() === 'CRYPTO' ? 'CRYPTO · USD' : 'NSE · INR'}
+              </span>
             </div>
           </div>
 
@@ -1058,7 +1102,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
             <div className="h-4 w-px bg-white/10" />
             <div className="flex items-center gap-3 ml-2">
               <div className="text-lg font-black text-white leading-none">
-                {formatPrice(price)}
+                {formatCurrency(price, assetType, symbol)}
               </div>
               <div className={`text-xs font-bold px-2 py-0.5 rounded ${priceChange >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
                 {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
@@ -1384,99 +1428,7 @@ export default function TraderChartPanel({ symbol, price, variant = 'simple' }) 
           )}
         </div>
 
-        {/* â”€â”€ Left Sidebar: Drawing Tools (Advanced Only) â”€â”€ */}
-        {advanced && (
-          <div className="w-14 border-r border-white/5 bg-[#0f172a] flex flex-col items-center py-4 gap-4 z-40">
-            {[
-              { id: 'trendline', icon: Pencil, label: 'Trendline' },
-              { id: 'rectangle', icon: Square, label: 'Rectangle' },
-              { id: 'fib', icon: Activity, label: 'Fibonacci' },
-              { id: 'horizontal', icon: Minus, label: 'Horizontal Line' },
-              { id: 'measure', icon: Ruler, label: 'Measure' },
-            ].map(tool => (
-              <button
-                key={tool.id}
-                onClick={() => setSelectedTool(selectedTool === tool.id ? null : tool.id)}
-                className={`p-2.5 rounded-xl transition-all relative group/tool ${selectedTool === tool.id ? 'bg-cyan-500 text-[#0f172a] shadow-lg shadow-cyan-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-                title={tool.label}
-              >
-                <tool.icon size={20} />
-              </button>
-            ))}
-            <div className="h-px w-6 bg-white/10 my-2" />
-            <button
-              onClick={() => { setDrawings([]); setDraftDrawing(null); }}
-              className="p-2.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
-              title="Clear All"
-            >
-              <Eraser size={20} />
-            </button>
-          </div>
-        )}
 
-        {/* â”€â”€ Center Viewport: Chart Stack â”€â”€ */}
-        <div className="flex-1 flex flex-col min-w-0 bg-[#0f172a]">
-          {advanced ? (
-            <div className="flex-1 flex flex-col min-h-0">
-              {/* Height distribution: 60% Price, 20% RSI, 20% MACD */}
-              <div className="flex-[3] min-h-0 border-b border-white/5">
-                <ResearchChartViewport
-                  panelId="main-price"
-                  timeframe={timeframe}
-                  rows={displayedRowsByTimeframe[timeframe] ?? []}
-                  drawings={drawings}
-                  draftDrawing={draftDrawing}
-                  selectedTool={selectedTool}
-                  onDrawingStart={handleDrawingStart}
-                  onDrawingUpdate={handleDrawingUpdate}
-                  onDrawingEnd={handleDrawingEnd}
-                  height={window.innerHeight * 0.55}
-                  showRsi={false}
-                  showMacd={false}
-                  showEma={indicators.ema}
-                  showVolume={indicators.volume}
-                  chartType={chartType}
-                  settings={chartSettings}
-                  onRequestMoreHistory={requestMoreHistory}
-                />
-              </div>
-              <div className="flex-1 min-h-0 border-b border-white/5">
-                <div className="absolute top-2 left-4 z-10 text-[9px] font-black text-slate-500 uppercase tracking-widest">RSI (14)</div>
-                <ResearchChartViewport
-                  panelId="main-rsi"
-                  timeframe={timeframe}
-                  rows={displayedRowsByTimeframe[timeframe] ?? []}
-                  drawings={[]}
-                  height={window.innerHeight * 0.18}
-                  showRsi={true}
-                  showMacd={false}
-                  showEma={false}
-                  showVolume={false}
-                  chartType="line"
-                  settings={{ ...chartSettings, watermark: false }}
-                />
-              </div>
-              <div className="flex-1 min-h-0">
-                <div className="absolute top-2 left-4 z-10 text-[9px] font-black text-slate-500 uppercase tracking-widest">MACD (12, 26, 9)</div>
-                <ResearchChartViewport
-                  panelId="main-macd"
-                  timeframe={timeframe}
-                  rows={displayedRowsByTimeframe[timeframe] ?? []}
-                  drawings={[]}
-                  height={window.innerHeight * 0.18}
-                  showRsi={false}
-                  showMacd={true}
-                  showEma={false}
-                  showVolume={false}
-                  chartType="line"
-                  settings={{ ...chartSettings, watermark: false }}
-                />
-              </div>
-            </div>
-          ) : (
-            <div ref={mainRef} className="h-full w-full" />
-          )}
-        </div>
 
         {/* â”€â”€ Right Panel: Insights & Signals (Advanced Only) â”€â”€ */}
         {advanced && (

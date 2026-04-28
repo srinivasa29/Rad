@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, Navigate } from "react-router-dom";
 import YourInvestments from '../components/investor/YourInvestments';
 import MostBoughtStocks from '../components/investor/MostBoughtStocks';
 import SharedTickerTape from '../components/landing/TickerTape';
 import Watchlist from '../components/investor/Watchlist';
 import Screeners from '../components/investor/Screeners';
 import Header from '../components/common/Header';
+import LearningAcademy from './LearningAcademy';
 
 import {
     LayoutDashboard,
@@ -43,6 +44,7 @@ import {
     YAxis,
     Tooltip,
     Bar,
+    Cell,
     ReferenceLine,
     LabelList,
 } from "recharts";
@@ -54,6 +56,7 @@ import { fetchEconomicCalendar } from "../api/calendarApi";
 import { updateUserMode } from "../api/userApi";
 import { useHeaderData } from "../hooks/useHeaderData";
 import { useSocket } from "../hooks/useSocket";
+import { formatPrice } from "../utils/currency";
 
 const formatNotificationTime = (value) => {
     if (!value) return "Now";
@@ -115,10 +118,7 @@ const extractHeadlineSymbol = (value) => {
     return matches.find((token) => !blacklist.has(token)) || null;
 };
 
-const FALLBACK_THEME_ROWS = {
-    rising: [],
-    falling: [],
-};
+
 
 const themes = {
     blue: {
@@ -152,9 +152,9 @@ const InvestorMode = ({ onToggleMode }) => {
 
         // Apply global background properties
         document.documentElement.style.setProperty('--investor-bg', fullBackground);
-        
+
         // 1:1 EXACT "Minimalist Sky" linear gradient from latest Step 3759 reference image
-        document.body.style.backgroundColor = '#f0f9ff'; 
+        document.body.style.backgroundColor = '#f0f9ff';
         document.body.style.backgroundImage = fullBackground;
         document.body.style.backgroundAttachment = 'fixed';
         document.body.style.backgroundSize = 'cover';
@@ -174,10 +174,10 @@ const InvestorMode = ({ onToggleMode }) => {
 
     return (
         <div className="dashboard-container investor-theme pt-4">
-            <Header 
-                activeModule={activeModule} 
-                setActiveModule={setActiveModule} 
-                onToggleMode={onToggleMode} 
+            <Header
+                activeModule={activeModule}
+                setActiveModule={setActiveModule}
+                onToggleMode={onToggleMode}
             />
             <SharedTickerTape variant="investor" />
             <main className="content fade-in transition-all duration-300">
@@ -452,7 +452,8 @@ const GlobalPulse = () => {
 
                     const mapped = unique.map(i => ({
                         name: i.symbol || i.name || 'ASSET',
-                        val: Number.isFinite(Number(i.price)) && Number(i.price) > 0 ? Number(i.price).toLocaleString() : '--',
+                        type: i.type,
+                        val: Number.isFinite(Number(i.price)) && Number(i.price) > 0 ? formatPrice(i.price, i.type, i.symbol || i.name) : '--',
                         change: Number.isFinite(Number(i.change_24h ?? i.change))
                             ? `${Number(i.change_24h ?? i.change) >= 0 ? '▲' : '▼'} ${Math.abs(Number(i.change_24h ?? i.change)).toFixed(2)}%`
                             : '--',
@@ -486,7 +487,7 @@ const GlobalPulse = () => {
         on('price_update', (event) => {
             if (!event.symbol) return;
             const eventSym = String(event.symbol).replace(/\.(NS|BO)$/i, '').toUpperCase();
-            
+
             setPulse(prev => {
                 const targetIdx = prev.findIndex(item => item.name.toUpperCase() === eventSym);
                 if (targetIdx === -1) return prev;
@@ -499,7 +500,7 @@ const GlobalPulse = () => {
 
                 next[targetIdx] = {
                     ...item,
-                    val: price.toLocaleString(),
+                    val: formatPrice(price, item.type, item.name),
                     change: `${isPositive ? '▲' : '▼'} ${Math.abs(change).toFixed(2)}%`,
                     changeDirection: isPositive ? 'up' : 'down',
                 };
@@ -525,13 +526,13 @@ const GlobalPulse = () => {
             <div className="card-header mb-6">
                 <h3 className="text-lg font-bold text-slate-800">Global Pulse</h3>
             </div>
-            <div className="space-y-6 flex-1">
+            <div className="space-y-6 flex-1 overflow-y-auto custom-scrollbar pr-2">
                 {!isLoading && pulse.length === 0 && !error && (
                     <div className="text-xs text-slate-500 font-medium">No pulse data available from backend.</div>
                 )}
                 {pulse.map((m, i) => (
-                    <div 
-                        key={i} 
+                    <div
+                        key={i}
                         onClick={() => navigate('/investor-stock/' + encodeURIComponent(m.name.toUpperCase()))}
                         className="flex justify-between items-center group cursor-pointer hover:bg-slate-50/50 p-2 -mx-2 rounded-xl transition-all"
                     >
@@ -637,8 +638,8 @@ const DiscoveryShelves = ({ onShelfClick }) => {
                     <div className="text-xs text-slate-500 font-medium">No discovery ideas available right now.</div>
                 )}
                 {items.map((item, i) => (
-                    <div 
-                        key={i} 
+                    <div
+                        key={i}
                         onClick={() => onShelfClick && onShelfClick('SCREENERS', item.filter)}
                         className="feature-item group hover:bg-blue-500/10 p-4 rounded-xl cursor-pointer transition-all border border-transparent hover:border-slate-200 hover:shadow-sm"
                     >
@@ -715,14 +716,15 @@ const SectorLandscape = () => {
     const buildSectorView = (rows) => {
         const normalized = mapSectorRows(rows);
         if (!normalized.length) return [];
-
-        const directional = viewType === 'BEST'
-            ? normalized.filter((row) => row.realValue >= 0)
-            : normalized.filter((row) => row.realValue <= 0);
-
-        const source = directional.length > 0 ? directional : normalized;
-        const sorted = [...source].sort((a, b) => viewType === 'BEST' ? b.realValue - a.realValue : a.realValue - b.realValue);
-        return sorted.slice(0, 7);
+        if (viewType === 'BEST') {
+            // Show only gainers, sorted highest → lowest
+            const gainers = normalized.filter((r) => r.realValue > 0).sort((a, b) => b.realValue - a.realValue);
+            return gainers.slice(0, 7);
+        } else {
+            // Show only losers, sorted worst → least-bad
+            const losers = normalized.filter((r) => r.realValue < 0).sort((a, b) => a.realValue - b.realValue);
+            return losers.slice(0, 7);
+        }
     };
 
     const SectorValueLabel = ({ x, y, width, height, value }) => {
@@ -846,8 +848,13 @@ const SectorLandscape = () => {
                 {!isLoading && !error && data.length === 0 ? (
                     <div className="h-full w-full rounded-xl border border-slate-200 bg-white/10 flex items-center justify-center text-center px-6">
                         <div>
-                            <p className="text-sm font-bold text-slate-700">No sector data from backend</p>
-                            <p className="text-xs text-slate-500 mt-1">Try a different timeframe or refresh once sector service is available.</p>
+                            <p className="text-2xl mb-2">{viewType === 'BEST' ? '📈' : '📉'}</p>
+                            <p className="text-sm font-bold text-slate-700">
+                                {viewType === 'BEST' ? 'No gaining sectors today' : 'No losing sectors today'}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Switch to <strong>{viewType === 'BEST' ? 'Worst' : 'Best'}</strong> to see {viewType === 'BEST' ? 'underperformers' : 'outperformers'}.
+                            </p>
                         </div>
                     </div>
                 ) : (
@@ -891,10 +898,17 @@ const SectorLandscape = () => {
                             <Bar
                                 dataKey="realValue"
                                 radius={[4, 4, 4, 4]}
-                                fill={viewType === 'BEST' ? 'url(#sectorBestGradient)' : 'url(#sectorWorstGradient)'}
                                 maxBarSize={72}
-                                style={{ filter: `drop-shadow(0 0 8px ${viewType === 'BEST' ? chartTheme.posGlow : chartTheme.negGlow})` }}
                             >
+                                {data.map((entry, index) => (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={entry.realValue >= 0
+                                            ? 'url(#sectorBestGradient)'
+                                            : 'url(#sectorWorstGradient)'}
+                                        style={{ filter: `drop-shadow(0 0 8px ${entry.realValue >= 0 ? chartTheme.posGlow : chartTheme.negGlow})` }}
+                                    />
+                                ))}
                                 <LabelList
                                     dataKey="realValue"
                                     content={(props) => <SectorValueLabel {...props} />}
@@ -929,8 +943,9 @@ const EconomicCalendar = () => {
                 setError(false);
                 const res = await fetchEconomicCalendar();
                 if (res && res.length > 0) {
+                    // No slice — show ALL events, the card itself scrolls
                     setEvents(
-                        res.slice(0, 8).map((event, index) => ({
+                        res.map((event, index) => ({
                             id: event.id || index + 1,
                             time: event.time || event.date || '-',
                             country: event.country || 'US',
@@ -994,7 +1009,14 @@ const EconomicCalendar = () => {
                 </div>
                 <div className="text-[10px] font-bold text-slate-500 bg-slate-100 rounded-full px-2 py-1">{events.length} events</div>
             </div>
-            <div className="space-y-2 flex-1 overflow-y-auto pr-1">
+            {/* Scrollable list — fixed height so the card doesn't expand infinitely */}
+            <div
+                className="space-y-2 flex-1 pr-1"
+                style={{ overflowY: 'auto', maxHeight: '340px', scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}
+            >
+                {events.length === 0 && !isLoading && (
+                    <div className="text-xs text-slate-400 text-center py-6">No upcoming events found.</div>
+                )}
                 {events.map((e) => (
                     <div key={e.id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-500/10 border border-slate-100 hover:border-blue-200 transition-colors">
                         <div className="flex items-center gap-3">
@@ -1020,114 +1042,180 @@ const EconomicCalendar = () => {
     );
 };
 
+// Sector-specific icons for Trending Themes
+const SECTOR_ICONS = {
+    'Information Technology': '💻',
+    'Technology':             '💻',
+    'Financial Services':     '🏦',
+    'Banking':                '🏦',
+    'Healthcare':             '💊',
+    'Pharmaceuticals':        '💊',
+    'Energy':                 '⚡',
+    'Oil & Gas':              '🛢️',
+    'Industrials':            '🏭',
+    'Consumer Cyclical':      '🚗',
+    'Automobiles':            '🚗',
+    'Consumer Defensive':     '🛒',
+    'FMCG':                   '🛒',
+    'Communication Services': '📡',
+    'Telecom':                '📡',
+    'Basic Materials':        '⛏️',
+    'Metals':                 '⛏️',
+    'Utilities':              '🔌',
+    'Infrastructure':         '🏗️',
+    'Real Estate':            '🏘️',
+};
+
+const FALLBACK_THEME_ROWS = {
+    rising: [
+        { name: 'Energy',              value: 2.6,  trend: '+2.6% wk', icon: '⚡' },
+        { name: 'Consumer Defensive',  value: 2.2,  trend: '+2.2% wk', icon: '🛒' },
+        { name: 'Healthcare',          value: 1.5,  trend: '+1.5% wk', icon: '💊' },
+    ],
+    falling: [
+        { name: 'Information Technology', value: -3.1, trend: '-3.1% wk', icon: '💻' },
+        { name: 'Consumer Cyclical',      value: -2.4, trend: '-2.4% wk', icon: '🚗' },
+        { name: 'Basic Materials',        value: -1.0, trend: '-1.0% wk', icon: '⛏️' },
+    ],
+};
+
 const TrendingThemes = () => {
-    const [risingThemes, setRisingThemes] = useState([]);
+    const [risingThemes, setRisingThemes]   = useState([]);
     const [fallingThemes, setFallingThemes] = useState([]);
+    const [isLoading, setIsLoading]         = useState(true);
 
     useEffect(() => {
         let timer;
 
         const load = async () => {
             try {
+                setIsLoading(true);
+                // Same backend source as Sector Landscape — just hardcoded to 1W
                 const response = await fetchSectorPerformance('1w');
-                const rows = Array.isArray(response?.data) ? response.data : [];
+                const rows = Array.isArray(response?.data) ? response.data
+                           : Array.isArray(response)       ? response
+                           : [];
 
-                const normalized = rows.map((sector) => ({
-                    name: sector.sector,
-                    value: Number(sector.return) || 0,
-                }));
+                const normalized = rows
+                    .map((s) => ({
+                        name:  s.sector,
+                        index: s.index || '',
+                        value: Number(s.return) || 0,
+                    }))
+                    .filter((s) => s.name && s.name !== 'Unknown');
 
                 const rising = normalized
-                    .filter((item) => item.value > 0)
+                    .filter((s) => s.value > 0)
                     .sort((a, b) => b.value - a.value)
                     .slice(0, 3)
-                    .map((item, index) => ({
-                        ...item,
-                        trend: `+${item.value.toFixed(1)}% wk`,
-                        icon: ['📈', '⚡', '🧠'][index % 3],
+                    .map((s) => ({
+                        ...s,
+                        trend: `+${s.value.toFixed(1)}% wk`,
+                        icon:  SECTOR_ICONS[s.name] || '📊',
                     }));
 
                 const falling = normalized
-                    .filter((item) => item.value < 0)
+                    .filter((s) => s.value < 0)
                     .sort((a, b) => a.value - b.value)
                     .slice(0, 3)
-                    .map((item, index) => ({
-                        ...item,
-                        trend: `${item.value.toFixed(1)}% wk`,
-                        icon: ['📉', '🧊', '🛰️'][index % 3],
+                    .map((s) => ({
+                        ...s,
+                        trend: `${s.value.toFixed(1)}% wk`,
+                        icon:  SECTOR_ICONS[s.name] || '📊',
                     }));
 
-                setRisingThemes(rising.length ? rising : FALLBACK_THEME_ROWS.rising);
-                setFallingThemes(falling.length ? falling : FALLBACK_THEME_ROWS.falling);
+                setRisingThemes(rising.length   ? rising   : FALLBACK_THEME_ROWS.rising);
+                setFallingThemes(falling.length ? falling  : FALLBACK_THEME_ROWS.falling);
             } catch (error) {
                 console.error('Trending themes fetch failed:', error);
                 setRisingThemes(FALLBACK_THEME_ROWS.rising);
                 setFallingThemes(FALLBACK_THEME_ROWS.falling);
+            } finally {
+                setIsLoading(false);
             }
         };
 
         load();
-        timer = setInterval(load, 60000);
+        timer = setInterval(load, 15 * 60 * 1000); // refresh every 15 min (matches backend cache TTL)
         return () => clearInterval(timer);
     }, []);
 
     return (
         <div className="investor-card p-4 h-full flex flex-col">
             <div className="card-header mb-3 flex justify-between items-center">
-                <h3 className="text-lg font-bold text-slate-800">Trending Themes</h3>
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800">Trending Themes</h3>
+                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">Sector momentum · This week vs last week</p>
+                </div>
                 <TrendingUp size={16} className="text-blue-500" />
             </div>
-            <div className="space-y-3 flex-1 overflow-y-auto pr-1">
-                <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white p-3">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                            <TrendingUp size={14} className="text-blue-600" />
-                            <span className="text-[11px] font-black text-blue-700 uppercase tracking-wider">Rising Themes</span>
-                        </div>
-                        <span className="text-[10px] text-blue-600 font-bold">Top Gainers</span>
-                    </div>
-                    <div className="space-y-1.5">
-                        {risingThemes.length === 0 && <div className="text-xs text-slate-500">No rising themes right now.</div>}
-                        {risingThemes.map((theme, i) => (
-                            <div key={`${theme.name}-${i}`} className="group relative flex items-center justify-between rounded-lg px-2 py-1.5 pl-3 hover:bg-white/70 transition-colors">
-                                <span className="absolute left-0 top-1/2 h-0 w-1 -translate-y-1/2 rounded-full bg-blue-500 opacity-0 transition-all duration-200 group-hover:h-4 group-hover:opacity-100"></span>
-                                <div className="flex items-center gap-2.5">
-                                    <span className="text-base">{theme.icon}</span>
-                                    <span className="text-xs font-bold text-slate-700">{theme.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2.5">
-                                    <span className="text-[11px] font-black text-blue-600">{theme.trend}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
 
-                <div className="rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-white p-3">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                            <TrendingDown size={14} className="text-rose-600" />
-                            <span className="text-[11px] font-black text-rose-700 uppercase tracking-wider">Falling Themes</span>
-                        </div>
-                        <span className="text-[10px] text-rose-600 font-bold">Top Decliners</span>
-                    </div>
-                    <div className="space-y-1.5">
-                        {fallingThemes.length === 0 && <div className="text-xs text-slate-500">No falling themes right now.</div>}
-                        {fallingThemes.map((theme, i) => (
-                            <div key={`${theme.name}-${i}`} className="group relative flex items-center justify-between rounded-lg px-2 py-1.5 pl-3 hover:bg-white/70 transition-colors">
-                                <span className="absolute left-0 top-1/2 h-0 w-1 -translate-y-1/2 rounded-full bg-rose-500 opacity-0 transition-all duration-200 group-hover:h-4 group-hover:opacity-100"></span>
-                                <div className="flex items-center gap-2.5">
-                                    <span className="text-base">{theme.icon}</span>
-                                    <span className="text-xs font-bold text-slate-700">{theme.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2.5">
-                                    <span className="text-[11px] font-black text-rose-600">{theme.trend}</span>
-                                </div>
+            {isLoading ? (
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                </div>
+            ) : (
+                /* No overflow-y-auto — card is fixed size, content fits naturally */
+                <div className="space-y-3 flex-1">
+                    {/* Rising */}
+                    <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-white p-3">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <TrendingUp size={14} className="text-emerald-600" />
+                                <span className="text-[11px] font-black text-emerald-700 uppercase tracking-wider">Rising Themes</span>
                             </div>
-                        ))}
+                            <span className="text-[10px] text-emerald-600 font-bold">Top Gainers</span>
+                        </div>
+                        <div className="space-y-1.5">
+                            {risingThemes.length === 0
+                                ? <div className="text-xs text-slate-400 py-1">No gaining sectors this week.</div>
+                                : risingThemes.map((theme, i) => (
+                                    <div key={`${theme.name}-${i}`} className="group relative flex items-center justify-between rounded-lg px-2 py-1.5 pl-3 hover:bg-white/70 transition-colors">
+                                        <span className="absolute left-0 top-1/2 h-0 w-1 -translate-y-1/2 rounded-full bg-emerald-500 opacity-0 transition-all duration-200 group-hover:h-4 group-hover:opacity-100" />
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="text-base">{theme.icon}</span>
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-700 leading-tight">{theme.name}</div>
+                                                {theme.index && <div className="text-[9px] text-slate-400 font-medium">{theme.index}</div>}
+                                            </div>
+                                        </div>
+                                        <span className="text-[11px] font-black text-emerald-600">{theme.trend}</span>
+                                    </div>
+                                ))
+                            }
+                        </div>
+                    </div>
+
+                    {/* Falling */}
+                    <div className="rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-white p-3">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <TrendingDown size={14} className="text-rose-600" />
+                                <span className="text-[11px] font-black text-rose-700 uppercase tracking-wider">Falling Themes</span>
+                            </div>
+                            <span className="text-[10px] text-rose-600 font-bold">Top Decliners</span>
+                        </div>
+                        <div className="space-y-1.5">
+                            {fallingThemes.length === 0
+                                ? <div className="text-xs text-slate-400 py-1">No declining sectors this week.</div>
+                                : fallingThemes.map((theme, i) => (
+                                    <div key={`${theme.name}-${i}`} className="group relative flex items-center justify-between rounded-lg px-2 py-1.5 pl-3 hover:bg-white/70 transition-colors">
+                                        <span className="absolute left-0 top-1/2 h-0 w-1 -translate-y-1/2 rounded-full bg-rose-500 opacity-0 transition-all duration-200 group-hover:h-4 group-hover:opacity-100" />
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="text-base">{theme.icon}</span>
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-700 leading-tight">{theme.name}</div>
+                                                {theme.index && <div className="text-[9px] text-slate-400 font-medium">{theme.index}</div>}
+                                            </div>
+                                        </div>
+                                        <span className="text-[11px] font-black text-rose-600">{theme.trend}</span>
+                                    </div>
+                                ))
+                            }
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };
@@ -1181,11 +1269,10 @@ const NewsTypeFilters = ({ selected, onToggle }) => {
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
             <button
                 onClick={() => onToggle("All")}
-                className={`px-4 py-1.5 rounded-full text-[11px] font-black transition-all whitespace-nowrap ${
-                    isAllSelected
+                className={`px-4 py-1.5 rounded-full text-[11px] font-black transition-all whitespace-nowrap ${isAllSelected
                         ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
                         : "bg-white text-slate-500 hover:bg-blue-50 hover:text-blue-600 border border-slate-100"
-                }`}
+                    }`}
             >
                 All
             </button>
@@ -1193,11 +1280,10 @@ const NewsTypeFilters = ({ selected, onToggle }) => {
                 <button
                     key={cat}
                     onClick={() => onToggle(cat)}
-                    className={`px-4 py-1.5 rounded-full text-[11px] font-black transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                        selected.includes(cat)
+                    className={`px-4 py-1.5 rounded-full text-[11px] font-black transition-all whitespace-nowrap flex items-center gap-1.5 ${selected.includes(cat)
                             ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
                             : "bg-white text-slate-500 hover:bg-blue-50 hover:text-blue-600 border border-slate-100"
-                    }`}
+                        }`}
                 >
                     {cat}
                     {selected.includes(cat) && <CheckCircle size={10} />}
@@ -1214,11 +1300,10 @@ const AssetClassToggle = ({ active, onChange }) => {
                 <button
                     key={asset}
                     onClick={() => onChange(asset)}
-                    className={`px-5 py-1.5 rounded-full text-[11px] font-black transition-all ${
-                        active === asset 
-                            ? "bg-white text-blue-600 shadow-sm" 
+                    className={`px-5 py-1.5 rounded-full text-[11px] font-black transition-all ${active === asset
+                            ? "bg-white text-blue-600 shadow-sm"
                             : "text-slate-500 hover:text-slate-800"
-                    }`}
+                        }`}
                 >
                     {asset}
                 </button>
@@ -1231,7 +1316,7 @@ const RegionFilter = ({ active, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
     return (
         <div className="relative">
-            <button 
+            <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black text-slate-700 hover:border-blue-300 transition-all shadow-sm min-w-[120px]"
             >
@@ -1248,9 +1333,8 @@ const RegionFilter = ({ active, onChange }) => {
                                 onChange(reg);
                                 setIsOpen(false);
                             }}
-                            className={`w-full text-left px-4 py-2 text-[11px] font-bold transition-colors ${
-                                active === reg ? "text-blue-600 bg-blue-50/50" : "text-slate-600 hover:bg-slate-50"
-                            }`}
+                            className={`w-full text-left px-4 py-2 text-[11px] font-bold transition-colors ${active === reg ? "text-blue-600 bg-blue-50/50" : "text-slate-600 hover:bg-slate-50"
+                                }`}
                         >
                             {reg}
                         </button>
@@ -1275,29 +1359,29 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                 <div className="flex-1 space-y-3">
                     {/* 1. Meta & Top Labels */}
                     <div className="flex items-center gap-2 text-[10px] font-bold">
-                         <a 
-                            href={item.url || "#"} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
+                        <a
+                            href={item.url || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 hover:text-blue-600 flex items-center gap-1 transition-colors"
-                         >
+                        >
                             <span>{item.source || 'Reuters'}</span>
                             <ExternalLink size={9} className="stroke-[3]" />
-                         </a>
-                         <span className="text-slate-300">•</span>
-                         <span className="text-slate-400 font-medium uppercase tracking-wider">{item.time || 'Just now'}</span>
-                         {(importance === "High" || item.strategy === "AI Generated") && (
+                        </a>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-400 font-medium uppercase tracking-wider">{item.time || 'Just now'}</span>
+                        {(importance === "High" || item.strategy === "AI Generated") && (
                             <div className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-black uppercase ring-1 ring-blue-100 shadow-sm ml-2">
                                 <Zap size={10} className="fill-blue-500" />
                                 <span>AI Analyzed</span>
                             </div>
-                         )}
+                        )}
                     </div>
 
                     {/* 2. Headline */}
-                    <a 
-                        href={item.url || "#"} 
-                        target="_blank" 
+                    <a
+                        href={item.url || "#"}
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="block group-hover:translate-x-0.5 transition-transform"
                     >
@@ -1305,7 +1389,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                             {item.title}
                         </h3>
                     </a>
-                    
+
                     {/* 3. Smart Tags: Sector | Impact | Type */}
                     <div className="flex flex-wrap items-center gap-2">
                         {/* High-Fidelity Sector Impact Tags */}
@@ -1314,13 +1398,12 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                             const sImpact = typeof sector === 'string' ? "Neutral" : (sector.impact || "Neutral");
                             const isUp = sImpact === "Positive";
                             const isDown = sImpact === "Negative";
-                            
+
                             return (
-                                <div key={idx} className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all shadow-sm ${
-                                    isUp ? "bg-green-600 text-white" :
-                                    isDown ? "bg-red-600 text-white" :
-                                    "bg-slate-700 text-white"
-                                }`}>
+                                <div key={idx} className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all shadow-sm ${isUp ? "bg-green-600 text-white" :
+                                        isDown ? "bg-red-600 text-white" :
+                                            "bg-slate-700 text-white"
+                                    }`}>
                                     <span>{name}</span>
                                     <span className="text-[11px] leading-none mb-0.5 font-normal">
                                         {isUp ? "↑" : isDown ? "↓" : "→"}
@@ -1330,11 +1413,10 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                         })}
 
                         {/* Sentiment Tag */}
-                        <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md border ${
-                            impact === "Positive" ? "bg-green-50 text-green-700 border-green-100" :
-                            impact === "Negative" ? "bg-red-50 text-red-700 border-red-100" :
-                            "bg-slate-100 text-slate-600 border-slate-200"
-                        }`}>
+                        <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md border ${impact === "Positive" ? "bg-green-50 text-green-700 border-green-100" :
+                                impact === "Negative" ? "bg-red-50 text-red-700 border-red-100" :
+                                    "bg-slate-100 text-slate-600 border-slate-200"
+                            }`}>
                             {impact}
                         </span>
 
@@ -1360,13 +1442,12 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
 
                 {/* Insight Toggle Button */}
                 <div className="flex-shrink-0 md:pl-6 md:border-l border-slate-100">
-                    <button 
+                    <button
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[12px] font-black tracking-tight transition-all ${
-                            isExpanded 
-                                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[12px] font-black tracking-tight transition-all ${isExpanded
+                                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
                                 : "text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-600 hover:text-white"
-                        }`}
+                            }`}
                     >
                         <span>{isExpanded ? "Hide Insight" : "View Insight"}</span>
                         <ChevronUp size={16} className={`transition-transform duration-300 ${isExpanded ? "" : "rotate-180"}`} />
@@ -1389,7 +1470,7 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                                     {item.whatHappened || "Processing core event details..."}
                                 </p>
                             </div>
-                            
+
                             <div>
                                 <div className="flex items-center gap-2.5 mb-3">
                                     <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></div>
@@ -1410,13 +1491,12 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                                             const sImpact = typeof sector === 'string' ? "Neutral" : (sector.impact || "Neutral");
                                             const isUp = sImpact === "Positive";
                                             const isDown = sImpact === "Negative";
-                                            
+
                                             return (
-                                                <div key={idx} className={`flex items-center gap-2 px-3.5 py-1.5 rounded text-[11px] font-black transition-all shadow-sm ${
-                                                    isUp ? "bg-green-600 text-white" :
-                                                    isDown ? "bg-red-600 text-white" :
-                                                    "bg-slate-700 text-white"
-                                                }`}>
+                                                <div key={idx} className={`flex items-center gap-2 px-3.5 py-1.5 rounded text-[11px] font-black transition-all shadow-sm ${isUp ? "bg-green-600 text-white" :
+                                                        isDown ? "bg-red-600 text-white" :
+                                                            "bg-slate-700 text-white"
+                                                    }`}>
                                                     <span>{name}</span>
                                                     <span className="text-[15px] leading-none mb-0.5 font-normal">
                                                         {isUp ? "↑" : isDown ? "↓" : "→"}
@@ -1431,28 +1511,25 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
 
                         {/* Right Column: Market Impact Conclusion */}
                         <div className="flex items-end md:justify-end">
-                            <div className={`p-6 rounded-3xl border flex gap-6 items-center w-full max-w-[420px] shadow-sm ${
-                                impact === "Positive" ? "bg-green-50/40 border-green-100" :
-                                impact === "Negative" ? "bg-red-50/40 border-red-100" :
-                                "bg-blue-50/40 border-blue-100"
-                            }`}>
-                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${
-                                    impact === "Positive" ? "bg-green-100 text-green-700" :
-                                    impact === "Negative" ? "bg-red-100 text-red-700" :
-                                    "bg-blue-100 text-blue-700"
+                            <div className={`p-6 rounded-3xl border flex gap-6 items-center w-full max-w-[420px] shadow-sm ${impact === "Positive" ? "bg-green-50/40 border-green-100" :
+                                    impact === "Negative" ? "bg-red-50/40 border-red-100" :
+                                        "bg-blue-50/40 border-blue-100"
                                 }`}>
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${impact === "Positive" ? "bg-green-100 text-green-700" :
+                                        impact === "Negative" ? "bg-red-100 text-red-700" :
+                                            "bg-blue-100 text-blue-700"
+                                    }`}>
                                     {impact === "Positive" ? <TrendingUp size={28} /> : impact === "Negative" ? <TrendingDown size={28} /> : <Activity size={28} />}
                                 </div>
                                 <div className="space-y-1.5">
-                                    <span className={`text-[11px] font-black uppercase tracking-[0.25em] block ${
-                                        impact === "Positive" ? "text-green-700" :
-                                        impact === "Negative" ? "text-red-700" :
-                                        "text-blue-700"
-                                    }`}>MARKET IMPACT</span>
+                                    <span className={`text-[11px] font-black uppercase tracking-[0.25em] block ${impact === "Positive" ? "text-green-700" :
+                                            impact === "Negative" ? "text-red-700" :
+                                                "text-blue-700"
+                                        }`}>MARKET IMPACT</span>
                                     <p className="text-[14px] text-slate-800 font-bold leading-tight">
                                         {impact === "Positive" ? `Positive driver for ${sectors.map(s => s.name || s).join(', ')} growth expectations.` :
-                                         impact === "Negative" ? `Direct pressure detected for rate-sensitive sectors like ${sectors.map(s => s.name || s).join(', ')}.` :
-                                         "Neutral consolidation expected with low direct volatility."}
+                                            impact === "Negative" ? `Direct pressure detected for rate-sensitive sectors like ${sectors.map(s => s.name || s).join(', ')}.` :
+                                                "Neutral consolidation expected with low direct volatility."}
                                     </p>
                                 </div>
                             </div>
@@ -1483,7 +1560,7 @@ const InvestorNewsFeed = () => {
     });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [selectedCategories, setSelectedCategories] = useState([]); 
+    const [selectedCategories, setSelectedCategories] = useState([]);
     const [assetClass, setAssetClass] = useState("Stocks");
     const [region, setRegion] = useState("India");
     const [isWatchlistOnly, setIsWatchlistOnly] = useState(false);
@@ -1495,9 +1572,9 @@ const InvestorNewsFeed = () => {
             return;
         }
 
-        setSelectedCategories(prev => 
-            prev.includes(cat) 
-                ? prev.filter(c => c !== cat) 
+        setSelectedCategories(prev =>
+            prev.includes(cat)
+                ? prev.filter(c => c !== cat)
                 : [...prev, cat]
         );
     };
@@ -1508,8 +1585,8 @@ const InvestorNewsFeed = () => {
 
         // 1. Filter by categories (OR logic as requested)
         if (selectedCategories.length > 0) {
-            filtered = filtered.filter(item => 
-                selectedCategories.some(cat => 
+            filtered = filtered.filter(item =>
+                selectedCategories.some(cat =>
                     item.category?.toLowerCase() === cat.toLowerCase()
                 )
             );
@@ -1531,35 +1608,35 @@ const InvestorNewsFeed = () => {
         try {
             setIsLoading(true);
             setError(null);
-            
+
             // To support robust frontend filtering, we fetch a broader set of news (All Category)
             const data = await fetchMarketNews({
-                category: "all", 
+                category: "all",
                 region: region.toLowerCase(),
                 assetClass: assetClass.toLowerCase(),
                 watchlist: isWatchlistOnly
             });
-            
+
             if (data && Array.isArray(data) && data.length > 0) {
-                const processed = data.map(item => ({...item, isToday: true}));
+                const processed = data.map(item => ({ ...item, isToday: true }));
                 setRawNews(processed);
                 localStorage.setItem('radar_investor_news', JSON.stringify(processed));
             } else if (!rawNews.length) {
                 // High-fidelity fallback if everything fails and no cache
                 const fallbacks = [
-                    { 
-                        id: 'f1', title: 'Global Indices Pivot as Inflation Data Cools', 
-                        source: 'Radar Intelligence', time: '2h ago', category: 'Macro', 
+                    {
+                        id: 'f1', title: 'Global Indices Pivot as Inflation Data Cools',
+                        source: 'Radar Intelligence', time: '2h ago', category: 'Macro',
                         impact: 'Positive', whatHappened: 'US CPI data came in at 3.1% vs 3.2% expected.',
                         whyItMatters: 'Reduced pressure on central banks to hike rates.',
-                        sectors: ['Financials', 'Technology'], isToday: false 
+                        sectors: ['Financials', 'Technology'], isToday: false
                     },
-                    { 
-                        id: 'f2', title: 'Banking Sector Resilience Amid Credit Cycle Shift', 
-                        source: 'Reuters', time: '5h ago', category: 'Deals', 
+                    {
+                        id: 'f2', title: 'Banking Sector Resilience Amid Credit Cycle Shift',
+                        source: 'Reuters', time: '5h ago', category: 'Deals',
                         impact: 'Neutral', whatHappened: 'Major private banks report strong loan growth.',
                         whyItMatters: 'Systemic stability remains high despite rate volatility.',
-                        sectors: ['Banking'], isToday: false 
+                        sectors: ['Banking'], isToday: false
                     }
                 ];
                 setRawNews(fallbacks);
@@ -1583,7 +1660,7 @@ const InvestorNewsFeed = () => {
         <div className="flex flex-col w-full">
             <div className="dashboard-layout fade-in bg-transparent w-full px-4 md:px-10 py-6">
                 <div className="main-content-area transition-all duration-300 w-full mb-10 max-w-[1400px] mx-auto">
-                    
+
 
                     {/* 1. LATEST HEADLINES HEADER */}
                     <div className="mb-6 px-1">
@@ -1634,7 +1711,7 @@ const InvestorNewsFeed = () => {
                             </div>
 
                             <div className="flex items-center gap-2.5 ml-auto">
-                                <button 
+                                <button
                                     onClick={loadNews}
                                     disabled={isLoading}
                                     className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-[11px] font-black shadow-lg shadow-blue-500/20 hover:scale-105 transition-all outline-none disabled:opacity-50"
@@ -1642,18 +1719,17 @@ const InvestorNewsFeed = () => {
                                     <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
                                     <span>{isLoading ? "Refreshing..." : "Refresh Feed"}</span>
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => setIsWatchlistOnly(!isWatchlistOnly)}
-                                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-[11px] font-black border transition-all outline-none ${
-                                        isWatchlistOnly 
-                                            ? "bg-amber-100 border-amber-300 text-amber-700 shadow-md" 
+                                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-[11px] font-black border transition-all outline-none ${isWatchlistOnly
+                                            ? "bg-amber-100 border-amber-300 text-amber-700 shadow-md"
                                             : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                                    }`}
+                                        }`}
                                 >
                                     <Star size={13} className={isWatchlistOnly ? "text-amber-600 fill-amber-500" : "text-amber-400"} />
                                     <span>Watchlist</span>
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => {
                                         setSelectedCategories([]);
                                         setAssetClass("Stocks");
@@ -1731,7 +1807,8 @@ function InvestorView({ activeModule, setActiveModule }) {
     };
 
     if (activeModule === 'WATCHLIST') {
-        return <Watchlist />;
+        // Navigate to the dedicated watchlist page instead of rendering inline
+        return <Navigate to="/investor/watchlists" replace />;
     }
 
     if (activeModule === 'SCREENERS') {
@@ -1740,6 +1817,10 @@ function InvestorView({ activeModule, setActiveModule }) {
 
     if (activeModule === 'NEWS') {
         return <InvestorNewsFeed />;
+    }
+
+    if (activeModule === 'ACADEMY') {
+        return <LearningAcademy />;
     }
 
     // Default: DASHBOARD
@@ -1761,11 +1842,11 @@ function InvestorView({ activeModule, setActiveModule }) {
                     <YourInvestments onStartInvesting={() => setActiveModule('WATCHLIST')} />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div className="md:col-span-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 items-stretch">
+                    <div className="md:col-span-2 h-[580px]">
                         <MostBoughtStocks />
                     </div>
-                    <div className="md:col-span-1">
+                    <div className="md:col-span-1 h-[580px]">
                         <GlobalPulse />
                     </div>
                 </div>

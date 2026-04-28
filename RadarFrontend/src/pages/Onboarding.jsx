@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../api/api';
 import {
     Target,
     Award,
@@ -21,7 +22,7 @@ import './Onboarding.css';
 
 const TERMS = {
     "RSI": "A 'market speedometer' that tracks if a stock is being bought too quickly (overpriced) or sold too aggressively (underbought).",
-    "MACD": "A tool used to spot the 'momentum' of a stockâ€”helping you see if its current price trend is gaining or losing steam."
+    "MACD": "A tool used to spot the 'momentum' of a stock—helping you see if its current price trend is gaining or losing steam."
 };
 
 const QuizTooltip = ({ term, explanation, onClose }) => (
@@ -74,7 +75,7 @@ const questions = [
     { id: 9, text: "How do you respond if a stock drops 15%?", options: [{ label: "Exit quickly to limit loss", type: 'A' }, { label: "Analyze and possibly hold or buy more", type: 'B' }] },
     { id: 10, text: "What kind of analysis do you rely on more?", weight: 3, options: [{ label: "Technical analysis (charts, RSI, MACD, etc.)", type: 'A' }, { label: "Fundamental analysis (earnings, business model)", type: 'B' }] },
     { id: 11, text: "How do you prefer to build wealth?", options: [{ label: "Active buying and selling", type: 'A' }, { label: "Long-term compounding", type: 'B' }] },
-    { id: 12, text: "Which statement sounds more like you?", options: [{ label: "â€œI want to beat the market regularly.â€", type: 'A' }, { label: "â€œI want to grow with the market over time.â€", type: 'B' }] }
+    { id: 12, text: "Which statement sounds more like you?", options: [{ label: "\"I want to beat the market regularly.\"", type: 'A' }, { label: "\"I want to grow with the market over time.\"", type: 'B' }] }
 ];
 
 const Onboarding = () => {
@@ -165,7 +166,7 @@ const Onboarding = () => {
                 ? "You prioritize capital preservation, fundamental growth, and long-term compounding."
                 : "You thrive on market volatility, quick execution, and momentum-based opportunities.";
 
-            setAnalysis({
+            const dnaPayload = {
                 investorPercent,
                 traderPercent,
                 dominant,
@@ -183,9 +184,15 @@ const Onboarding = () => {
                 confidence,
                 whyBullets: whyBullets.slice(0, 3),
                 hybridLine
-            });
+            };
+
+            setAnalysis(dnaPayload);
             setStep('result');
             localStorage.setItem('hasCompletedAssessment', 'true');
+            localStorage.setItem('investorDNA', JSON.stringify(dnaPayload));
+
+            // Persist to backend (non-blocking — fails silently if not logged in)
+            api.post('/user/dna', dnaPayload).catch(() => {});
         }, 1500);
     };
 
@@ -225,7 +232,7 @@ const Onboarding = () => {
                         <button className="btn-start" onClick={startQuiz}>
                             Start Assessment <ChevronRight size={18} />
                         </button>
-                        <p className="intro-meta">Takes ~2 minutes â€¢ Research-based Analysis</p>
+                        <p className="intro-meta">Takes ~2 minutes • Research-based Analysis</p>
                     </div>
                 </div>
             )}
@@ -247,7 +254,7 @@ const Onboarding = () => {
                             {showHelp && (
                                 <div className="absolute top-10 right-0 w-[240px] bg-slate-900 text-white p-4 rounded-xl shadow-2xl z-50 text-xs leading-relaxed border border-white/10 fade-in">
                                     <p className="font-bold mb-2 text-blue-400 uppercase tracking-tighter">What is this for?</p>
-                                    This assessment maps your market behavior and execution style. Your answers help RADAR personalize your entire experienceâ€”optimizing your dashboard for your unique psychological edge.
+                                    This assessment maps your market behavior and execution style. Your answers help RADAR personalize your entire experience—optimizing your dashboard for your unique psychological edge.
                                     <button className="mt-3 block text-[10px] uppercase font-black text-slate-400 hover:text-white" onClick={() => setShowHelp(false)}>Got it</button>
                                 </div>
                             )}
@@ -361,7 +368,7 @@ const Onboarding = () => {
                                                 <span key={n} className="text-[9px] font-black bg-white/5 px-2 py-0.5 rounded text-white/60 border border-white/10">{n}</span>
                                             )}
                                         </div>
-                                        <button className="text-[10px] font-black text-blue-400 hover:text-blue-300 transition-colors">Start Academy Path â†’</button>
+                                        <button className="text-[10px] font-black text-blue-400 hover:text-blue-300 transition-colors">Start Academy Path →</button>
                                     </div>
                                 </div>
                             </div>
@@ -414,15 +421,15 @@ const Onboarding = () => {
                                                     <div className="space-y-1.5 px-1">
                                                         {analysis.dominant === 'TRADER' ? (
                                                             <>
-                                                                <div className="text-[11px] font-bold text-slate-600">â€¢ High volatility markets</div>
-                                                                <div className="text-[11px] font-bold text-slate-600">â€¢ Breakout conditions</div>
-                                                                <div className="text-[11px] font-bold text-slate-600">â€¢ Momentum-driven trends</div>
+                                                                <div className="text-[11px] font-bold text-slate-600">• High volatility markets</div>
+                                                                <div className="text-[11px] font-bold text-slate-600">• Breakout conditions</div>
+                                                                <div className="text-[11px] font-bold text-slate-600">• Momentum-driven trends</div>
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <div className="text-[11px] font-bold text-slate-600">â€¢ Value-driven cycles</div>
-                                                                <div className="text-[11px] font-bold text-slate-600">â€¢ Compound growth steady-stats</div>
-                                                                <div className="text-[11px] font-bold text-slate-600">â€¢ Reversion to mean</div>
+                                                                <div className="text-[11px] font-bold text-slate-600">• Value-driven cycles</div>
+                                                                <div className="text-[11px] font-bold text-slate-600">• Compound growth steady-stats</div>
+                                                                <div className="text-[11px] font-bold text-slate-600">• Reversion to mean</div>
                                                             </>
                                                         )}
                                                     </div>
@@ -432,15 +439,15 @@ const Onboarding = () => {
                                                     <div className="space-y-1.5 px-1">
                                                         {analysis.dominant === 'TRADER' ? (
                                                             <>
-                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">â€¢ Overtrading in sideways markets</div>
-                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">â€¢ Entering trades emotionally</div>
-                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">â€¢ Ignoring long-term signals</div>
+                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">• Overtrading in sideways markets</div>
+                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">• Entering trades emotionally</div>
+                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">• Ignoring long-term signals</div>
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">â€¢ Analysis paralysis</div>
-                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">â€¢ Missing quick opportunity windows</div>
-                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">â€¢ Underestimating volatility impact</div>
+                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">• Analysis paralysis</div>
+                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">• Missing quick opportunity windows</div>
+                                                                <div className="text-[11px] font-bold text-slate-400 opacity-80">• Underestimating volatility impact</div>
                                                             </>
                                                         )}
                                                     </div>
@@ -480,14 +487,14 @@ const Onboarding = () => {
 
                             <div className="result-actions-grid pt-4 border-t border-slate-100 mt-auto">
                                 <button className="btn-activate mb-3" onClick={() => chooseMode(analysis.dominant)}>
-                                    Enter {analysis.dominant.charAt(0) + analysis.dominant.slice(1).toLowerCase()} Mode (Recommended for you) â†’
+                                    Enter {analysis.dominant.charAt(0) + analysis.dominant.slice(1).toLowerCase()} Mode (Recommended for you) →
                                 </button>
                                 <div className="flex gap-3">
                                     <button 
                                         className="btn-secondary flex-1" 
-                                        onClick={() => chooseMode('INVESTOR')}
+                                        onClick={() => chooseMode(analysis.dominant === 'INVESTOR' ? 'TRADER' : 'INVESTOR')}
                                     >
-                                        Investor Mode
+                                        {analysis.dominant === 'INVESTOR' ? 'Trader Mode' : 'Investor Mode'}
                                     </button>
                                     <button 
                                         className="btn-outline flex-1" 

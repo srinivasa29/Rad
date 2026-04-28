@@ -48,6 +48,16 @@ api.interceptors.request.use((config) => {
     return Promise.reject(error);
 });
 
+const AUTH_KEYS = ['token', 'user', 'mode', 'userId', 'userEmail'];
+
+const clearAuthAndRedirect = () => {
+    AUTH_KEYS.forEach(k => localStorage.removeItem(k));
+    // Only redirect if not already on an auth page
+    if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+    }
+};
+
 api.interceptors.response.use(
     (response) => {
         if (response && typeof response === 'object' && response.data !== undefined) {
@@ -56,14 +66,44 @@ api.interceptors.response.use(
         return response;
     },
     (error) => {
-        if (typeof window !== 'undefined' && error.response?.data?.error) {
-            const event = new CustomEvent('api-error', { 
-                detail: { message: error.response.data.error } 
-            });
+        const status = error.response?.status;
+        const msg = error.response?.data?.error || '';
+
+        // Stale / invalid token — wipe it and force re-login
+        if (status === 401 && (msg.includes('token failed') || msg.includes('invalid signature') || msg.includes('Not authorized'))) {
+            clearAuthAndRedirect();
+            return Promise.reject(error);
+        }
+
+        if (typeof window !== 'undefined' && msg) {
+            const event = new CustomEvent('api-error', { detail: { message: msg } });
             window.dispatchEvent(event);
         }
         return Promise.reject(error);
     }
 );
+
+export const saveToDefaultWatchlist = async (symbol) => {
+    try {
+        const watchlistsRes = await api.get('/watchlist');
+        let defaultId = null;
+        
+        if (watchlistsRes.data?.length > 0) {
+            defaultId = watchlistsRes.data[0]._id;
+        } else {
+            const createRes = await api.post('/watchlist', { name: 'My Watchlist' });
+            defaultId = createRes.data._id;
+        }
+        
+        if (defaultId) {
+            const addRes = await api.post(`/watchlist/${defaultId}/add`, { symbol });
+            return { success: true, data: addRes.data };
+        }
+        throw new Error("Could not find or create a watchlist");
+    } catch (error) {
+        console.error("Failed to save to watchlist:", error);
+        throw error;
+    }
+};
 
 export default api;

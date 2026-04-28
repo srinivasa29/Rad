@@ -18,11 +18,14 @@ import {
     Check,
     ArrowUpRight,
     Zap,
-    RefreshCw
+    RefreshCw,
+    Trash2,
+    Download
 } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
-import { runScreenerScan } from '../../api/screenerApi';
+import { runScreenerScan, createCustomFilter, getCustomFilters, deleteCustomFilter } from '../../api/screenerApi';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 
 const MOCK_READY_MADE = [
     { id: 'div', title: 'Dividend Giants', desc: 'Top yield names with stable cash flows and 5Y growth.', icon: Banknote, color: 'text-emerald-600', bg: 'bg-emerald-50', filters: { yield: '> 3%', mcap: 'Large' } },
@@ -32,12 +35,12 @@ const MOCK_READY_MADE = [
 
 const MOCK_FALLBACK_RESULTS = [
     { 
-        id: 'HDFCBANK.NS', price: 'â‚¹1,652', change: '+0.4%', isPositive: true, sector: 'Finance', mcap: '12.5T', pe: '18.2', roe: '16.5%', yield: '1.2%', confidence: 92,
+        id: 'HDFCBANK.NS', price: '₹1,652', change: '+0.4%', isPositive: true, sector: 'Finance', mcap: '12.5T', pe: '18.2', roe: '16.5%', yield: '1.2%', confidence: 92,
         why: 'Price testing major demand zone with high institutional delivery.', 
         tags: ['Value', 'Large Cap'], trend: [1640, 1645, 1642, 1650, 1648, 1652]
     },
     { 
-        id: 'RELIANCE.NS', price: 'â‚¹2,985', change: '+1.1%', isPositive: true, sector: 'Energy', mcap: '20.1T', pe: '24.5', roe: '14.2%', yield: '0.8%', confidence: 85,
+        id: 'RELIANCE.NS', price: '₹2,985', change: '+1.1%', isPositive: true, sector: 'Energy', mcap: '20.1T', pe: '24.5', roe: '14.2%', yield: '0.8%', confidence: 85,
         why: 'Breakout above 20-day EMA on increased relative volume.', 
         tags: ['Momentum', 'Bluechip'], trend: [2950, 2960, 2975, 2980, 2970, 2985]
     }
@@ -55,7 +58,7 @@ const strategies = [
 
 const allFilters = [
     { id: 'mcap', label: 'Market Cap', icon: BarChart3, options: ['Large', 'Mid', 'Small', 'Micro'] },
-    { id: 'price', label: 'Price', icon: Banknote, options: ['Any', '< â‚¹500', 'â‚¹500 - â‚¹2k', '> â‚¹2k'] },
+    { id: 'price', label: 'Price', icon: Banknote, options: ['Any', '< ₹500', '₹500 - ₹2k', '> ₹2k'] },
     { id: 'change', label: 'Change %', icon: TrendingUp, options: ['Any', '> 0%', '> 2%', '> 5%', '< 0%'] },
     { id: 'sector', label: 'Sector', icon: Search, options: ['All', 'IT', 'Finance', 'FMCG', 'Auto', 'Energy', 'Healthcare'] },
     { id: 'roe', label: 'ROE', icon: Activity, options: ['Any', '> 10%', '> 15%', '> 20%'] },
@@ -91,6 +94,14 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
     const navigate = useNavigate();
     const userMode = localStorage.getItem('mode') || 'INVESTOR';
 
+    // ── Custom Filters state ──────────────────────────────────
+    const [myFilters, setMyFilters] = useState([]);
+    const [newFilterName, setNewFilterName] = useState('');
+    const [newFilterOptions, setNewFilterOptions] = useState('');
+    const [newFilterQuery, setNewFilterQuery] = useState('SELECT * FROM market WHERE x > y');
+    const [filterSaving, setFilterSaving] = useState(false);
+    const [filterError, setFilterError] = useState('');
+
     const handleFilterChange = (id, value) => {
         setActiveFilters(prev => ({ ...prev, [id]: value }));
         setOpenFilter(null);
@@ -108,6 +119,73 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
             setVisibleFilters(prev => [...prev, id]);
         }
         setOpenFilter(null);
+    };
+
+    // ── Custom filter helpers ─────────────────────────────────
+    const loadMyFilters = async () => {
+        try {
+            const res = await getCustomFilters();
+            const filters = res?.data || [];
+            setMyFilters(filters);
+            // Surface them as additional filter chips
+            filters.forEach(f => {
+                if (!allFilters.find(af => af.id === f._id)) {
+                    allFilters.push({
+                        id: f._id,
+                        label: f.name,
+                        icon: Filter,
+                        options: f.options,
+                        isCustom: true,
+                    });
+                }
+            });
+        } catch (_) {
+            // silently ignore — user might not be logged in yet
+        }
+    };
+
+    const handleCreateFilter = async () => {
+        setFilterError('');
+        if (!newFilterName.trim()) {
+            setFilterError('Please enter a filter name.');
+            return;
+        }
+        try {
+            setFilterSaving(true);
+            const res = await createCustomFilter({
+                name: newFilterName.trim(),
+                options: newFilterOptions,
+                logicQuery: newFilterQuery,
+            });
+            const created = res.data;
+            setMyFilters(prev => [created, ...prev]);
+            // Add to live filter chips
+            allFilters.push({
+                id: created._id,
+                label: created.name,
+                icon: Filter,
+                options: created.options,
+                isCustom: true,
+            });
+            setVisibleFilters(prev => [...prev, created._id]);
+            // Reset
+            setNewFilterName('');
+            setNewFilterOptions('');
+            setNewFilterQuery('SELECT * FROM market WHERE x > y');
+            setShowCreateModal(false);
+        } catch (err) {
+            setFilterError(err?.response?.data?.message || 'Failed to create filter.');
+        } finally {
+            setFilterSaving(false);
+        }
+    };
+
+    const handleDeleteMyFilter = async (id) => {
+        try {
+            await deleteCustomFilter(id);
+            setMyFilters(prev => prev.filter(f => f._id !== id));
+            setVisibleFilters(prev => prev.filter(vid => vid !== id));
+        } catch (_) {}
     };
 
     const filteredResults = results.filter(stock => {
@@ -137,6 +215,40 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
         }
     };
 
+    const exportToExcel = () => {
+        if (!filteredResults.length) return;
+
+        // Build rows
+        const rows = filteredResults.map(s => ({
+            'Ticker':       (s.id || '').split('.')[0],
+            'Sector':       s.sector        || '—',
+            'Price':        s.price         || '—',
+            'Change %':     s.change        || '—',
+            'Market Cap':   s.mcap          || '—',
+            'P/E Ratio':    s.pe            || '—',
+            'ROE':          s.roe           || '—',
+            'Div. Yield':   s.yield         || '—',
+            'Signal %':     s.confidence != null ? `${s.confidence}%` : '—',
+            'Tags':         Array.isArray(s.tags) ? s.tags.join(', ') : '—',
+            'Insight':      s.why           || '—',
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+
+        // Column widths
+        ws['!cols'] = [
+            { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 10 },
+            { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+            { wch: 10 }, { wch: 20 }, { wch: 50 },
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Screener Results');
+
+        const timestamp = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(wb, `RADAR_Screener_${timestamp}.xlsx`);
+    };
+
     React.useEffect(() => {
         // Initial scan if we have filters or if cache is empty
         if (Object.keys(activeFilters).length > 0) {
@@ -146,6 +258,10 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
             runScan();
         }
     }, [activeFilters]);
+
+    React.useEffect(() => {
+        loadMyFilters();
+    }, []);
 
     React.useEffect(() => {
         const style = document.createElement('style');
@@ -450,7 +566,14 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
                                         <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
                                         {isLoading ? "Scanning..." : "Refresh Results"}
                                     </button>
-                                    <button className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-md hover:bg-blue-700 transition-all">Export Report</button>
+                                    <button
+                                        onClick={exportToExcel}
+                                        disabled={filteredResults.length === 0}
+                                        className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-md hover:bg-blue-700 transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <Download size={13} />
+                                        Export Report
+                                    </button>
                                 </div>
                             </div>
                             
@@ -568,7 +691,7 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
                     </div>
                 </div>
 
-                {}
+                {/* ── Create Filter Modal ───────────────────────────── */}
                 {showCreateModal && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <div className="absolute inset-0 modal-overlay" onClick={() => setShowCreateModal(false)} />
@@ -583,20 +706,71 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Filter Name</label>
-                                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-800 focus:bg-white focus:border-blue-500 transition-all" placeholder="e.g. FII Holding %" />
+                                    <input
+                                        type="text"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-800 focus:bg-white focus:border-blue-500 transition-all"
+                                        placeholder="e.g. FII Holding %"
+                                        value={newFilterName}
+                                        onChange={e => setNewFilterName(e.target.value)}
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Options (comma separated)</label>
-                                    <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-800 h-20 focus:bg-white focus:border-blue-500 transition-all" placeholder="Large, Mid, Small..."></textarea>
+                                    <textarea
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-800 h-20 focus:bg-white focus:border-blue-500 transition-all"
+                                        placeholder="Large, Mid, Small..."
+                                        value={newFilterOptions}
+                                        onChange={e => setNewFilterOptions(e.target.value)}
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Logic Query</label>
                                     <div className="p-4 bg-slate-900 rounded-xl">
-                                        <code className="text-emerald-400 font-mono text-xs">SELECT * FROM market WHERE x {'>'} y</code>
+                                        <textarea
+                                            className="w-full bg-transparent text-emerald-400 font-mono text-xs outline-none resize-none"
+                                            rows={2}
+                                            value={newFilterQuery}
+                                            onChange={e => setNewFilterQuery(e.target.value)}
+                                            spellCheck={false}
+                                        />
                                     </div>
                                 </div>
-                                <button className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-lg shadow-xl shadow-blue-200 mt-4 active:scale-95 transition-all">Create Filter Metric</button>
+                                {filterError && (
+                                    <p className="text-xs font-bold text-rose-500 pl-1">{filterError}</p>
+                                )}
+                                <button
+                                    onClick={handleCreateFilter}
+                                    disabled={filterSaving}
+                                    className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-lg shadow-xl shadow-blue-200 mt-4 active:scale-95 transition-all disabled:opacity-60"
+                                >
+                                    {filterSaving ? 'Saving...' : 'Create Filter Metric'}
+                                </button>
                             </div>
+
+                            {/* My saved filters */}
+                            {myFilters.length > 0 && (
+                                <div className="mt-6 pt-5 border-t border-slate-100">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">My Saved Filters</p>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        {myFilters.map(f => (
+                                            <div key={f._id} className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl">
+                                                <div>
+                                                    <p className="text-sm font-black text-slate-700">{f.name}</p>
+                                                    {f.options?.length > 0 && (
+                                                        <p className="text-[10px] text-slate-400 font-bold">{f.options.join(', ')}</p>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    onClick={() => handleDeleteMyFilter(f._id)}
+                                                    className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

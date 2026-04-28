@@ -1,5 +1,6 @@
 const Portfolio = require('../models/Portfolio');
 const { fetchStockData } = require('./stockService');
+const { getBatchFundamentals } = require('./fundamentalsEnrichmentService');
 
 const toNumber = (value, fallback = 0) => {
     const parsed = Number(value);
@@ -35,9 +36,27 @@ const calculatePortfolioRisk = async (userId) => {
 
     const totalHoldingsValue = positions.reduce((sum, row) => sum + row.value, 0);
     const totalValue = totalHoldingsValue + toNumber(portfolio.cashBalance, 0);
-    const concentration = positions
+
+    const fundas = await getBatchFundamentals(positions.map(p => p.symbol));
+    const sectorMap = {};
+
+    const enrichedPositions = positions.map(row => {
+        const info = fundas.get(row.symbol) || {};
+        const sector = info.sector || 'Others';
+        sectorMap[sector] = (sectorMap[sector] || 0) + row.value;
+        return { ...row, sector };
+    });
+
+    const sectorWeights = Object.keys(sectorMap).map(name => ({
+        name,
+        value: Number(sectorMap[name].toFixed(2)),
+        weightPct: totalHoldingsValue > 0 ? Number(((sectorMap[name] / totalHoldingsValue) * 100).toFixed(2)) : 0
+    })).sort((a, b) => b.value - a.value);
+
+    const concentration = enrichedPositions
         .map((row) => ({
             symbol: row.symbol,
+            sector: row.sector,
             value: Number(row.value.toFixed(2)),
             weightPct: totalHoldingsValue > 0 ? Number(((row.value / totalHoldingsValue) * 100).toFixed(2)) : 0,
         }))
@@ -58,6 +77,7 @@ const calculatePortfolioRisk = async (userId) => {
         var95: Number(var95.toFixed(2)),
         beta,
         concentration,
+        sectorWeights,
         riskLevel,
         assumptions: {
             method: 'parametric-var',

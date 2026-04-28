@@ -73,12 +73,12 @@ export default function AnalysisBottom({ stock }) {
                         <div className="grid grid-cols-3 gap-8">
                             <div className="flex flex-col gap-1">
                                 <span className="alpha-label">Revenue (TTM)</span>
-                                <span className="text-xl font-black text-white terminal-value">â‚¹9.8T</span>
+                                <span className="text-xl font-black text-white terminal-value">₹9.8T</span>
                                 <span className="text-[10px] font-bold text-emerald-500">+15.2% YoY</span>
                             </div>
                             <div className="flex flex-col gap-1">
                                 <span className="alpha-label">Net Profit</span>
-                                <span className="text-xl font-black text-white terminal-value">â‚¹780B</span>
+                                <span className="text-xl font-black text-white terminal-value">₹780B</span>
                                 <span className="text-[10px] font-bold text-emerald-500">+11.8% YoY</span>
                             </div>
                             <div className="flex flex-col gap-1">

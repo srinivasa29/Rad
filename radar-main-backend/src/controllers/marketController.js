@@ -4,36 +4,53 @@ const { fetchStockData } = require('../services/stockService');
 const { fetchForexData } = require('../services/forexService');
 const { normalizeCrypto, normalizeStock, normalizeForex } = require('../utils/normalizer');
 const { searchSymbolRegistry, syncSymbolRegistry } = require('../services/symbolRegistryService');
+const { getActiveSymbols } = require('../utils/symbolRegistry');
 
 const cache = new NodeCache({ stdTTL: 60 });
 const DEFAULT_MARKET_REGION = String(process.env.DEFAULT_MARKET_REGION || 'IN').toUpperCase();
 const stripStockSuffix = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
 
 const getMarketData = async (req, res) => {
-    const { type, search, minPrice, maxPrice, minChange, sort } = req.query;
+    const { type, search, minPrice, maxPrice, minChange, sort, symbols } = req.query;
 
     try {
         let combinedData = cache.get("allMarketData");
 
         if (!combinedData) {
-            const [rawCrypto, rawStocks, rawForex] = await Promise.all([
+            const [cryptoResult, stockResult, forexResult] = await Promise.allSettled([
                 fetchCryptoData(),
                 fetchStockData(),
                 fetchForexData()
             ]);
 
+            const rawCrypto = cryptoResult.status === 'fulfilled' ? cryptoResult.value : [];
+            const rawStocks = stockResult.status === 'fulfilled' ? stockResult.value : [];
+            const rawForex  = forexResult.status === 'fulfilled'  ? forexResult.value  : [];
+
+            if (stockResult.status === 'rejected') {
+                console.error('[marketController] fetchStockData failed:', stockResult.reason?.message);
+            }
+
             const cleanCrypto = normalizeCrypto(rawCrypto);
             const cleanStocks = normalizeStock(rawStocks);
-            const cleanForex = normalizeForex(rawForex);
-            
+            const cleanForex  = normalizeForex(rawForex);
+
             combinedData = [...cleanCrypto, ...cleanStocks, ...cleanForex];
-            cache.set("allMarketData", combinedData);
+            // Only cache when we have reasonable data; don't cache an empty result
+            if (combinedData.length > 0) {
+                cache.set("allMarketData", combinedData);
+            }
         }
 
         let result = combinedData;
 
         if (type) {
             result = result.filter(item => item.type === type.toUpperCase());
+        }
+
+        if (symbols) {
+            const symList = symbols.split(',').map(s => s.trim().toUpperCase());
+            result = result.filter(item => symList.includes(item.symbol.toUpperCase()));
         }
 
         if (search) {
@@ -77,28 +94,33 @@ const getCryptoBySymbol = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-const getTrendingSearches = (req, res) => {
+const getTrendingSearches = async (req, res) => {
     try {
-        const regionalTrending = {
-            IN: ['NIFTY', 'BANKNIFTY', 'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'BTC', 'USDINR'],
-            US: ['AAPL', 'NVDA', 'BTC', 'TSLA', 'ETH', 'MSFT', 'AMD', 'SOL'],
-            GLOBAL: ['NIFTY', 'AAPL', 'BTC', 'RELIANCE', 'NVDA', 'ETH', 'TCS', 'EURUSD'],
-        };
-
         const region = String(DEFAULT_MARKET_REGION || 'IN').toUpperCase();
-        const baseTrending = regionalTrending[region] || regionalTrending.IN || [];
-        const trending = baseTrending.map(stripStockSuffix);
 
-        res.json({
-            success: true,
-            trending,
-        });
+        // Fetch up to 8 active equity symbols for the current region from DB
+        const exchangeMap = { IN: ['NSE', 'BSE'], US: ['NASDAQ', 'NYSE'], GLOBAL: ['NSE', 'BSE', 'NASDAQ', 'NYSE', 'CRYPTO'] };
+        const exchanges = exchangeMap[region] || exchangeMap.IN;
+
+        const dbSymbols = await getActiveSymbols({ exchanges });
+        const topStocks = dbSymbols.slice(0, 6).map(stripStockSuffix);
+
+        // Always include index + BTC for IN, just BTC+ETH for global
+        const pinned = region === 'US'
+            ? ['BTC', 'ETH']
+            : region === 'GLOBAL'
+            ? ['BTC', 'NIFTY']
+            : ['NIFTY', 'BTC', 'USDINR'];
+
+        const trending = [...new Set([...pinned, ...topStocks])].slice(0, 10);
+
+        res.json({ success: true, trending });
     } catch (error) {
         console.error('Failed to get trending searches:', error);
         res.status(200).json({
             success: true,
-            trending: ['NIFTY', 'RELIANCE', 'TCS', 'BTC'],
-            message: 'Fallback active'
+            trending: ['NIFTY', 'BTC'],
+            message: 'Fallback active',
         });
     }
 };

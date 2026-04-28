@@ -32,7 +32,7 @@ export default function AnalysisHeader({ stock, onBack }) {
                 {}
                 <div className="flex items-center gap-4">
                     <div className="flex flex-col">
-                        <span className="terminal-price text-white">â‚¹{stock.price.toLocaleString()}</span>
+                        <span className="terminal-price text-white">₹{stock.price.toLocaleString()}</span>
                         <div className={`flex items-center gap-1 text-[11px] font-black ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {isPositive ? '+' : ''}{stock.changePercent.toFixed(2)}% (+{stock.change.toFixed(2)})
                         </div>

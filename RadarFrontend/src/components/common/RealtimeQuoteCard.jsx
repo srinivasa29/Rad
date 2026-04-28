@@ -66,7 +66,7 @@ const RealtimeQuoteCard = ({ symbol, className = '' }) => {
             {}
             <div className="mb-2">
                 <p className="text-3xl font-bold text-gray-900">
-                    â‚¹{price?.toFixed(2) || 'â€”'}
+                    ₹{price?.toFixed(2) || 'â€”'}
                 </p>
             </div>
 
@@ -81,19 +81,19 @@ const RealtimeQuoteCard = ({ symbol, className = '' }) => {
             <div className="grid grid-cols-2 gap-3 text-sm mt-4">
                 <div>
                     <p className="text-gray-500">Open</p>
-                    <p className="font-semibold">â‚¹{quote.open?.toFixed(2) || 'â€”'}</p>
+                    <p className="font-semibold">₹{quote.open?.toFixed(2) || 'â€”'}</p>
                 </div>
                 <div>
                     <p className="text-gray-500">Prev Close</p>
-                    <p className="font-semibold">â‚¹{quote.previousClose?.toFixed(2) || 'â€”'}</p>
+                    <p className="font-semibold">₹{quote.previousClose?.toFixed(2) || 'â€”'}</p>
                 </div>
                 <div>
                     <p className="text-gray-500">High</p>
-                    <p className="font-semibold text-green-600">â‚¹{quote.high?.toFixed(2) || 'â€”'}</p>
+                    <p className="font-semibold text-green-600">₹{quote.high?.toFixed(2) || 'â€”'}</p>
                 </div>
                 <div>
                     <p className="text-gray-500">Low</p>
-                    <p className="font-semibold text-red-600">â‚¹{quote.low?.toFixed(2) || 'â€”'}</p>
+                    <p className="font-semibold text-red-600">₹{quote.low?.toFixed(2) || 'â€”'}</p>
                 </div>
             </div>
 

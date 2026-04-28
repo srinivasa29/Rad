@@ -93,11 +93,38 @@ router.get('/symbols/nifty50', (req, res) => {
 
 router.get('/symbols/sensex30', (req, res) => {
     const symbols = historicalDataBackfillService.getSensex30Symbols();
-    res.json({
-        success: true,
-        count: symbols.length,
-        symbols,
-    });
+    res.json({ success: true, count: symbols.length, symbols });
 });
+
+router.get('/symbols/all', (req, res) => {
+    const symbols = historicalDataBackfillService.getAllNseSymbols();
+    res.json({ success: true, count: symbols.length, symbols });
+});
+
+// Fire-and-forget full universe backfill (~200 NSE symbols, batched)
+router.post('/backfill/full-universe', asyncHandler(async (req, res) => {
+    const { timeframe = '1d', range = '1y' } = req.body;
+    logger.info(`Admin triggered FULL UNIVERSE backfill (${timeframe}, ${range})`);
+    historicalDataBackfillService.backfillFullUniverse(timeframe, range)
+        .then(r => logger.info(`Full universe done: ${r.success.length} ok, ${r.failed.length} fail, ${r.skipped.length} skip`))
+        .catch(e => logger.error(`Full universe backfill error: ${e.message}`));
+    res.json({ success: true, message: 'Full universe backfill started (~200 NSE symbols)', timeframe, range, note: 'Running in background. Check logs for progress.' });
+}));
+
+router.post('/backfill/nifty-next50', asyncHandler(async (req, res) => {
+    const { timeframe = '1d', range = '1y' } = req.body;
+    historicalDataBackfillService.backfillNiftyNext50(timeframe, range)
+        .then(r => logger.info(`Next50 done: ${r.success.length} ok`))
+        .catch(e => logger.error(`Next50 backfill error: ${e.message}`));
+    res.json({ success: true, message: 'Nifty Next 50 backfill started', timeframe, range });
+}));
+
+router.post('/backfill/midcap', asyncHandler(async (req, res) => {
+    const { timeframe = '1d', range = '1y' } = req.body;
+    historicalDataBackfillService.backfillMidcap(timeframe, range)
+        .then(r => logger.info(`Midcap done: ${r.success.length} ok`))
+        .catch(e => logger.error(`Midcap backfill error: ${e.message}`));
+    res.json({ success: true, message: 'Midcap 100 backfill started', timeframe, range });
+}));
 
 module.exports = router;

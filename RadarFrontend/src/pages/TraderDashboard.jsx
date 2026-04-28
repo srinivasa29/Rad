@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { Activity, Maximize2, TrendingDown, TrendingUp, Search, Newspaper, Globe, Zap, ExternalLink, Monitor } from "lucide-react";
 import { motion } from "framer-motion";
 import {
@@ -30,6 +30,7 @@ import RealTimeScanner from "../components/trader/RealTimeScanner"; // TRADINGVI
 import MainLayout from "../components/layout/MainLayout";
 import MarketTicker from "../components/dashboard/MarketTicker";
 import TraderStockPage from "./TraderStockPage"; 
+import LearningAcademy from "./LearningAcademy";
 import "./TraderDashboard.css";
 
 import ScreenerPage from "./ScreenerPage";
@@ -402,7 +403,7 @@ const SectorHeatmap = () => {
           {isLoading ? "SYNCING" : "LIVE"}
         </span>
       </div>
-      <div className="flex-1 p-3 grid grid-cols-3 gap-2">
+      <div className="flex-1 p-3 grid grid-cols-3 gap-2 overflow-y-auto custom-scrollbar">
         {!isLoading && sectors.length === 0 && (
           <div className="col-span-3 text-[10px] text-[#5d606b] font-mono uppercase tracking-wider px-1">No backend sectors available.</div>
         )}
@@ -747,7 +748,7 @@ const GapLists = () => {
               <div className="w-1.5 h-6 rounded-full" style={{ background: accentColor, boxShadow: `0 0 6px ${accentColor}` }} />
               <div>
                 <div className="font-bold text-white text-xs tracking-wide">{normalizeDisplaySymbol(item.symbol)}</div>
-                <div className="text-[10px] font-mono" style={{ color: "#5d6b7a" }}>Rs {Number(item.price || 0).toLocaleString()}</div>
+                <div className="text-[10px] font-mono" style={{ color: "#5d6b7a" }}>₹ {Number(item.price || 0).toLocaleString()}</div>
               </div>
             </div>
             <span className="font-mono text-sm font-black px-2 py-0.5 rounded-md" style={{ color: accentColor, background: `${accentColor}15` }}>
@@ -1395,7 +1396,7 @@ const SignalEnginePanel = () => {
               timeframe: alert.time,
               details: [
                 { name: "Trigger", value: alert.type, note: "Technical alert", color: "#42C0A5" },
-                { name: "Price", value: Number(alert.price || 0).toLocaleString(), note: "Spot price", color: "#d1d4dc" },
+                { name: "Price", value: `₹${Number(alert.price || 0).toLocaleString()}`, note: "Spot price", color: "#d1d4dc" },
               ],
               note: `${alert.symbol} flashed a live breakout condition at ${alert.time}.`,
             });
@@ -1885,7 +1886,7 @@ const TechnicalScreeners = () => {
                   </span>
                 </div>
                 <span className={`font-mono font-bold text-sm ${(item.type || "").toLowerCase().includes("support") ? "text-[#ed5750]" : "text-[#42C0A5]"}`}>
-                  {Number.isFinite(item.price) ? Number(item.price).toLocaleString() : "--"}
+                  {Number.isFinite(item.price) ? `₹${Number(item.price).toLocaleString()}` : "--"}
                 </span>
               </div>
             ))}
@@ -2605,41 +2606,190 @@ const NewsFlash = ({ variant = "full" }) => {
 };
 
 
-const ResearchToolPanel = () => {
-  const { activeSymbol } = useAsset();
-  
+const SIGNAL_COLOR = { BUY: 'text-emerald-400', SELL: 'text-rose-400', NEUTRAL: 'text-amber-400', HOLD: 'text-amber-400' };
+const SIGNAL_BG   = { BUY: 'bg-emerald-500/10 border-emerald-500/30', SELL: 'bg-rose-500/10 border-rose-500/30', NEUTRAL: 'bg-amber-500/10 border-amber-500/30', HOLD: 'bg-amber-500/10 border-amber-500/30' };
+
+const ResearchToolPanel = ({ symbol: symbolProp } = {}) => {
+  const { activeSymbol, setAsset } = useAsset();
+  // Prefer the explicit prop (set by parent when a stock is clicked/selected);
+  // fall back to the context value which is updated by other parts of the app.
+  const raw = symbolProp || activeSymbol || '';
+  const sym = raw.replace(/\.(NS|BO)$/i, '');
+
+  const [tech, setTech]         = useState(null);
+  const [techLoading, setTL]    = useState(false);
+  const [activeTab, setActiveTab] = useState('signals'); // 'signals' | 'links' | 'ratios'
+
+  // Load technical summary whenever symbol changes
+  useEffect(() => {
+    if (!sym) return;
+    let alive = true;
+    setTL(true);
+    fetchTechnicalSummary('STOCK', sym)
+      .then(d => { if (alive) setTech(d); })
+      .catch(() => {})
+      .finally(() => { if (alive) setTL(false); });
+    return () => { alive = false; };
+  }, [sym]);
+
+  const overall   = tech?.overall  || tech?.recommendation || '—';
+  const rsi       = Number(tech?.rsi ?? tech?.indicators?.rsi ?? 0);
+  const macd      = tech?.macd     || tech?.indicators?.macd || null;
+  const trend     = tech?.trend    || tech?.indicators?.trend || '—';
+  const support   = Number(tech?.support  ?? tech?.levels?.support  ?? 0);
+  const resist    = Number(tech?.resistance ?? tech?.levels?.resistance ?? 0);
+  const momentum  = tech?.momentum || tech?.indicators?.momentum || '—';
+
+  const overallKey = String(overall).toUpperCase();
+  const sigColor   = SIGNAL_COLOR[overallKey] || 'text-slate-300';
+  const sigBg      = SIGNAL_BG[overallKey]    || 'bg-white/5 border-white/10';
+
+  // External links
+  const nseBase   = `https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(sym)}`;
+  const tvBase    = `https://www.tradingview.com/chart/?symbol=NSE%3A${encodeURIComponent(sym)}`;
+  const scBase    = `https://www.screener.in/company/${encodeURIComponent(sym)}/`;
+  const moneyBase = `https://www.moneycontrol.com/india/stockpricequote//${encodeURIComponent(sym.toLowerCase())}`;
+
+  const externalLinks = [
+    { label: 'NSE India',      href: nseBase,   color: 'text-sky-300',    bg: 'bg-sky-500/10 border-sky-500/20' },
+    { label: 'TradingView',    href: tvBase,     color: 'text-blue-300',   bg: 'bg-blue-500/10 border-blue-500/20' },
+    { label: 'Screener.in',    href: scBase,     color: 'text-violet-300', bg: 'bg-violet-500/10 border-violet-500/20' },
+    { label: 'MoneyControl',   href: moneyBase,  color: 'text-emerald-300',bg: 'bg-emerald-500/10 border-emerald-500/20' },
+  ];
+
   return (
-    <div className="tr-card flex flex-col h-full bg-gradient-to-br from-[#1e293b]/20 to-transparent">
+    <div className="tr-card flex flex-col h-full">
+      {/* ── Header ── */}
       <div className="tr-card-header">
         <div className="flex items-center gap-2">
           <Zap size={14} className="text-amber-400" />
           <h3 className="tr-card-title uppercase tracking-widest text-[11px]">Research Tools</h3>
         </div>
       </div>
-      <div className="flex-1 p-4 space-y-4">
-        <div className="rounded-xl border border-white/5 bg-white/5 p-4">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Active Research</h4>
-          <div className="text-lg font-black text-white">{activeSymbol || "Select Symbol"}</div>
-          <p className="text-[11px] text-slate-400 mt-1">Deep analysis mode active for this instrument.</p>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+
+        {/* ── Active Symbol pill ── */}
+        <div className={`rounded-xl border p-3 flex items-center justify-between ${sigBg}`}>
+          <div>
+            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Active Symbol</div>
+            <div className="text-base font-black text-white">{sym || '—'}</div>
+          </div>
+          {techLoading
+            ? <div className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+            : overall !== '—' && (
+              <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${sigBg} ${sigColor} uppercase`}>
+                {overall}
+              </span>
+            )
+          }
         </div>
-        
-        <div className="space-y-2">
-          <button className="w-full py-2.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-300 text-[11px] font-bold hover:bg-sky-500/20 transition-all flex items-center justify-center gap-2">
-             <Globe size={12} /> External Research
-          </button>
-          <button className="w-full py-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-300 text-[11px] font-bold hover:bg-violet-500/20 transition-all flex items-center justify-center gap-2">
-             <Activity size={12} /> Fundamental Ratios
-          </button>
-          <button className="w-full py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] font-bold hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-2">
-             <Zap size={12} /> Technical Signals
-          </button>
+
+        {/* ── Tab selector ── */}
+        <div className="flex rounded-lg bg-white/5 p-0.5 gap-0.5">
+          {[
+            { id: 'signals', label: 'Signals' },
+            { id: 'links',   label: 'Research' },
+            { id: 'ratios',  label: 'Levels' },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`flex-1 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${
+                activeTab === t.id
+                  ? 'bg-white/10 text-white shadow'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
-        
-        <div className="mt-auto pt-4 border-t border-white/5">
-          <p className="text-[10px] text-slate-500 leading-relaxed italic">
-            *This terminal is strictly for research purposes. No actual trade execution is supported.
-          </p>
-        </div>
+
+        {/* ── SIGNALS TAB ── */}
+        {activeTab === 'signals' && (
+          <div className="space-y-2">
+            {[
+              { label: 'RSI (14)',   value: rsi ? rsi.toFixed(1) : '—', sub: rsi > 70 ? 'Overbought' : rsi < 30 ? 'Oversold' : 'Neutral',
+                color: rsi > 70 ? 'text-rose-400' : rsi < 30 ? 'text-emerald-400' : 'text-amber-400' },
+              { label: 'Trend',      value: trend,    sub: 'Price direction', color: String(trend).toUpperCase().includes('UP') || String(trend).toUpperCase() === 'BULLISH' ? 'text-emerald-400' : 'text-rose-400' },
+              { label: 'MACD',       value: macd ? (Number(macd) > 0 ? 'Bullish' : 'Bearish') : '—',
+                sub: 'Signal crossover', color: macd && Number(macd) > 0 ? 'text-emerald-400' : 'text-rose-400' },
+              { label: 'Momentum',   value: momentum, sub: 'Price velocity', color: String(momentum).toUpperCase() === 'STRONG' ? 'text-emerald-400' : 'text-slate-400' },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between rounded-lg bg-white/[0.03] border border-white/5 px-3 py-2.5">
+                <div>
+                  <div className="text-[10px] font-black text-slate-300">{row.label}</div>
+                  <div className="text-[9px] text-slate-500 mt-0.5">{row.sub}</div>
+                </div>
+                <span className={`text-[11px] font-black ${row.color}`}>{row.value || '—'}</span>
+              </div>
+            ))}
+            {!tech && !techLoading && (
+              <p className="text-center text-[10px] text-slate-600 py-3">Select a symbol to load signals</p>
+            )}
+          </div>
+        )}
+
+        {/* ── EXTERNAL LINKS TAB ── */}
+        {activeTab === 'links' && (
+          <div className="space-y-2">
+            {externalLinks.map(link => (
+              <a
+                key={link.label}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-[11px] font-bold hover:opacity-80 transition-all ${link.bg} ${link.color}`}
+              >
+                <span>{link.label}</span>
+                <ExternalLink size={11} />
+              </a>
+            ))}
+            <div className="rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2.5">
+              <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Quick Copy</div>
+              <div
+                onClick={() => navigator.clipboard?.writeText(sym)}
+                className="text-[11px] font-black text-slate-200 cursor-pointer hover:text-white transition-colors flex items-center gap-2"
+              >
+                <Monitor size={11} className="text-slate-500" />
+                {sym || '—'} <span className="text-[9px] text-slate-500 font-normal">(click to copy)</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── LEVELS TAB ── */}
+        {activeTab === 'ratios' && (
+          <div className="space-y-2">
+            {[
+              { label: 'Support',    value: support  ? `₹${support.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—', color: 'text-emerald-400' },
+              { label: 'Resistance', value: resist   ? `₹${resist.toLocaleString('en-IN',  { maximumFractionDigits: 2 })}` : '—', color: 'text-rose-400' },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between rounded-lg bg-white/[0.03] border border-white/5 px-3 py-2.5">
+                <span className="text-[10px] font-black text-slate-400 uppercase">{row.label}</span>
+                <span className={`text-[11px] font-black ${row.color}`}>{row.value}</span>
+              </div>
+            ))}
+            {!tech && !techLoading && (
+              <p className="text-center text-[10px] text-slate-600 py-3">Select a symbol to load levels</p>
+            )}
+            <div className="rounded-lg border border-amber-500/10 bg-amber-500/5 px-3 py-2">
+              <div className="flex items-center gap-1.5 text-amber-300 text-[9px] font-black uppercase tracking-widest">
+                <Zap size={9} /> Research Cue
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                Confirm thesis with cross-source validation before acting.
+              </p>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Footer ── */}
+      <div className="px-4 py-2 border-t border-white/5">
+        <p className="text-[9px] text-slate-600 italic">Research only. No trade execution.</p>
       </div>
     </div>
   );
@@ -2695,17 +2845,12 @@ function ResearchView({ activeModule, onRequestModuleChange }) {
   }, [expandedChart, timeframe]);
 
   const [analysisSymbol, setAnalysisSymbol] = useState(null);
+  // Seed with first chart symbol so the panel is useful before any click
+  const [focusedSymbol, setFocusedSymbol] = useState('RELIANCE');
+  const { setAsset } = useAsset();
 
   if (activeModule === "WATCHLIST") {
-    return (
-      <MainLayout>
-        <div className="dashboard-layout flex flex-col w-full">
-          <div className="flex-1 overflow-y-auto main-content-area" style={{ padding: 0 }}>
-            <SharedAdvancedWatchlist onSymbolSelect={(s) => navigate(`/stocks/${s}`)} />
-          </div>
-        </div>
-      </MainLayout>
-    );
+    return <Navigate to="/investor/watchlists" replace />;
   }
 
   if (analysisSymbol) {
@@ -2737,6 +2882,18 @@ function ResearchView({ activeModule, onRequestModuleChange }) {
         <div className="dashboard-layout flex flex-col w-full">
           <div className="flex-1 overflow-y-auto main-content-area" style={{ padding: 0 }}>
             <NewsFlash variant="full" />
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (activeModule === "ACADEMY") {
+    return (
+      <MainLayout>
+        <div className="dashboard-layout flex flex-col w-full">
+          <div className="flex-1 overflow-y-auto main-content-area" style={{ padding: 0 }}>
+            <LearningAcademy />
           </div>
         </div>
       </MainLayout>
@@ -2819,7 +2976,13 @@ function ResearchView({ activeModule, onRequestModuleChange }) {
                   </div>
                   <SharedMultiChartGrid
                     className="workspace-body"
-                    onOpenChart={(title) => setExpandedChart(title)}
+                    onOpenChart={(title) => {
+                      setExpandedChart(title);
+                      if (title) {
+                        setFocusedSymbol(title);
+                        setAsset(title, 'stock');
+                      }
+                    }}
                     timeframe={timeframe}
                     showIndicators={showIndicators}
                     layout={layout}
@@ -2878,7 +3041,7 @@ function ResearchView({ activeModule, onRequestModuleChange }) {
                 </div>
 
                 <div className="tr-surface-card tr-panel-shell tr-panel-shell--sidebar">
-                  <ResearchToolPanel />
+                  <ResearchToolPanel symbol={focusedSymbol || analysisSymbol || undefined} />
                 </div>
 
                 <div className="tr-surface-card tr-panel-shell tr-panel-shell--sidebar">

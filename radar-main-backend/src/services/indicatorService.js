@@ -44,6 +44,14 @@ const getTechnicalIndicators = async (assetType, symbol, interval = '1D', option
     const emaRaw = calculateEMA(prices, 20);
     const ema20 = emaRaw.length > 0 ? parseFloat(emaRaw[emaRaw.length - 1].toFixed(2)) : null;
 
+    let support = null;
+    let resistance = null;
+    if (prices.length >= 20) {
+        const recent20 = prices.slice(-20);
+        support = parseFloat(Math.min(...recent20).toFixed(2));
+        resistance = parseFloat(Math.max(...recent20).toFixed(2));
+    }
+
     const volumeStatus = getVolumeStatus(history, 20);
     const last = history[history.length - 1] || null;
     const previous = history[history.length - 2] || null;
@@ -54,11 +62,29 @@ const getTechnicalIndicators = async (assetType, symbol, interval = '1D', option
         : null;
     const lastUpdatedAt = last?.date || null;
 
+    let atr = null;
+    if (prices.length >= 14) {
+        let trSum = 0;
+        let count = 0;
+        for (let i = prices.length - 14; i < prices.length; i++) {
+            if (i > 0) {
+                trSum += Math.abs(prices[i] - prices[i - 1]);
+                count++;
+            }
+        }
+        if (count > 0) {
+            atr = parseFloat((trSum / count).toFixed(2));
+        }
+    }
+
     return {
         rsi,
         macd,
         ema20,
+        support,
+        resistance,
         volumeStatus,
+        atr,
         lastPrice: Number.isFinite(lastPrice) ? lastPrice : null,
         previousPrice: Number.isFinite(previousPrice) ? previousPrice : null,
         lastChangePercent,

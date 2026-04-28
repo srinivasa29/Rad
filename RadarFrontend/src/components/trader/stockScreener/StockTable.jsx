@@ -97,7 +97,7 @@ export function StockTable({ rows, sortBy, sortOrder, onSort, watchlistSet, onTo
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right text-[13px] font-bold text-gray-100 border-none">â‚¹{formatPrice(row.price)}</td>
+                <td className="px-4 py-3 text-right text-[13px] font-bold text-gray-100 border-none">₹{formatPrice(row.price)}</td>
                 <td className={`px-4 py-3 text-right text-[13px] font-black ${changeTone} border-none`}>{row.change == null ? "--" : `${row.change > 0 ? "+" : ""}${row.change.toFixed(2)}%`}</td>
                 <td className="px-4 py-3 text-right text-[12px] text-gray-500 font-bold border-none">{formatNumber(row.volume)}</td>
                 <td className="px-4 py-3 text-right text-[12px] font-black text-blue-500/70 border-none">{Number(row.rvol || 0).toFixed(1)}x</td>
@@ -105,7 +105,7 @@ export function StockTable({ rows, sortBy, sortOrder, onSort, watchlistSet, onTo
                 {}
                 <td className="px-4 py-3 border-none text-right min-w-[120px]">
                   <div className="flex flex-col items-end gap-1">
-                    <span className="text-[12px] text-gray-400 font-bold">â‚¹{Number(row.atr || 0).toFixed(2)}</span>
+                    <span className="text-[12px] text-gray-400 font-bold">₹{Number(row.atr || 0).toFixed(2)}</span>
                     <div className="gauge-container max-w-[60px]">
                       <div className="gauge-fill bg-amber-500/50" style={{ width: `${atrWidth}%` }} />
                     </div>

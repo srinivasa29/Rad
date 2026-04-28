@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const UserSchema = new mongoose.Schema({
     username: {
@@ -59,8 +60,54 @@ const UserSchema = new mongoose.Schema({
             enum: ['INDEX', 'STOCK', 'CRYPTO'],
             default: 'INDEX'
         }
-    }]
+    }],
+
+    // Investor Identity — saved after onboarding assessment
+    investorDNA: {
+        dominant:            { type: String, enum: ['TRADER', 'INVESTOR'], default: null },
+        personaName:         { type: String, default: null },
+        personaDescription:  { type: String, default: null },
+        investorPercent:     { type: Number, default: null },
+        traderPercent:       { type: Number, default: null },
+        traits:              [{ type: String }],
+        hybridLine:          { type: String, default: null },
+        confidence:          { type: String, default: null },
+        metrics: {
+            speed:       { type: Number, default: null },
+            risk:        { type: Number, default: null },
+            patience:    { type: Number, default: null },
+            volatility:  { type: Number, default: null },
+            discipline:  { type: Number, default: null }
+        },
+        completedAt: { type: Date, default: null }
+    },
+
+    // Notification preferences — persisted per user
+    notificationPreferences: {
+        priceAlerts:     { type: Boolean, default: true },
+        earningsUpdates: { type: Boolean, default: true },
+        importantNews:   { type: Boolean, default: true }
+    },
+
+    resetPasswordToken: String,
+    resetPasswordExpire: Date
 });
+
+UserSchema.methods.getResetPasswordToken = function () {
+    // Generate token
+    const resetToken = crypto.randomBytes(20).toString('hex');
+
+    // Hash token and set to resetPasswordToken field
+    this.resetPasswordToken = crypto
+        .createHash('sha256')
+        .update(resetToken)
+        .digest('hex');
+
+    // Set expire
+    this.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    return resetToken;
+};
 
 UserSchema.pre('save', async function (next) {
     if (!this.isModified('password')) {

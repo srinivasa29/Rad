@@ -4,7 +4,7 @@ const stripSuffix = (v) => String(v || '').replace(/\.(NS|BO)$/i, '');
 
 export const fetchUserWatchlist = async () => {
     try {
-        const res = await api.get('/watchlists');
+        const res = await api.get('/watchlist');
         const lists = Array.isArray(res.data) ? res.data : [];
         // Return flat list of symbols from the first (default) watchlist
         if (lists.length === 0) return [];
@@ -17,7 +17,7 @@ export const fetchUserWatchlist = async () => {
 
 export const addSymbolToWatchlist = async (watchlistId, symbol) => {
     try {
-        const res = await api.post(`/watchlists/${watchlistId}/add`, { symbol });
+        const res = await api.post(`/watchlist/${watchlistId}/add`, { symbol });
         return res.data;
     } catch (err) {
         console.error('addSymbolToWatchlist failed:', err.message);
@@ -27,7 +27,7 @@ export const addSymbolToWatchlist = async (watchlistId, symbol) => {
 
 export const removeSymbolFromWatchlist = async (watchlistId, symbol) => {
     try {
-        const res = await api.delete(`/watchlists/${watchlistId}/remove/${encodeURIComponent(symbol)}`);
+        const res = await api.delete(`/watchlist/${watchlistId}/remove/${encodeURIComponent(symbol)}`);
         return res.data;
     } catch (err) {
         console.error('removeSymbolFromWatchlist failed:', err.message);
@@ -37,7 +37,7 @@ export const removeSymbolFromWatchlist = async (watchlistId, symbol) => {
 
 export const createWatchlist = async (name) => {
     try {
-        const res = await api.post('/watchlists', { name });
+        const res = await api.post('/watchlist', { name });
         return res.data;
     } catch (err) {
         console.error('createWatchlist failed:', err.message);

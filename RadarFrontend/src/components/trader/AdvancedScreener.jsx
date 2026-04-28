@@ -17,10 +17,11 @@ import {
     Check,
     ChevronDown,
     Zap,
-    LayoutDashboard
+    LayoutDashboard,
+    Trash2
 } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
-import { runScreenerScan } from "../../api/screenerApi";
+import { runScreenerScan, createCustomFilter, getCustomFilters, deleteCustomFilter } from "../../api/screenerApi";
 
 const mockReadyMade = [
     { id: 1, title: 'Consistent Growers', desc: '15%+ profit growth over 3 years.', icon: Activity, color: 'text-[#42C0A5]', bg: 'bg-[#42C0A5]/10' },
@@ -32,12 +33,8 @@ const mockReadyMade = [
     { id: 7, title: 'ESG Score', desc: 'Leading sustainability scores.', icon: ShieldCheck, color: 'text-teal-400', bg: 'bg-teal-400/10' },
 ];
 
-const mockResults = [
-    { id: 'RELIANCE', name: 'Reliance Industries', price: '?2,942.10', change: '+1.2%', isPositive: true, mcap: '19.4T', sector: 'Energy', why: 'Strong 200-DMA support with institutional accumulation.', tags: ['Value', 'Growth'], confidence: 92, yield: '0.8%', beta: 0.95, volume: '4.4M', pe: 26.4, roe: '14.2%', trend: [2850, 2870, 2890, 2920, 2942] },
-    { id: 'TCS', name: 'Tata Consultancy Services', price: '?3,810.50', change: '-0.4%', isPositive: false, mcap: '13.6T', sector: 'IT Services', why: 'Consolidating near major Fibonacci support level.', tags: ['Blue Chip'], confidence: 85, yield: '1.2%', beta: 0.72, volume: '1.2M', pe: 29.1, roe: '28.5%', trend: [3850, 3840, 3820, 3815, 3810] },
-    { id: 'HDFCBANK', name: 'HDFC Bank', price: '?1,615.80', change: '+2.1%', isPositive: true, mcap: '12.1T', sector: 'Banking', why: 'Breakout above horizontal resistance with volume spike.', tags: ['Momentum', 'Finance'], confidence: 88, yield: '1.1%', beta: 1.04, volume: '12.2M', pe: 18.2, roe: '17.1%', trend: [1550, 1570, 1585, 1600, 1615] },
-    { id: 'INFY', name: 'Infosys Ltd', price: '?1,540.00', change: '+0.8%', isPositive: true, mcap: '6.4T', sector: 'IT Services', why: 'Price above all major EMAs, bullish bias.', tags: ['Momentum'], confidence: 90, yield: '1.5%', beta: 1.15, volume: '2.6M', pe: 24.5, roe: '26.8%', trend: [1510, 1520, 1535, 1530, 1540] },
-];
+// Empty — live data is loaded from runScreenerScan() in the useEffect below
+const mockResults = [];
 
 const strategies = [
     { id: 'intra', label: 'Intraday Volatility', desc: 'High momentum stocks for quick trades', icon: Activity, color: 'text-[#42C0A5]', filters: { change: '> 2%', volume: 'High', rsi: 'Overbought' } },
@@ -79,6 +76,14 @@ const AdvancedScreener = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [results, setResults] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    // ── Custom Filters state ──────────────────────────────────
+    const [myFilters, setMyFilters] = useState([]);
+    const [newFilterName, setNewFilterName] = useState('');
+    const [newFilterOptions, setNewFilterOptions] = useState('');
+    const [newFilterQuery, setNewFilterQuery] = useState('SELECT * FROM market WHERE x > y');
+    const [filterSaving, setFilterSaving] = useState(false);
+    const [filterError, setFilterError] = useState('');
 
     useEffect(() => {
         const style = document.createElement('style');
@@ -156,6 +161,72 @@ const AdvancedScreener = () => {
         }
         setOpenFilter(null);
     };
+
+    // ── Custom filter helpers ─────────────────────────────────
+    const loadMyFilters = async () => {
+        try {
+            const res = await getCustomFilters();
+            const filters = res?.data || [];
+            setMyFilters(filters);
+            filters.forEach(f => {
+                if (!allFilters.find(af => af.id === f._id)) {
+                    allFilters.push({
+                        id: f._id,
+                        label: f.name,
+                        icon: Filter,
+                        options: f.options,
+                        isCustom: true,
+                    });
+                }
+            });
+        } catch (_) {}
+    };
+
+    const handleCreateFilter = async () => {
+        setFilterError('');
+        if (!newFilterName.trim()) {
+            setFilterError('Please enter a filter name.');
+            return;
+        }
+        try {
+            setFilterSaving(true);
+            const res = await createCustomFilter({
+                name: newFilterName.trim(),
+                options: newFilterOptions,
+                logicQuery: newFilterQuery,
+            });
+            const created = res.data;
+            setMyFilters(prev => [created, ...prev]);
+            allFilters.push({
+                id: created._id,
+                label: created.name,
+                icon: Filter,
+                options: created.options,
+                isCustom: true,
+            });
+            setVisibleFilters(prev => [...prev, created._id]);
+            setNewFilterName('');
+            setNewFilterOptions('');
+            setNewFilterQuery('SELECT * FROM market WHERE x > y');
+            setShowCreateModal(false);
+        } catch (err) {
+            setFilterError(err?.response?.data?.message || 'Failed to create filter.');
+        } finally {
+            setFilterSaving(false);
+        }
+    };
+
+    const handleDeleteMyFilter = async (id) => {
+        try {
+            await deleteCustomFilter(id);
+            setMyFilters(prev => prev.filter(f => f._id !== id));
+            setVisibleFilters(prev => prev.filter(vid => vid !== id));
+        } catch (_) {}
+    };
+
+    useEffect(() => {
+        loadMyFilters();
+    }, []);
 
     // Live screener scan — replaces mockResults
     useEffect(() => {
@@ -528,7 +599,7 @@ const AdvancedScreener = () => {
                 </div>
             </div>
 
-            {}
+            {/* ── Create Filter Modal ───────────────────────────── */}
             {showCreateModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowCreateModal(false)} />
@@ -538,19 +609,76 @@ const AdvancedScreener = () => {
                                 <h2 className="text-2xl font-black text-[#f0f6fc]">Create Filter</h2>
                                 <p className="text-sm font-bold text-[#8b949e]">Define custom processing logic</p>
                             </div>
-                            <button onClick={() => setShowCreateModal(false)} className="text-[#8b949e] hover:text-white"><X size={20} /></button>
+                            <button onClick={() => setShowCreateModal(false)} className="text-[#8b949e] hover:text-white transition-colors"><X size={20} /></button>
                         </div>
-                        <div className="space-y-5">
+                        <div className="space-y-4">
                             <div>
-                                <label className="block text-[10px] font-black text-[#42C0A5] uppercase tracking-widest mb-2">Metric Identity</label>
-                                <input type="text" className="w-full bg-[#0d1117] border border-[#30363d] rounded-xl px-4 py-3 text-sm text-[#f0f6fc] outline-none focus:border-[#42C0A5]" placeholder="e.g. Institutional Delta %" />
+                                <label className="block text-[10px] font-black text-[#42C0A5] uppercase tracking-widest mb-1.5 ml-1">Filter Name</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-[#0d1117] border border-[#30363d] rounded-xl px-4 py-3 text-sm text-[#f0f6fc] outline-none focus:border-[#42C0A5] transition-all"
+                                    placeholder="e.g. FII Holding %"
+                                    value={newFilterName}
+                                    onChange={e => setNewFilterName(e.target.value)}
+                                />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-[#42C0A5] uppercase tracking-widest mb-2">Logic Description</label>
-                                <textarea className="w-full bg-[#0d1117] border border-[#30363d] rounded-xl px-4 py-3 text-sm text-[#f0f6fc] outline-none focus:border-[#42C0A5] h-24" placeholder="Describe how this filter should behave..."></textarea>
+                                <label className="block text-[10px] font-black text-[#42C0A5] uppercase tracking-widest mb-1.5 ml-1">Options (comma separated)</label>
+                                <textarea
+                                    className="w-full bg-[#0d1117] border border-[#30363d] rounded-xl px-4 py-3 text-sm text-[#f0f6fc] outline-none focus:border-[#42C0A5] h-20 transition-all"
+                                    placeholder="Large, Mid, Small..."
+                                    value={newFilterOptions}
+                                    onChange={e => setNewFilterOptions(e.target.value)}
+                                />
                             </div>
-                            <button className="w-full py-4 bg-[#42C0A5] text-[#0b0f17] rounded-xl font-black text-lg transition-all active:scale-95 shadow-lg shadow-[#42C0A5]/10 mt-2">Activate Metric</button>
+                            <div>
+                                <label className="block text-[10px] font-black text-[#42C0A5] uppercase tracking-widest mb-1.5 ml-1">Logic Query</label>
+                                <div className="p-4 bg-[#0d1117] border border-[#30363d] rounded-xl">
+                                    <textarea
+                                        className="w-full bg-transparent text-[#42C0A5] font-mono text-xs outline-none resize-none"
+                                        rows={2}
+                                        value={newFilterQuery}
+                                        onChange={e => setNewFilterQuery(e.target.value)}
+                                        spellCheck={false}
+                                    />
+                                </div>
+                            </div>
+                            {filterError && (
+                                <p className="text-xs font-bold text-[#f85149] pl-1">{filterError}</p>
+                            )}
+                            <button
+                                onClick={handleCreateFilter}
+                                disabled={filterSaving}
+                                className="w-full py-4 bg-[#42C0A5] text-[#0b0f17] rounded-xl font-black text-lg shadow-lg shadow-[#42C0A5]/10 mt-4 active:scale-95 transition-all disabled:opacity-60"
+                            >
+                                {filterSaving ? 'Saving...' : 'Create Filter Metric'}
+                            </button>
                         </div>
+
+                        {/* My saved filters */}
+                        {myFilters.length > 0 && (
+                            <div className="mt-6 pt-5 border-t border-[#30363d]">
+                                <p className="text-[10px] font-black text-[#8b949e] uppercase tracking-widest mb-3">My Saved Filters</p>
+                                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                                    {myFilters.map(f => (
+                                        <div key={f._id} className="flex items-center justify-between px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-xl">
+                                            <div>
+                                                <p className="text-sm font-black text-[#f0f6fc]">{f.name}</p>
+                                                {f.options?.length > 0 && (
+                                                    <p className="text-[10px] text-[#8b949e] font-bold">{f.options.join(', ')}</p>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeleteMyFilter(f._id)}
+                                                className="p-1.5 text-[#8b949e] hover:text-[#f85149] hover:bg-[#f85149]/10 rounded-lg transition-all"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

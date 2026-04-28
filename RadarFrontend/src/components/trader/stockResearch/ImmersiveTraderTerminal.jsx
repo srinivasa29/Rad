@@ -654,15 +654,15 @@ const ImmersiveTraderTerminal = ({ symbol: initialSymbol = "RELIANCE", basePrice
                   autoFocus
                 />
               </div>
-              <div className="space-y-1 max-h-[200px] overflow-y-auto custom-scrollbar">
-                {['TCS', 'INFY', 'WIPRO', 'HCLTECH', 'TECHM', 'ADANIENT', 'RELIANCE', 'SBIN', 'ICICIBANK', 'HDFCBANK']
+              <div className="space-y-1">
+                {(watchlist.length > 0 ? watchlist.map(s => s.symbol || s) : [symbol])
                   .filter(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
                   .map(s => (
                     <button 
                       key={s} 
                       onClick={() => {
                         setCompareList(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
-                        setSearchQuery(''); // Clear search on select
+                        setSearchQuery(''); 
                       }}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-[10px] font-bold transition-all ${compareList.includes(s) ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
                     >

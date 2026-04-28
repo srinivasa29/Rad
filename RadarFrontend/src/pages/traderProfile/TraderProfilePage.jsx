@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, BrainCircuit, ShieldAlert, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useHeaderData } from '../../hooks/useHeaderData';
 import ProfileHeader from './components/ProfileHeader';
 import MetricsCard from './components/MetricsCard';
 import RiskBar from './components/RiskBar';
@@ -9,8 +10,9 @@ import InsightCard from './components/InsightCard';
 import { fallbackQuotes, profileData } from './mockProfileData';
 import './TraderProfilePage.css';
 
+import api from '../../api/api';
+
 const TWELVE_DATA_API_BASE = 'https://api.twelvedata.com/price';
-const WATCHLIST_SYMBOLS = ['AAPL', 'MSFT'];
 
 const TraderProfilePage = () => {
   const navigate = useNavigate();
@@ -32,8 +34,21 @@ const TraderProfilePage = () => {
 
     const fetchQuotes = async () => {
       try {
+        // Dynamically load the user's watchlist from the backend
+        let symbols = [];
+        try {
+          const wlRes = await api.get('/watchlist');
+          const items = wlRes.data?.data || wlRes.data || [];
+          symbols = items.map(i => i.symbol || i).filter(Boolean).slice(0, 5);
+        } catch (_) { /* fall through to fallback */ }
+
+        // Fall back to first two symbols from fallbackQuotes if no watchlist
+        if (symbols.length === 0) {
+          symbols = fallbackQuotes.map(q => q.symbol);
+        }
+
         const responses = await Promise.all(
-          WATCHLIST_SYMBOLS.map(async (symbol) => {
+          symbols.map(async (symbol) => {
             const response = await fetch(
               `${TWELVE_DATA_API_BASE}?symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(apiKey)}`
             );

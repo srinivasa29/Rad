@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -27,12 +27,10 @@ import { fetchWatchlistLiveData } from "../../api/watchlistApi";
 import { fetchMarketData, fetchUniversalSymbolSearch } from "../../api/marketApi";
 import api from "../../api/api";
 import { useSocket } from "../../hooks/useSocket";
+import { getCurrencySymbol } from "../../utils/currency";
 
 const NOTES_KEY = "watchlist_notes_v2";
 const WATCHLIST_KEY = "trader_terminal_watchlist_v1";
-
-// Default symbols shown when user has no saved watchlist
-const DEFAULT_SYMBOLS = ["RELIANCE", "HDFCBANK", "INFY", "TCS", "SBIN", "ICICIBANK", "TATAMOTORS"];
 
 const Sparkline = ({ data, color, width = 80, height = 24 }) => {
   if (!data || data.length < 2) return null;
@@ -93,6 +91,7 @@ const normalizeMarketRow = (item) => ({
   changePercent: Number(item?.changePercent ?? item?.change_24h ?? item?.change ?? 0),
   volume: Number(item?.volume ?? item?.vol ?? 0),
   sector: item?.sector || 'Market',
+  type: item?.type || 'STOCK',
 });
 
 const makeSeed = (text) => String(text || "").split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
@@ -195,7 +194,8 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
       }
 
       if (symbols.length === 0) {
-        symbols = DEFAULT_SYMBOLS;
+        setRows([]);
+        return;
       }
 
       // 2. Fetch live market data for those symbols
@@ -208,7 +208,7 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
         });
       }
 
-      // 3. Build decorated rows — merge live data with defaults
+      // 3. Build decorated rows
       const builtRows = symbols.map(sym => {
         const live = marketMap[sym];
         const base = normalizeMarketRow(live || { symbol: sym });
@@ -218,7 +218,7 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
       setRows(builtRows);
     } catch (err) {
       console.error('loadWatchlist failed:', err);
-      setRows(DEFAULT_SYMBOLS.map(sym => buildDecoratedRow(normalizeMarketRow({ symbol: sym }))));
+      setRows([]);
     } finally {
       setIsLoading(false);
     }
@@ -373,11 +373,16 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
   }, [query, rows, sortBy, focusedRowsMode, focusedSymbols]);
 
   const insightStats = useMemo(() => {
-    if (!filteredRows.length) return { strong: 0, weak: 0, meanRsi: 0 };
+    if (!filteredRows.length) return { strong: 0, weak: 0, meanRsi: '—', topGainer: null, topLoser: null, mostActive: null, avgRS: '—' };
     const strong = filteredRows.filter(r => r.tradeScore > 75).length;
     const weak = filteredRows.filter(r => r.tradeScore < 40).length;
     const meanRsi = filteredRows.reduce((a, b) => a + calculateRSI(b.chart), 0) / filteredRows.length;
-    return { strong, weak, meanRsi: meanRsi.toFixed(1) };
+    const avgRS = (filteredRows.reduce((a, b) => a + (b.tradeScore || 0), 0) / filteredRows.length).toFixed(1);
+    const sorted = [...filteredRows].sort((a, b) => b.percent - a.percent);
+    const topGainer = sorted[0] ?? null;
+    const topLoser = sorted[sorted.length - 1] ?? null;
+    const mostActive = [...filteredRows].sort((a, b) => b.volume - a.volume)[0] ?? null;
+    return { strong, weak, meanRsi: meanRsi.toFixed(1), topGainer, topLoser, mostActive, avgRS };
   }, [filteredRows]);
 
   const openSymbol = (row) => {
@@ -398,8 +403,13 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
 
     const doomedRow = rows[doomedIndex];
     setLastDeleted({ row: doomedRow, index: doomedIndex });
-    
     setRows(prev => prev.filter(r => r.symbol !== symbol));
+
+    if (watchlistId) {
+      api.delete(`/watchlists/${watchlistId}/remove`, { data: { symbol } })
+        .catch(err => console.warn('Failed to remove symbol from backend:', err.message));
+    }
+
     pushNotice(`${symbol} removed from terminal`, {
       label: "UNDO",
       handler: () => {
@@ -408,6 +418,10 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
           next.splice(doomedIndex, 0, doomedRow);
           return next;
         });
+        if (watchlistId) {
+          api.post(`/watchlists/${watchlistId}/add`, { symbol })
+            .catch(err => console.warn('Failed to re-add symbol on undo:', err.message));
+        }
         setUiNotice(null);
       }
     });
@@ -417,6 +431,80 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
     return (
       <div className="flex h-[400px] w-full items-center justify-center text-cyan-400">
         <Activity className="animate-pulse mr-2" /> Syncing market intelligence...
+      </div>
+    );
+  }
+
+  if (!isLoading && rows.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen w-full gap-6 text-center px-6" style={{ minHeight: 'calc(100vh - 90px)' }}>
+        <div className="h-20 w-20 rounded-2xl bg-slate-900/60 border border-white/5 flex items-center justify-center">
+          <Plus size={32} className="text-slate-600" />
+        </div>
+        <div className="flex flex-col items-center text-center">
+          <h3 className="text-lg font-black text-white mb-2 text-center">Your watchlist is empty</h3>
+          <p className="text-sm text-slate-500 max-w-xs text-center mx-auto">Add your first ticker to start tracking live prices, technicals, and trade scores.</p>
+        </div>
+        <button
+          onClick={() => setAddTickerOpen(true)}
+          className="flex items-center gap-2 px-6 py-3 bg-cyan-600 text-white rounded-xl text-sm font-black shadow-lg shadow-cyan-900/40 hover:bg-cyan-500 transition-all"
+        >
+          <Plus size={16} /> Add Your First Ticker
+        </button>
+
+        {/* Add-ticker dropdown anchored here for empty state */}
+        {addTickerOpen && (
+          <div ref={addTickerRef} className="relative">
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-72 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
+              <div className="p-2 border-b border-white/5 flex items-center gap-2">
+                <Search size={13} className="text-slate-500" />
+                <input
+                  autoFocus
+                  value={addTickerQuery}
+                  onChange={e => setAddTickerQuery(e.target.value)}
+                  placeholder="Search symbol..."
+                  className="flex-1 bg-transparent text-xs text-white outline-none focus:outline-none placeholder:text-slate-600"
+                  style={{ boxShadow: 'none', border: 'none' }}
+                />
+                {addTickerQuery && (
+                  <button onClick={() => setAddTickerQuery('')}><X size={12} className="text-slate-500" /></button>
+                )}
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                {addTickerLoading && <p className="px-4 py-3 text-xs text-slate-500">Searching...</p>}
+                {!addTickerLoading && addTickerResults.length === 0 && addTickerQuery && (
+                  <p className="px-4 py-3 text-xs text-slate-500">No results found.</p>
+                )}
+                {addTickerResults.map(item => {
+                  const sym = String(item?.symbol || '').replace(/\.(NS|BO)$/i, '');
+                  return (
+                    <button
+                      key={sym}
+                      onClick={async () => {
+                        setAddTickerOpen(false);
+                        setAddTickerQuery('');
+                        setAddTickerResults([]);
+                        // Persist to backend watchlist
+                        if (watchlistId) {
+                          try { await api.post(`/watchlists/${watchlistId}/add`, { symbol: sym }); }
+                          catch (e) { console.warn('Failed to persist symbol:', e.message); }
+                        }
+                        // Navigate directly to the stock page
+                        navigate(`/stocks/${sym}`);
+                      }}
+                      className="w-full text-left px-4 py-2.5 flex items-center justify-between border-b border-white/5 hover:bg-white/5 transition-colors"
+                    >
+                      <div>
+                        <p className="text-xs font-black text-white">{sym}</p>
+                        <p className="text-[10px] text-slate-500">{item.name}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -477,49 +565,55 @@ const AdvancedWatchlist = ({ onSymbolSelect }) => {
            </div>
         </div>
 
-        {}
+        {/* Live Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 px-1">
            <div className="col-span-1 lg:col-span-2 rounded-xl border border-white/5 bg-slate-900/40 p-4 transition-all hover:border-slate-700">
               <div className="text-[9px] uppercase font-black tracking-widest text-[#2ecc71]">Top Gainer</div>
               <div className="flex items-center justify-between mt-2">
-                 <div className="text-xl font-black text-white">SBIN</div>
-                 <div className="text-xs font-bold text-emerald-400">+2.15%</div>
+                 <div className="text-xl font-black text-white">{insightStats.topGainer?.symbol ?? '—'}</div>
+                 <div className="text-xs font-bold text-emerald-400">
+                   {insightStats.topGainer ? `${insightStats.topGainer.percent >= 0 ? '+' : ''}${insightStats.topGainer.percent.toFixed(2)}%` : '—'}
+                 </div>
               </div>
            </div>
            <div className="col-span-1 lg:col-span-2 rounded-xl border border-rose-500/10 bg-rose-500/5 p-4 transition-all hover:border-rose-500/30">
               <div className="text-[9px] uppercase font-black tracking-widest text-rose-500">Top Loser</div>
               <div className="flex items-center justify-between mt-2">
-                 <div className="text-xl font-black text-white">TCS</div>
-                 <div className="text-xs font-bold text-rose-500">-0.31%</div>
+                 <div className="text-xl font-black text-white">{insightStats.topLoser?.symbol ?? '—'}</div>
+                 <div className="text-xs font-bold text-rose-500">
+                   {insightStats.topLoser ? `${insightStats.topLoser.percent.toFixed(2)}%` : '—'}
+                 </div>
               </div>
            </div>
            <div className="col-span-1 lg:col-span-2 rounded-xl border border-white/5 bg-[#0a1122]/80 p-4 transition-all hover:border-slate-700">
               <div className="text-[9px] uppercase font-black tracking-widest text-cyan-400">Most Active</div>
               <div className="flex items-center justify-between mt-2">
-                 <div className="text-xl font-black text-white">SBIN</div>
-                 <div className="text-[10px] font-bold text-slate-400">2.6Cr volume</div>
+                 <div className="text-xl font-black text-white">{insightStats.mostActive?.symbol ?? '—'}</div>
+                 <div className="text-[10px] font-bold text-slate-400">
+                   {insightStats.mostActive ? `${(insightStats.mostActive.volume / 1e7).toFixed(1)}Cr volume` : '—'}
+                 </div>
               </div>
            </div>
            <div className="hidden lg:block h-full w-[1px] bg-white/5 mx-auto" />
-           
+
            <div className="col-span-1 lg:col-span-1 rounded-xl border border-white/5 bg-slate-900/20 p-4">
-              <div className="text-[9px] uppercase font-black tracking-widest text-slate-500">Avg Rel Strength</div>
-              <div className="mt-2 text-2xl font-black text-white">60.2</div>
+              <div className="text-[9px] uppercase font-black tracking-widest text-slate-500">Avg Trade Score</div>
+              <div className="mt-2 text-2xl font-black text-white">{insightStats.avgRS}</div>
               <div className="text-[8px] font-bold text-slate-600 mt-1 uppercase tracking-tighter">cross-symbol momentum score</div>
            </div>
            <div className="col-span-1 lg:col-span-1 rounded-xl border border-white/5 bg-slate-900/20 p-4">
               <div className="text-[9px] uppercase font-black tracking-widest text-slate-500">High Conviction</div>
-              <div className="mt-2 text-2xl font-black text-cyan-400">0</div>
+              <div className="mt-2 text-2xl font-black text-cyan-400">{insightStats.strong}</div>
               <div className="text-[8px] font-bold text-slate-600 mt-1 uppercase tracking-tighter">momentum + RS alignment</div>
            </div>
            <div className="col-span-1 lg:col-span-1 rounded-xl border border-white/5 bg-slate-900/20 p-4">
               <div className="text-[9px] uppercase font-black tracking-widest text-slate-500">Fragile Setups</div>
-              <div className="mt-2 text-2xl font-black text-rose-500">0</div>
+              <div className="mt-2 text-2xl font-black text-rose-500">{insightStats.weak}</div>
               <div className="text-[8px] font-bold text-slate-600 mt-1 uppercase tracking-tighter">weak structure symbols</div>
            </div>
            <div className="col-span-1 lg:col-span-1 rounded-xl border border-white/5 bg-slate-900/20 p-4">
               <div className="text-[9px] uppercase font-black tracking-widest text-slate-500">Mean RSI</div>
-              <div className="mt-2 text-2xl font-black text-white">67</div>
+              <div className="mt-2 text-2xl font-black text-white">{insightStats.meanRsi}</div>
               <div className="text-[8px] font-bold text-slate-600 mt-1 uppercase tracking-tighter">breadth pressure read</div>
            </div>
         </div>

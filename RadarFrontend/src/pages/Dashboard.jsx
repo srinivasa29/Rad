@@ -12,6 +12,7 @@ import {
   Settings,
   HelpCircle,
   LogOut,
+  GraduationCap,
 } from "lucide-react";
 import { updateUserMode } from "../api/userApi";
 import { fetchMarketData, fetchTrendingSearches, logSearchQuery, fetchUniversalSymbolSearch } from "../api/marketApi";
@@ -126,14 +127,34 @@ const FooterActions = ({ onSignOut }) => (
 );
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const location = useLocation();
-  const [isTraderMode, setIsTraderMode] = useState(
-    String(localStorage.getItem("mode") || "").toUpperCase() === "TRADER"
-  );
+  const navigate = useNavigate();
+  const queryParams = new URLSearchParams(location.search);
+  const activeModuleParam = queryParams.get("module") || "DASHBOARD";
+
+  const isTraderPath = location.pathname.includes('/trader');
+  const isInvestorPath = location.pathname.includes('/investor');
+
+  const [activeModule, setActiveModule] = useState(activeModuleParam);
+  const [isTraderMode, setIsTraderMode] = useState(() => {
+    if (isTraderPath) return true;
+    if (isInvestorPath) return false;
+    return String(localStorage.getItem("mode") || "INVESTOR").toUpperCase() === "TRADER";
+  });
+
+  // Sync isTraderMode with URL path changes
+  useEffect(() => {
+    if (isTraderPath && !isTraderMode) {
+      setIsTraderMode(true);
+      localStorage.setItem('mode', 'TRADER');
+    } else if (isInvestorPath && isTraderMode) {
+      setIsTraderMode(false);
+      localStorage.setItem('mode', 'INVESTOR');
+    }
+  }, [isTraderPath, isInvestorPath, isTraderMode]);
+
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [activeModule, setActiveModule] = useState("DASHBOARD");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [traderSearchQuery, setTraderSearchQuery] = useState("");
@@ -157,19 +178,17 @@ export default function Dashboard() {
 
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const moduleParam = String(params.get("module") || "").toUpperCase();
-    if (["DASHBOARD", "WATCHLIST", "SCREENERS", "NEWS"].includes(moduleParam)) {
-      setActiveModule(moduleParam);
-    }
-
     const token = localStorage.getItem("token");
     const hasCompletedAssessment = localStorage.getItem("hasCompletedAssessment") === "true";
-    
     if (token && !hasCompletedAssessment) {
       navigate("/onboarding");
     }
-  }, [location.search, navigate]);
+  }, [navigate]);
+  
+
+
+
+
   useEffect(() => {
     if (!isTraderMode) {
       // Apply Investor Mode "Minimalist Sky" Gradient to body
@@ -233,14 +252,8 @@ export default function Dashboard() {
     };
   }, [isTraderMode]);
 
-  const handleModuleChange = (moduleId) => {
-    const module = String(moduleId || "").toUpperCase();
-    if (!["DASHBOARD", "WATCHLIST", "SCREENERS", "NEWS"].includes(module)) {
-      return;
-    }
-
+  const handleModuleChange = (module) => {
     setActiveModule(module);
-    navigate({ pathname: "/dashboard", search: `?module=${module}` }, { replace: false });
   };
 
   useEffect(() => {
@@ -437,6 +450,7 @@ export default function Dashboard() {
                     { id: "WATCHLIST", icon: Star, label: "Watchlist" },
                     { id: "SCREENERS", icon: Filter, label: "Screeners" },
                     { id: "NEWS", icon: Newspaper, label: "News" },
+                    { id: "ACADEMY", icon: GraduationCap, label: "Academy" },
                   ].map((item) => (
                     <button
                       key={item.id}
@@ -527,7 +541,7 @@ export default function Dashboard() {
                   </div>
 
                   {showTraderSearchDropdown && (
-                    <div className="trader-search-dropdown absolute top-11 left-0 right-0 rounded-2xl shadow-xl overflow-hidden z-[120]">
+                    <div className="trader-search-dropdown absolute top-11 left-0 right-0 rounded-2xl shadow-xl overflow-hidden">
                       {isTraderSearching && (
                         <div className="px-4 py-3 text-xs font-semibold text-[#9fb4c8]">Searching market...</div>
                       )}

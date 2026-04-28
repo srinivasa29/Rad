@@ -177,21 +177,37 @@ const toModeledEvent = (event) => ({
 
 const DEFAULT_MARKET_REGION = String(process.env.DEFAULT_MARKET_REGION || 'IN').toUpperCase();
 
-const getCorporateActions = (req, res) => {
-    if (DEFAULT_MARKET_REGION === 'US') {
-        return res.json([
-            { date: shiftDate(3), symbol: 'AAPL', action: 'Dividend', details: '$0.26/share' },
-            { date: shiftDate(6), symbol: 'NVDA', action: 'Earnings', details: 'Quarterly results' },
-            { date: shiftDate(12), symbol: 'TSLA', action: 'AGM', details: 'Annual General Meeting' },
-        ]);
-    }
+const getCorporateActions = async (req, res) => {
+    try {
+        const { getActiveSymbols } = require('../utils/symbolRegistry');
+        const exchange = DEFAULT_MARKET_REGION === 'US' ? ['NASDAQ', 'NYSE'] : ['NSE', 'BSE'];
+        const suffix = DEFAULT_MARKET_REGION === 'US' ? '' : '.NS';
+        const currency = DEFAULT_MARKET_REGION === 'US' ? '$' : 'Rs';
 
-    res.json([
-        { date: shiftDate(2), symbol: 'RELIANCE.NS', action: 'Dividend', details: 'Rs 9.00/share' },
-        { date: shiftDate(5), symbol: 'TCS.NS', action: 'Earnings', details: 'Quarterly results' },
-        { date: shiftDate(9), symbol: 'HDFCBANK.NS', action: 'Board Meeting', details: 'Capital and guidance update' },
-        { date: shiftDate(13), symbol: 'INFY.NS', action: 'AGM', details: 'Annual General Meeting' },
-    ]);
+        const syms = await getActiveSymbols({ exchanges: exchange });
+        const top4 = syms.slice(0, 4);
+
+        const actions = ['Dividend', 'Earnings', 'Board Meeting', 'AGM'];
+        const details = [
+            `${currency} ${(Math.random() * 10 + 1).toFixed(2)}/share`,
+            'Quarterly results',
+            'Capital and guidance update',
+            'Annual General Meeting',
+        ];
+        const shifts = [2, 5, 9, 13];
+
+        const result = top4.map((sym, i) => ({
+            date: shiftDate(shifts[i]),
+            symbol: `${sym}${suffix}`,
+            action: actions[i],
+            details: details[i],
+        }));
+
+        return res.json(result);
+    } catch (_err) {
+        // Minimal fallback when DB is unreachable
+        return res.json([]);
+    }
 };
 
 const getEconomicEvents = async (req, res) => {

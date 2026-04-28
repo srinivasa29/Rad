@@ -1,0 +1,79 @@
+﻿
+D:\myprojects\RADAR\RadarFrontend\src\pages\TraderStockPage.jsx
+    1:8   error    'React' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  unused-imports/no-unused-imports
+    3:87  error    'BarChart2' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              unused-imports/no-unused-imports
+  310:53  warning  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+  308 |       {isCompany && (
+  309 |         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+> 310 |           <Card><Lbl>Quarterly Revenue (Rs T)</Lbl><BarChart vals={qRev} color="#22d3ee" /></Card>
+      |                                                     ^^^^^^^^ This component is created during render
+  311 |           <Card><Lbl>Quarterly Profit (Rs T)</Lbl><BarChart vals={qPro} color="#10b981" /></Card>
+  312 |         </div>
+  313 |       )}
+
+  273 |   const qtrs = ['Q2FY24', 'Q3FY24', 'Q4FY24', 'Q1FY25', 'Q2FY25'];
+  274 |   
+> 275 |   const BarChart = ({ vals, color }) => {
+      |                    ^^^^^^^^^^^^^^^^^^^^^^
+> 276 |     const mx = Math.max(...vals);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 277 |     return (
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 287 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 288 |   };
+      | ^^^^ The component is created during render here
+  289 |
+  290 |   return (
+  291 |     <div className="space-y-4">  react-hooks/static-components
+  311:52  warning  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+  309 |         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+  310 |           <Card><Lbl>Quarterly Revenue (Rs T)</Lbl><BarChart vals={qRev} color="#22d3ee" /></Card>
+> 311 |           <Card><Lbl>Quarterly Profit (Rs T)</Lbl><BarChart vals={qPro} color="#10b981" /></Card>
+      |                                                    ^^^^^^^^ This component is created during render
+  312 |         </div>
+  313 |       )}
+  314 |
+
+  273 |   const qtrs = ['Q2FY24', 'Q3FY24', 'Q4FY24', 'Q1FY25', 'Q2FY25'];
+  274 |   
+> 275 |   const BarChart = ({ vals, color }) => {
+      |                    ^^^^^^^^^^^^^^^^^^^^^^
+> 276 |     const mx = Math.max(...vals);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 277 |     return (
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 287 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 288 |   };
+      | ^^^^ The component is created during render here
+  289 |
+  290 |   return (
+  291 |     <div className="space-y-4">                         react-hooks/static-components
+  453:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  451 |     if (!symbol) return;
+  452 |     let active = true;
+> 453 |     setLoading(true);
+      |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  454 |
+  455 |     Promise.allSettled([
+  456 |       fetchTechnicalSummary('stock', symbol),                                                                                                                                                                                                                          react-hooks/set-state-in-effect
+
+Γ£û 5 problems (2 errors, 3 warnings)
+  2 errors and 0 warnings potentially fixable with the `--fix` option.
+

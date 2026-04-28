@@ -111,7 +111,7 @@ const RealtimeWatchlist = ({ symbols = [], title = 'My Watchlist' }) => {
                                         </div>
                                     </td>
                                     <td className="text-right py-3 px-4 font-semibold">
-                                        â‚¹{quote.price?.toFixed(2) || 'â€”'}
+                                        ₹{quote.price?.toFixed(2) || 'â€”'}
                                     </td>
                                     <td className={`text-right py-3 px-4 font-semibold ${changeColor}`}>
                                         {isPositive ? 'â–²' : 'â–¼'} {Math.abs(quote.change)?.toFixed(2) || 0}

@@ -44,49 +44,71 @@ const fetchFinnhubNews = async ({ category, symbol, limit }) => {
     const normalizedSymbol = normalizeSymbol(symbol);
     const normalizedCategory = normalizeCategory(category);
 
-    if (normalizedSymbol) {
+    // If it's a specific stock symbol, use company-news
+    if (normalizedSymbol && normalizedCategory !== 'crypto') {
         const to = new Date();
         const from = new Date();
         from.setDate(from.getDate() - 10);
-        const response = await axios.get(`${FINNHUB_BASE_URL}/company-news`, {
+        try {
+            const response = await axios.get(`${FINNHUB_BASE_URL}/company-news`, {
+                params: {
+                    symbol: normalizedSymbol,
+                    from: from.toISOString().slice(0, 10),
+                    to: to.toISOString().slice(0, 10),
+                    token,
+                },
+                timeout: 7000,
+            });
+
+            const rows = Array.isArray(response.data) ? response.data : [];
+            return rows.slice(0, limit).map((item) => mapArticle({
+                id: item.id || item.url,
+                source: item.source,
+                title: item.headline || item.title,
+                summary: item.summary,
+                description: item.summary,
+                publishedAt: item.datetime ? new Date(Number(item.datetime) * 1000).toISOString() : new Date().toISOString(),
+                url: item.url,
+            }));
+        } catch (e) {
+            logger.warn(`Finnhub company-news failed for ${normalizedSymbol}`, { error: e.message });
+        }
+    }
+
+    // Fallback or general category news (including crypto)
+    try {
+        const response = await axios.get(`${FINNHUB_BASE_URL}/news`, {
             params: {
-                symbol: normalizedSymbol,
-                from: from.toISOString().slice(0, 10),
-                to: to.toISOString().slice(0, 10),
+                category: FINNHUB_CATEGORY_MAP[normalizedCategory] || 'general',
                 token,
             },
             timeout: 7000,
         });
-
         const rows = Array.isArray(response.data) ? response.data : [];
-        return rows.slice(0, limit).map((item) => mapArticle({
+        
+        // If a symbol was provided but we are using general news, filter it
+        let filtered = rows;
+        if (normalizedSymbol) {
+            const sym = normalizedSymbol.toUpperCase();
+            filtered = rows.filter(item => {
+                const text = `${item.headline} ${item.summary}`.toUpperCase();
+                return text.includes(sym);
+            });
+        }
+
+        return (filtered.length > 0 ? filtered : rows).slice(0, limit).map((item) => mapArticle({
             id: item.id || item.url,
             source: item.source,
-            title: item.headline,
+            title: item.headline || item.title,
             summary: item.summary,
             description: item.summary,
             publishedAt: item.datetime ? new Date(Number(item.datetime) * 1000).toISOString() : new Date().toISOString(),
             url: item.url,
         }));
+    } catch (e) {
+        logger.warn('Finnhub general news failed', { error: e.message });
+        return [];
     }
-
-    const response = await axios.get(`${FINNHUB_BASE_URL}/news`, {
-        params: {
-            category: FINNHUB_CATEGORY_MAP[normalizedCategory] || 'general',
-            token,
-        },
-        timeout: 7000,
-    });
-    const rows = Array.isArray(response.data) ? response.data : [];
-    return rows.slice(0, limit).map((item) => mapArticle({
-        id: item.id || item.url,
-        source: item.source,
-        title: item.headline,
-        summary: item.summary,
-        description: item.summary,
-        publishedAt: item.datetime ? new Date(Number(item.datetime) * 1000).toISOString() : new Date().toISOString(),
-        url: item.url,
-    }));
 };
 
 const fetchMarketAuxNews = async ({ category, symbol, limit }) => {
@@ -203,36 +225,36 @@ const fetchMarketNews = async (category = 'general', options = {}) => {
 
     return [
         {
-            id: 1,
-            source: "Reuters",
-            title: "Global markets rally as inflation shows signs of cooling",
-            summary: "Market breadth improved as inflation data cooled across major economies.",
-            description: "Market breadth improved as inflation data cooled across major economies.",
-            time: "2h ago",
+            id: 'f-1',
+            source: "Market Pulse",
+            title: "Global markets stabilize as economic data suggests resilience",
+            summary: "Investors are closely monitoring central bank signals and corporate earnings for direction.",
+            description: "Investors are closely monitoring central bank signals and corporate earnings for direction.",
+            time: "Recently",
+            publishedAt: new Date().toISOString(),
+            sentiment: "Neutral",
+            url: "#"
+        },
+        {
+            id: 'f-2',
+            source: "Financial Times",
+            title: "Energy sector shows momentum amid shifting demand patterns",
+            summary: "Renewable and traditional energy providers are seeing increased institutional interest.",
+            description: "Renewable and traditional energy providers are seeing increased institutional interest.",
+            time: "1h ago",
             publishedAt: new Date().toISOString(),
             sentiment: "Bullish",
             url: "#"
         },
         {
-            id: 2,
-            source: "Bloomberg",
-            title: "Tech stocks face pressure ahead of earnings season",
-            summary: "Large-cap tech stocks traded mixed ahead of earnings.",
-            description: "Large-cap tech stocks traded mixed ahead of earnings.",
-            time: "4h ago",
+            id: 'f-3',
+            source: "Global News",
+            title: "Inflation targets remain in focus for major economies",
+            summary: "Recent policy reports highlight the ongoing efforts to balance growth and stability.",
+            description: "Recent policy reports highlight the ongoing efforts to balance growth and stability.",
+            time: "3h ago",
             publishedAt: new Date().toISOString(),
-            sentiment: "Bearish",
-            url: "#"
-        },
-        {
-            id: 3,
-            source: "CNBC",
-            title: "Fed signals potential rate cuts later this year",
-            summary: "Policy commentary pointed to a data-dependent easing path.",
-            description: "Policy commentary pointed to a data-dependent easing path.",
-            time: "5h ago",
-            publishedAt: new Date().toISOString(),
-            sentiment: "Bullish",
+            sentiment: "Neutral",
             url: "#"
         }
     ];

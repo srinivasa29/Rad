@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { 
-    getUserProfile, 
+    getUserProfile,
+    updateUserProfile,
+    saveInvestorDNA,
+    updateNotificationPreferences,
     getMode, 
     updateMode,
     getUserPortfolio,
@@ -15,6 +18,9 @@ const { getSettings, updateSettings } = require('../controllers/settingsControll
 const { authMiddleware } = require('../middleware/authMiddleware');
 
 router.get('/profile', authMiddleware, getUserProfile);
+router.patch('/profile', authMiddleware, updateUserProfile);
+router.post('/dna', authMiddleware, saveInvestorDNA);
+router.patch('/notifications', authMiddleware, updateNotificationPreferences);
 router.get('/mode', authMiddleware, getMode);
 router.patch('/mode', authMiddleware, updateMode);
 router.get('/settings', authMiddleware, getSettings);

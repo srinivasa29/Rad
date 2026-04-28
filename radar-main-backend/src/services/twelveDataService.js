@@ -79,7 +79,7 @@ class TwelveDataService {
         },
       };
     } catch (error) {
-      logger.error(`Twelve Data API error for ${symbol}:`, error.message);
+      logger.error(`Twelve Data API error for ${symbol}: ${error.message}`);
       return {
         success: false,
         message: error.message,
@@ -127,7 +127,7 @@ class TwelveDataService {
         },
       };
     } catch (error) {
-      logger.error(`Twelve Data price error:`, error.message);
+      logger.error(`Twelve Data price error: ${error.message}`);
       return {
         success: false,
         message: error.message,
@@ -182,7 +182,7 @@ class TwelveDataService {
         meta: data.meta,
       };
     } catch (error) {
-      logger.error(`Twelve Data time series error:`, error.message);
+      logger.error(`Twelve Data time series error: ${error.message}`);
       return {
         success: false,
         message: error.message,
@@ -215,7 +215,7 @@ class TwelveDataService {
       const result = await this.getPrice('RELIANCE.NS');
       return result.success;
     } catch (error) {
-      logger.error('Twelve Data connection test failed:', error.message);
+      logger.error(`Twelve Data connection test failed: ${error.message}`);
       return false;
     }
   }

@@ -86,7 +86,7 @@ const FilterModal = ({ isOpen, onClose, filters, onApplyFilters }) => {
                       >
                         <div>
                           <label className="text-xs font-semibold text-slate-400 block mb-2">
-                            Min Price: â‚¹{localFilters.priceRange[0]}
+                            Min Price: ₹{localFilters.priceRange[0]}
                           </label>
                           <input
                             type="range"
@@ -100,7 +100,7 @@ const FilterModal = ({ isOpen, onClose, filters, onApplyFilters }) => {
 
                         <div>
                           <label className="text-xs font-semibold text-slate-400 block mb-2">
-                            Max Price: â‚¹{localFilters.priceRange[1]}
+                            Max Price: ₹{localFilters.priceRange[1]}
                           </label>
                           <input
                             type="range"
@@ -113,9 +113,9 @@ const FilterModal = ({ isOpen, onClose, filters, onApplyFilters }) => {
                         </div>
 
                         <div className="flex gap-2 text-xs text-slate-400">
-                          <span>â‚¹{localFilters.priceRange[0]}</span>
+                          <span>₹{localFilters.priceRange[0]}</span>
                           <span>-</span>
-                          <span>â‚¹{localFilters.priceRange[1]}</span>
+                          <span>₹{localFilters.priceRange[1]}</span>
                         </div>
                       </motion.div>
                     )}

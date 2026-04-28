@@ -4,6 +4,7 @@ const finnhubService = require('./finnhubService');
 const twelveDataService = require('./twelveDataService');
 const yahooFinanceService = require('./yahooFinanceService');
 const ohlcService = require('./ohlcService');
+const cryptoService = require('./cryptoService');
 const logger = require('../utils/logger');
 
 class FreeApiAggregator {
@@ -68,6 +69,13 @@ class FreeApiAggregator {
 
   
   selectBestSource(symbol) {
+    const s = String(symbol || '').toUpperCase().replace(/USDT$/i, '');
+    const CRYPTO_SYMBOLS = new Set(['BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK','AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT','ARB','OP','INJ','SUI','SEI','PEPE','WIF','TON','FLOKI','BONK']);
+    
+    if (CRYPTO_SYMBOLS.has(s) || symbol.toUpperCase().endsWith('USDT')) {
+      return 'binance';
+    }
+
     if (symbol.includes('.NS') || symbol.includes('.BO')) {
       if (twelveDataService.canMakeRequest()) {
         return 'twelvedata';
@@ -86,6 +94,36 @@ class FreeApiAggregator {
   async trySource(symbol, source) {
     try {
       switch (source) {
+        case 'binance':
+          try {
+            const data = await cryptoService.fetchCryptoBySymbol(symbol);
+            if (data) {
+              return {
+                success: true,
+                source: 'binance',
+                data: {
+                  symbol: symbol,
+                  current: data.current_price,
+                  high: data.high_24h,
+                  low: data.low_24h,
+                  open: data.open,
+                  previousClose: data.prev_close,
+                  change: data.price_change_24h,
+                  changePercent: data.price_change_percentage_24h,
+                  timestamp: new Date(),
+                  volume: data.total_volume,
+                  tradeCount: data.trade_count,
+                  category: data.category,
+                  layer: data.layer,
+                  consensus: data.consensus
+                },
+              };
+            }
+          } catch (e) {
+            logger.error(`Binance fetch failed for ${symbol}:`, e.message);
+          }
+          return { success: false, message: 'Binance fetch failed', source: 'binance' };
+
         case 'twelvedata':
           this.stats.twelveDataHits++;
           return await twelveDataService.getQuote(symbol);

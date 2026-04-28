@@ -137,14 +137,14 @@ const LatestPriceCard = ({ symbol }) => {
     return (
         <div className="p-4 bg-white rounded-lg shadow">
             <div className="text-sm text-gray-500 mb-1">{symbol}</div>
-            <div className="text-2xl font-bold mb-2">â‚¹{data.close.toFixed(2)}</div>
+            <div className="text-2xl font-bold mb-2">₹{data.close.toFixed(2)}</div>
             <div className={`flex items-center gap-2 text-sm ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
                 <span>{isPositive ? 'â–²' : 'â–¼'}</span>
                 <span>{Math.abs(priceChange).toFixed(2)}</span>
                 <span>({priceChangePercent}%)</span>
             </div>
             <div className="mt-2 text-xs text-gray-400">
-                H: â‚¹{data.high.toFixed(2)} | L: â‚¹{data.low.toFixed(2)}
+                H: ₹{data.high.toFixed(2)} | L: ₹{data.low.toFixed(2)}
             </div>
         </div>
     );
@@ -189,10 +189,10 @@ const PriceHistoryTable = ({ symbol, days = 10 }) => {
                             <td className="px-4 py-2 border">
                                 {new Date(candle.timestamp).toLocaleDateString()}
                             </td>
-                            <td className="px-4 py-2 border">â‚¹{candle.open.toFixed(2)}</td>
-                            <td className="px-4 py-2 border text-green-600">â‚¹{candle.high.toFixed(2)}</td>
-                            <td className="px-4 py-2 border text-red-600">â‚¹{candle.low.toFixed(2)}</td>
-                            <td className="px-4 py-2 border font-semibold">â‚¹{candle.close.toFixed(2)}</td>
+                            <td className="px-4 py-2 border">₹{candle.open.toFixed(2)}</td>
+                            <td className="px-4 py-2 border text-green-600">₹{candle.high.toFixed(2)}</td>
+                            <td className="px-4 py-2 border text-red-600">₹{candle.low.toFixed(2)}</td>
+                            <td className="px-4 py-2 border font-semibold">₹{candle.close.toFixed(2)}</td>
                             <td className="px-4 py-2 border text-gray-600">
                                 {candle.volume ? candle.volume.toLocaleString() : 'N/A'}
                             </td>

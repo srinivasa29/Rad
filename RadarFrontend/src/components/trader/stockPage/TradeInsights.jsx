@@ -19,7 +19,7 @@ export default function TradeInsights() {
                         <TrendingUp size={14} />
                         <span className="alpha-label text-emerald-500/80">Entry Zone</span>
                     </div>
-                    <span className="text-xl font-black text-white terminal-value">â‚¹2,855 - 2,870</span>
+                    <span className="text-xl font-black text-white terminal-value">₹2,855 - 2,870</span>
                     <p className="text-[9px] text-slate-500 mt-1 font-medium italic">Wait for pull-back to 21 EMA</p>
                 </div>
 
@@ -28,7 +28,7 @@ export default function TradeInsights() {
                         <Target size={14} />
                         <span className="alpha-label text-blue-500/80">Profit Target</span>
                     </div>
-                    <span className="text-xl font-black text-white terminal-value">â‚¹3,040 - 3,120</span>
+                    <span className="text-xl font-black text-white terminal-value">₹3,040 - 3,120</span>
                     <p className="text-[9px] text-slate-500 mt-1 font-medium italic">Projected 8.5% Upside</p>
                 </div>
 
@@ -37,7 +37,7 @@ export default function TradeInsights() {
                         <ShieldAlert size={14} />
                         <span className="alpha-label text-rose-500/80">Stop Loss</span>
                     </div>
-                    <span className="text-xl font-black text-white terminal-value">â‚¹2,810.00</span>
+                    <span className="text-xl font-black text-white terminal-value">₹2,810.00</span>
                     <p className="text-[9px] text-slate-500 mt-1 font-medium italic">Below previous swing low</p>
                 </div>
 
@@ -78,7 +78,7 @@ export default function TradeInsights() {
                         </div>
                         <div className="flex items-start gap-2">
                             <div className="mt-1 w-1 h-1 rounded-full bg-blue-500"></div>
-                            <p className="text-[11px] text-slate-400 leading-relaxed"><span className="text-white font-bold">Catalyst:</span> Technical breakout above long-term resistance of â‚¹2,850 now confirmed as Support.</p>
+                            <p className="text-[11px] text-slate-400 leading-relaxed"><span className="text-white font-bold">Catalyst:</span> Technical breakout above long-term resistance of ₹2,850 now confirmed as Support.</p>
                         </div>
                     </div>
                 </div>

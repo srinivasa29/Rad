@@ -23,7 +23,10 @@ const normalizeStock = (data) => {
         image: null,
         type: 'STOCK',
         details: stock.details,
-        financials: stock.financials
+        financials: stock.financials,
+        volume: stock.volume || 0,
+        dayLow: stock.dayLow || 0,
+        dayHigh: stock.dayHigh || 0
     }));
 };
 

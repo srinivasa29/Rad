@@ -16,26 +16,11 @@ const ProfileDropdown = ({
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [mode, setMode] = useState("trader");
+  const [mode, setMode] = useState(isTraderMode ? "trader" : "investor");
 
   useEffect(() => {
-    const saved = localStorage.getItem("mode");
-    if (!saved) return;
-
-    const normalized = String(saved).toLowerCase();
-    if (normalized === "trader" || normalized === "investor") {
-      setMode(normalized);
-      return;
-    }
-
-    if (saved === "TRADER" || saved === "INVESTOR") {
-      setMode(saved.toLowerCase());
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("mode", mode);
-  }, [mode]);
+    setMode(isTraderMode ? "trader" : "investor");
+  }, [isTraderMode]);
 
   useEffect(() => {
     if (typeof isTraderMode === "boolean") {
@@ -115,7 +100,7 @@ const ProfileDropdown = ({
 
   const handleSelectMode = (nextMode) => {
     setMode(nextMode);
-    navigate(nextMode === "investor" ? "/dashboard/investor" : "/dashboard/trader");
+    navigate(nextMode === "investor" ? "/investor/dashboard" : "/trader/dashboard");
     onClose();
   };
 
@@ -152,7 +137,7 @@ const ProfileDropdown = ({
           className="dropdown-menu-item"
           onClick={() => {
             onClose();
-            navigate("/profile");
+            navigate(isTraderMode ? "/trader/profile" : "/investor/profile");
           }}
         >
           <span className="dropdown-menu-icon">
@@ -165,7 +150,7 @@ const ProfileDropdown = ({
           className="dropdown-menu-item"
           onClick={() => {
             onClose();
-            navigate("/settings");
+            navigate(isTraderMode ? "/trader/settings" : "/investor/settings");
           }}
         >
           <span className="dropdown-menu-icon">
@@ -178,7 +163,7 @@ const ProfileDropdown = ({
           className="dropdown-menu-item"
           onClick={() => {
             onClose();
-            navigate(isTraderMode ? "/support/trader" : "/support/investor");
+            navigate(isTraderMode ? "/trader/support" : "/investor/support");
           }}
         >
           <span className="dropdown-menu-icon">

@@ -31,104 +31,9 @@ import { useKeyboardShortcuts, KEYBOARD_SHORTCUTS_HELP } from '../../hooks/useKe
 import { sortStocks, SORT_OPTIONS } from '../../hooks/watchlistSorting';
 import api, { hasAuthToken } from '../../api/api';
 
-const MOCK_STOCKS = [
-  {
-    id: 1,
-    symbol: 'RELIANCE',
-    name: 'Reliance Industries',
-    price: 2845.50,
-    change: 1.42,
-    percent: 0.82,
-    volume: 3250000,
-    marketCap: 1850000,
-    rsi: 62.5,
-    macd: 'bullish',
-    high52w: 3050,
-    low52w: 2200,
-    vwap: 2820.30,
-    status: 'breakout',
-  },
-  {
-    id: 2,
-    symbol: 'HDFCBANK',
-    name: 'HDFC Bank',
-    price: 1618.75,
-    change: -0.58,
-    percent: -0.04,
-    volume: 2840000,
-    marketCap: 950000,
-    rsi: 48.2,
-    macd: 'neutral',
-    high52w: 1850,
-    low52w: 1420,
-    vwap: 1625.40,
-    status: 'neutral',
-  },
-  {
-    id: 3,
-    symbol: 'INFY',
-    name: 'Infosys',
-    price: 1520.25,
-    change: 2.85,
-    percent: 1.92,
-    volume: 1950000,
-    marketCap: 640000,
-    rsi: 68.3,
-    macd: 'bullish',
-    high52w: 1650,
-    low52w: 1200,
-    vwap: 1510.50,
-    status: 'strong',
-  },
-  {
-    id: 4,
-    symbol: 'TCS',
-    name: 'Tata Consultancy',
-    price: 3650.80,
-    change: -1.25,
-    percent: -0.34,
-    volume: 850000,
-    marketCap: 1200000,
-    rsi: 42.1,
-    macd: 'bearish',
-    high52w: 4100,
-    low52w: 3300,
-    vwap: 3670.20,
-    status: 'weak',
-  },
-  {
-    id: 5,
-    symbol: 'ICICIBANK',
-    name: 'ICICI Bank',
-    price: 945.60,
-    change: 3.12,
-    percent: 2.34,
-    volume: 4120000,
-    marketCap: 780000,
-    rsi: 72.8,
-    macd: 'bullish',
-    high52w: 1050,
-    low52w: 820,
-    vwap: 938.15,
-    status: 'breakout',
-  },
-  {
-    id: 6,
-    symbol: 'SBIN',
-    name: 'State Bank of India',
-    price: 520.15,
-    change: -0.92,
-    percent: -0.18,
-    volume: 5650000,
-    marketCap: 450000,
-    rsi: 51.5,
-    macd: 'neutral',
-    high52w: 620,
-    low52w: 450,
-    vwap: 523.80,
-    status: 'neutral',
-  },
-];
+// Real data is loaded from the backend in the useEffect below.
+// This empty array is the initial state; no hardcoded symbols.
+const MOCK_STOCKS = [];
 
 const FILTER_TABS = [
   { id: 'all', label: 'All', icon: null },
@@ -140,7 +45,7 @@ const FILTER_TABS = [
 
 export default function AdvancedWatchlistDashboard() {
   const [stocks, setStocks] = useState(MOCK_STOCKS);
-  const [selectedStock, setSelectedStock] = useState(MOCK_STOCKS[0]);
+  const [selectedStock, setSelectedStock] = useState(null);
   const [selectedStockIndex, setSelectedStockIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('all');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -212,10 +117,10 @@ export default function AdvancedWatchlistDashboard() {
       try {
         if (!hasAuthToken()) return; // Not logged in — keep mock
 
-        const wlRes = await api.get('/watchlists');
+        const wlRes = await api.get('/watchlist');
         const wlData = wlRes.data?.data ?? wlRes.data;
         const symbols = (Array.isArray(wlData)
-          ? wlData.flatMap(w => w.symbols ?? w.stocks ?? [])
+          ? wlData.flatMap(w => (w.items ?? []).map(i => i?.symbol ?? i))
           : []).filter(Boolean).map(s => String(s).replace(/\.(NS|BO)$/i, ''));
 
         if (!symbols.length || !active) return;

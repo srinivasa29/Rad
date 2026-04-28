@@ -858,6 +858,8 @@ export function ProfilePage() {
         loadDashboardData();
     }, []);
 
+    const initial = profile?.username?.[0]?.toUpperCase() || 'U';
+
     useEffect(() => {
         const fullBackground = 'linear-gradient(180deg, #f0f9ff 0%, #e1effe 100%)';
         document.documentElement.style.setProperty('--investor-bg', fullBackground);
@@ -886,7 +888,27 @@ export function ProfilePage() {
         { title: 'Risk Management', status: 'Not Started', progress: 0, icon: <ShieldCheck size={14} /> }
     ];
 
-    const initial = profile?.username?.charAt(0).toUpperCase() || 'U';
+    const dna = profile?.investorDNA || null;
+    const hasDNA = dna && dna.dominant;
+
+    // Fallback persona labels when no DNA saved
+    const personaName = hasDNA ? dna.personaName : 'No Assessment Yet';
+    const personaBlurb = hasDNA ? dna.personaDescription : 'Take the assessment to generate your investor identity.';
+    const investorPct = hasDNA ? dna.investorPercent : null;
+    const traderPct   = hasDNA ? dna.traderPercent   : null;
+    const dnaTraits   = hasDNA ? dna.traits : [];
+    const riskLabel   = hasDNA
+        ? (dna.metrics?.risk >= 75 ? 'High' : dna.metrics?.risk >= 40 ? 'Moderate' : 'Conservative')
+        : 'Unknown';
+    const riskDesc    = hasDNA
+        ? (dna.metrics?.risk >= 75 ? 'High comfort with market volatility and short-term swings.' : dna.metrics?.risk >= 40 ? 'Balanced approach between capital preservation and growth.' : 'Strong preference for capital preservation over speculative returns.')
+        : 'Complete the assessment to determine your risk profile.';
+    const strategyLabel = hasDNA
+        ? (dna.dominant === 'INVESTOR' ? 'Growth' : 'Active Trading')
+        : '-';
+    const horizonLabel = hasDNA
+        ? (dna.metrics?.patience >= 75 ? '5-10 Years' : dna.metrics?.patience >= 40 ? '1-5 Years' : '< 1 Year')
+        : '-';
 
     return (
         <div className="dashboard-container investor-theme pt-2 min-h-screen">
@@ -909,14 +931,14 @@ export function ProfilePage() {
                                 <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-wider">
                                     <Clock size={12} /> {profile?.joinedDate || 'Joined Recently'} • <Zap size={12} className="text-blue-500" fill="currentColor" /> Investor Mode
                                 </div>
-                                <p className="text-[10px] text-slate-400 font-bold mt-3 italic">Manage your account settings in <span className="text-blue-500 cursor-pointer hover:underline" onClick={() => navigate('/settings')}>Settings</span></p>
+                                <p className="text-[10px] text-slate-400 font-bold mt-3 italic">Manage your account settings in <span className="text-blue-500 cursor-pointer hover:underline" onClick={() => navigate('/investor/settings')}>Settings</span></p>
                             </div>
                         </div>
                         <div className="flex flex-col gap-3">
                             <button className="px-6 py-3 bg-blue-600 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center gap-2" onClick={() => navigate('/onboarding')}>
                                 <RefreshCw size={14} /> Retake Assessment
                             </button>
-                            <button className="px-6 py-3 bg-slate-50 text-slate-600 rounded-xl text-xs font-black border border-slate-200 hover:bg-slate-100 transition-all flex items-center gap-2" onClick={() => navigate('/settings')}>
+                            <button className="px-6 py-3 bg-slate-50 text-slate-600 rounded-xl text-xs font-black border border-slate-200 hover:bg-slate-100 transition-all flex items-center gap-2" onClick={() => navigate('/investor/settings')}>
                                 <Settings size={14} /> Go to Settings
                             </button>
                         </div>
@@ -926,18 +948,27 @@ export function ProfilePage() {
                     <div className="bg-blue-50/50 rounded-[28px] p-10 border border-blue-100/50">
                         <div className="flex flex-col gap-2">
                             <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Investor Identity</span>
-                            <h2 className="text-2xl font-black text-slate-800">The Growth Pathfinder</h2>
+                            <h2 className="text-2xl font-black text-slate-800">{personaName}</h2>
                             <p className="text-slate-500 font-medium max-w-2xl leading-relaxed mt-2">
-                                You are a <strong className="text-slate-800">Growth-focused</strong> investor with a <strong className="text-slate-800">moderate risk appetite</strong> and a <strong className="text-slate-800">long-term strategy</strong>. Your behavior heavily aligns with identifying disruptive technologies.
+                                {hasDNA ? (
+                                    <>You are a <strong className="text-slate-800">{dna.dominant === 'INVESTOR' ? 'Growth-focused' : 'Active Trader'}</strong> with a <strong className="text-slate-800">{riskLabel} risk appetite</strong> and a <strong className="text-slate-800">{horizonLabel} horizon</strong>. {dna.hybridLine}</>                                ) : personaBlurb}
                             </p>
-                            <div className="flex gap-2 mt-4">
-                                <span className="px-4 py-2 bg-white text-blue-600 rounded-lg text-xs font-black border border-blue-100 shadow-sm">Growth Focused</span>
-                                <span className="px-4 py-2 bg-white text-emerald-600 rounded-lg text-xs font-black border border-emerald-100 shadow-sm">Moderate Risk</span>
-                            </div>
+                            {dnaTraits.length > 0 && (
+                                <div className="flex gap-2 mt-4">
+                                    {dnaTraits.map((t, i) => (
+                                        <span key={i} className="px-4 py-2 bg-white text-blue-600 rounded-lg text-xs font-black border border-blue-100 shadow-sm">{t}</span>
+                                    ))}
+                                </div>
+                            )}
+                            {!hasDNA && (
+                                <button onClick={() => navigate('/onboarding')} className="mt-4 self-start px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black shadow hover:bg-blue-700 transition-all">
+                                    Take Assessment →
+                                </button>
+                            )}
                         </div>
                     </div>
 
-                    {/* INSIGHTS GRID */}
+                    {/* INSIGHTS GRID — driven by real DNA */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                         
                         <div className="p-8 rounded-[24px] bg-slate-50/50 border border-slate-100 space-y-4">
@@ -946,9 +977,9 @@ export function ProfilePage() {
                                 <BarChart2 size={16} />
                             </div>
                             <div className="space-y-4 pt-4">
-                                <div className="flex justify-between items-center"><span className="text-[11px] font-black text-slate-800">INVESTOR</span><span className="text-[11px] font-black text-blue-600">72%</span></div>
-                                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div className="bg-blue-600 h-full w-[72%] rounded-full shadow-sm" /></div>
-                                <p className="text-[11px] text-slate-500 font-bold leading-relaxed pt-2">Behavior heavily aligns with long-term investing cycles.</p>
+                                <div className="flex justify-between items-center"><span className="text-[11px] font-black text-slate-800">{hasDNA ? dna.dominant : 'UNKNOWN'}</span><span className="text-[11px] font-black text-blue-600">{hasDNA ? `${investorPct}%` : '-'}</span></div>
+                                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div className="bg-blue-600 h-full rounded-full shadow-sm" style={{ width: hasDNA ? `${investorPct}%` : '0%' }} /></div>
+                                <p className="text-[11px] text-slate-500 font-bold leading-relaxed pt-2">{hasDNA ? dna.hybridLine : 'Complete the assessment to see your behavior breakdown.'}</p>
                             </div>
                         </div>
 
@@ -961,15 +992,23 @@ export function ProfilePage() {
                                 <div className="w-1/2 h-full">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
-                                            <Pie data={[{ name: 'Tech', value: 45 }, { name: 'Finance', value: 25 }, { name: 'Energy', value: 20 }, { name: 'Others', value: 10 }]} cx="50%" cy="50%" innerRadius={35} outerRadius={50} paddingAngle={5} dataKey="value">
-                                                <Cell fill="#3b82f6" /><Cell fill="#60a5fa" /><Cell fill="#93c5fd" /><Cell fill="#bfdbfe" />
+                                            <Pie 
+                                                data={portfolio?.sectorWeights?.length > 0 ? portfolio.sectorWeights : [{ name: 'None', value: 1 }]} 
+                                                cx="50%" cy="50%" innerRadius={35} outerRadius={50} paddingAngle={5} dataKey="value"
+                                            >
+                                                <Cell fill="#3b82f6" />
+                                                <Cell fill="#60a5fa" />
+                                                <Cell fill="#93c5fd" />
+                                                <Cell fill="#bfdbfe" />
+                                                <Cell fill="#dbeafe" />
                                             </Pie>
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </div>
                                 <div className="w-1/2">
                                     <p className="text-[9px] font-black text-slate-400 uppercase">Top Sector</p>
-                                    <p className="text-sm font-black text-blue-600 pt-1">Tech (45%)</p>
+                                    <p className="text-[13px] font-black text-slate-800 truncate">{portfolio?.sectorWeights?.[0]?.name || 'Diversified'}</p>
+                                    <p className="text-[11px] text-blue-600 font-bold mt-0.5">{portfolio?.sectorWeights?.[0]?.weightPct || 0}% weight</p>
                                 </div>
                             </div>
                         </div>
@@ -980,8 +1019,8 @@ export function ProfilePage() {
                                 <ShieldCheck size={16} />
                             </div>
                             <div className="pt-6">
-                                <p className="text-2xl font-black text-slate-800 tracking-tight">Moderate</p>
-                                <p className="text-[11px] text-slate-500 font-bold mt-2">Balanced approach between capital preservation and growth.</p>
+                                <p className="text-2xl font-black text-slate-800 tracking-tight">{riskLabel}</p>
+                                <p className="text-[11px] text-slate-500 font-bold mt-2">{riskDesc}</p>
                             </div>
                         </div>
 
@@ -991,9 +1030,9 @@ export function ProfilePage() {
                                 <Settings size={16} />
                             </div>
                             <div className="space-y-4 pt-4">
-                                <div className="flex justify-between items-center"><span className="text-[10px] font-black text-slate-400 uppercase">Horizon</span><span className="text-[11px] font-black text-slate-800">5-10 Years</span></div>
-                                <div className="flex justify-between items-center"><span className="text-[10px] font-black text-slate-400 uppercase">Strategy</span><span className="text-[11px] font-black text-slate-800">Growth</span></div>
-                                <div className="flex justify-between items-center"><span className="text-[10px] font-black text-slate-400 uppercase">Universe</span><span className="text-[11px] font-black text-slate-800">Equities</span></div>
+                                <div className="flex justify-between items-center"><span className="text-[10px] font-black text-slate-400 uppercase">Horizon</span><span className="text-[11px] font-black text-slate-800">{horizonLabel}</span></div>
+                                <div className="flex justify-between items-center"><span className="text-[10px] font-black text-slate-400 uppercase">Strategy</span><span className="text-[11px] font-black text-slate-800">{strategyLabel}</span></div>
+                                <div className="flex justify-between items-center"><span className="text-[10px] font-black text-slate-400 uppercase">Confidence</span><span className="text-[11px] font-black text-slate-800">{hasDNA ? dna.confidence : '-'}</span></div>
                             </div>
                         </div>
 
@@ -1094,8 +1133,17 @@ export function SettingsPage() {
         
         const load = async () => {
             try {
-                const res = await api.get('/auth/me');
-                setProfile(res.data);
+                const res = await api.get('/user/profile');
+                const data = res.data;
+                setProfile(data);
+                // Load persisted notification prefs
+                if (data.notificationPreferences) {
+                    setNotifications({
+                        priceAlerts:     { enabled: Boolean(data.notificationPreferences.priceAlerts) },
+                        earningsUpdates: { enabled: Boolean(data.notificationPreferences.earningsUpdates) },
+                        importantNews:   { enabled: Boolean(data.notificationPreferences.importantNews) }
+                    });
+                }
             } catch (err) { console.error(err); }
         };
         load();
@@ -1108,6 +1156,19 @@ export function SettingsPage() {
             document.body.style.backgroundSize = '';
         };
     }, []);
+
+    // Toggle a notification key and persist immediately
+    const handleNotificationToggle = async (key) => {
+        const newEnabled = !notifications[key].enabled;
+        setNotifications(prev => ({ ...prev, [key]: { enabled: newEnabled } }));
+        try {
+            await api.patch('/user/notifications', { [key]: newEnabled });
+        } catch (err) {
+            // Revert on failure
+            setNotifications(prev => ({ ...prev, [key]: { enabled: !newEnabled } }));
+            console.error('Failed to save notification preference', err);
+        }
+    };
 
     return (
         <div className="dashboard-container investor-theme pt-2 min-h-screen">
@@ -1182,7 +1243,7 @@ export function SettingsPage() {
                                             type="checkbox" 
                                             className="sr-only peer" 
                                             checked={notifications[n.id].enabled}
-                                            onChange={() => setNotifications({...notifications, [n.id]: {enabled: !notifications[n.id].enabled}})}
+                                            onChange={() => handleNotificationToggle(n.id)}
                                         />
                                         <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                                     </label>
@@ -1280,7 +1341,25 @@ export function SettingsPage() {
                             <button onClick={() => setIsEditModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-slate-600">✕</button>
                         </div>
                         
-                        <form className="space-y-8" onSubmit={(e) => { e.preventDefault(); setIsEditModalOpen(false); setStatus('Changes Saved!'); setTimeout(() => setStatus(''), 3000); }}>
+                        <form className="space-y-8" onSubmit={async (e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.target);
+                            const username = formData.get('username')?.trim();
+                            const email    = formData.get('email')?.trim();
+                            try {
+                                const res = await api.patch('/user/profile', { username, email });
+                                if (res.data?.success) {
+                                    setProfile(prev => ({ ...prev, username: res.data.data.username, email: res.data.data.email }));
+                                    setStatus('Changes Saved!');
+                                    setTimeout(() => setStatus(''), 3000);
+                                }
+                            } catch (err) {
+                                console.error('Profile update failed', err);
+                                setStatus('Save failed. Please try again.');
+                                setTimeout(() => setStatus(''), 3000);
+                            }
+                            setIsEditModalOpen(false);
+                        }}>
                             
                             {/* Profile Photo Section (Centered) */}
                             <div className="flex flex-col items-center gap-4">
@@ -1322,11 +1401,11 @@ export function SettingsPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">Full Name</label>
-                                    <input type="text" defaultValue={profile?.username} className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 transition-all" />
+                                    <input type="text" name="username" defaultValue={profile?.username} className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 transition-all" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">Email Address</label>
-                                    <input type="email" defaultValue={profile?.email} className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 transition-all" />
+                                    <input type="email" name="email" defaultValue={profile?.email} className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 transition-all" />
                                 </div>
                             </div>
 

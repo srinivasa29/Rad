@@ -25,6 +25,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const TraderStockPage = lazy(() => import('./pages/TraderStockPage'));
 const TradeTerminalPage = lazy(() => import('./pages/TradeTerminalPage'));
 const MinimalChartPage = lazy(() => import('./pages/MinimalChartPage'));
@@ -67,8 +68,7 @@ const DashboardAliasRoute = ({ mode, module }) => {
     localStorage.setItem('mode', mode);
   }
 
-  const query = module ? `?module=${encodeURIComponent(module)}` : '';
-  return <Navigate to={`/dashboard${query}`} replace />;
+  return <Dashboard />;
 };
 
 const AssetAliasRoute = () => {
@@ -135,6 +135,11 @@ const AdvancedChartsRoute = () => {
   return <InvestorAdvancedCharts />;
 };
 
+const DashboardRedirect = () => {
+  const mode = getStoredMode();
+  return <Navigate to={mode === 'TRADER' ? '/trader/dashboard' : '/investor/dashboard'} replace />;
+};
+
 function App() {
   return (
     <AssetProvider>
@@ -142,40 +147,69 @@ function App() {
         <Suspense fallback={<AppLoader />}>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/trader" element={<DashboardAliasRoute mode="TRADER" />} />
-            <Route path="/dashboard/investor" element={<DashboardAliasRoute mode="INVESTOR" />} />
+            <Route path="/dashboard" element={<DashboardRedirect />} />
+            <Route path="/dashboard/trader" element={<Navigate to="/trader/dashboard" replace />} />
+            <Route path="/dashboard/investor" element={<Navigate to="/investor/dashboard" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
             <Route path="/auth/oauth/callback" element={<OAuthCallbackRoute />} />
             <Route path="/stocks/:symbol" element={<TraderStockPage />} />
             <Route path="/trade/:symbol" element={<TradeTerminalPage />} />
             <Route path="/chart/:symbol" element={<MinimalChartPage />} />
             <Route path="/investor-stock/:symbol" element={<InvestorStockPage />} />
             <Route path="/asset/:symbol" element={<AssetAliasRoute />} />
-            <Route path="/trader/momentum" element={<DashboardAliasRoute mode="TRADER" module="DASHBOARD" />} />
-            <Route path="/investor/valuation" element={<DashboardAliasRoute mode="INVESTOR" module="DASHBOARD" />} />
+
+            {/* Persona Dashboards */}
+            <Route path="/investor/dashboard" element={<DashboardAliasRoute mode="INVESTOR" />} />
+            <Route path="/trader/dashboard" element={<DashboardAliasRoute mode="TRADER" />} />
+
+            {/* Investor Specialized Routes */}
+            <Route path="/investor/momentum" element={<DashboardAliasRoute mode="TRADER" />} />
+            <Route path="/investor/valuation" element={<DashboardAliasRoute mode="INVESTOR" />} />
             <Route path="/investor/filings" element={<InvestorFilingsPage />} />
-            <Route path="/screener" element={<ScreenerPage />} />
-            <Route path="/search" element={<GlobalSearchPage />} />
-            <Route path="/discovery" element={<DiscoveryPage />} />
-            <Route path="/calendar" element={<CalendarPage />} />
-            <Route path="/news" element={<NewsPage />} />
-            <Route path="/watchlists" element={<WatchlistsPage />} />
-            <Route path="/portfolio" element={<PortfolioPage />} />
-            <Route path="/alerts" element={<AlertsPage />} />
-            <Route path="/reports/export" element={<ReportsExportPage />} />
+            <Route path="/investor/screener" element={<ScreenerPage />} />
+            <Route path="/investor/search" element={<GlobalSearchPage />} />
+            <Route path="/investor/discovery" element={<DiscoveryPage />} />
+            <Route path="/investor/calendar" element={<CalendarPage />} />
+            <Route path="/investor/news" element={<NewsPage />} />
+            <Route path="/investor/watchlists" element={<WatchlistsPage />} />
+            <Route path="/investor/portfolio" element={<PortfolioPage />} />
+            <Route path="/investor/alerts" element={<AlertsPage />} />
+            <Route path="/investor/reports/export" element={<ReportsExportPage />} />
+            <Route path="/investor/profile" element={<ProfilePage />} />
+            <Route path="/investor/settings" element={<SettingsPage />} />
+            <Route path="/investor/support" element={<HelpSupportPage />} />
+            <Route path="/investor/advanced-charts" element={<InvestorAdvancedCharts />} />
+
+            {/* Trader Specialized Routes */}
+            <Route path="/trader/profile" element={<TraderProfilePage />} />
+            <Route path="/trader/settings" element={<TraderSettingsPage />} />
+            <Route path="/trader/support" element={<TraderHelpSupportPage />} />
+            <Route path="/trader/terminal/:symbol" element={<TradeTerminalPage />} />
+            <Route path="/trader/charts/:symbol" element={<MinimalChartPage />} />
+
+            {/* Legacy/Redirect Routes */}
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<ProfileRoute />} />
-            <Route path="/trader-profile" element={<TraderProfilePage />} />
             <Route path="/settings" element={<SettingsRoute />} />
             <Route path="/support" element={<SupportRoute />} />
-            <Route path="/support/investor" element={<InvestorSupportRoute />} />
-            <Route path="/support/trader" element={<TraderSupportRoute />} />
             <Route path="/help" element={<SupportRoute />} />
             <Route path="/advanced-charts" element={<AdvancedChartsRoute />} />
+            
+            {/* Legacy Investor Mappings (Redirect to namespaced) */}
+            <Route path="/screener" element={<Navigate to="/investor/screener" replace />} />
+            <Route path="/search" element={<Navigate to="/investor/search" replace />} />
+            <Route path="/discovery" element={<Navigate to="/investor/discovery" replace />} />
+            <Route path="/calendar" element={<Navigate to="/investor/calendar" replace />} />
+            <Route path="/news" element={<Navigate to="/investor/news" replace />} />
+            <Route path="/watchlists" element={<Navigate to="/investor/watchlists" replace />} />
+            <Route path="/portfolio" element={<Navigate to="/investor/portfolio" replace />} />
+            <Route path="/alerts" element={<Navigate to="/investor/alerts" replace />} />
+            <Route path="/reports/export" element={<Navigate to="/investor/reports/export" replace />} />
+            <Route path="/trader-profile" element={<Navigate to="/trader/profile" replace />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/health" element={<Navigate to="/admin" replace />} />
             <Route path="/demo" element={<RealtimeDemoPage />} />

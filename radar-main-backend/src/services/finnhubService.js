@@ -80,7 +80,7 @@ class FinnhubService {
         },
       };
     } catch (error) {
-      logger.error(`Finnhub API error for ${symbol}:`, error.message);
+      logger.error(`Finnhub API error for ${symbol}: ${error.message}`);
       return {
         success: false,
         message: error.message,
@@ -117,7 +117,7 @@ class FinnhubService {
         data: response.data,
       };
     } catch (error) {
-      logger.error(`Finnhub company profile error:`, error.message);
+      logger.error(`Finnhub company profile error: ${error.message}`);
       return {
         success: false,
         message: error.message,
@@ -150,10 +150,18 @@ class FinnhubService {
   
   async testConnection() {
     try {
-      const result = await this.getQuote('AAPL');
+      // Use first active symbol from DB for connectivity test; fall back to AAPL
+      let testSymbol = 'AAPL';
+      try {
+        const { getActiveSymbols } = require('../utils/symbolRegistry');
+        const syms = await getActiveSymbols({ exchanges: ['NASDAQ', 'NYSE', 'NSE', 'BSE'] });
+        if (syms.length > 0) testSymbol = syms[0];
+      } catch (_) { /* keep default */ }
+
+      const result = await this.getQuote(testSymbol);
       return result.success;
     } catch (error) {
-      logger.error('Finnhub connection test failed:', error.message);
+      logger.error(`Finnhub connection test failed: ${error.message}`);
       return false;
     }
   }

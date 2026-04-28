@@ -1,9 +1,11 @@
 const axios = require('axios');
 const { generateHistory } = require('../utils/mockGenerator');
 const logger = require('../utils/logger');
+const { getActiveSymbolsWithSuffix, SEED_SYMBOLS } = require('../utils/symbolRegistry');
 
 const QUOTE_CACHE_TTL_MS = Number.parseInt(process.env.STOCK_QUOTES_CACHE_TTL_MS || '20000', 10);
-const PROVIDER_FAILURE_COOLDOWN_MS = Number.parseInt(process.env.STOCK_PROVIDER_FAILURE_COOLDOWN_MS || '180000', 10);
+// Reduced from 180s → 90s so blocked providers recover faster after transient failures
+const PROVIDER_FAILURE_COOLDOWN_MS = Number.parseInt(process.env.STOCK_PROVIDER_FAILURE_COOLDOWN_MS || '90000', 10);
 const WARNING_THROTTLE_MS = Number.parseInt(process.env.STOCK_WARNING_THROTTLE_MS || '60000', 10);
 const WARNING_THROTTLE_MAX_KEYS = Number.parseInt(process.env.STOCK_WARNING_THROTTLE_MAX_KEYS || '500', 10);
 const TIINGO_BASE_URL = 'https://api.tiingo.com/tiingo';
@@ -11,14 +13,47 @@ const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 const MARKETSTACK_BASE_URL = 'https://api.marketstack.com/v1';
 
 const DEFAULT_MARKET_REGION = String(process.env.DEFAULT_MARKET_REGION || 'IN').toUpperCase();
-const DEFAULT_STOCK_SYMBOLS_BY_REGION = {
-    IN: ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'ICICIBANK.NS', 'SBIN.NS', 'LT.NS', 'ITC.NS', 'HINDUNILVR.NS', 'KOTAKBANK.NS', 'BHARTIARTL.NS', 'BAJFINANCE.NS'],
-    US: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'JPM', 'XOM', 'UNH', 'WMT', 'BA'],
-    GLOBAL: ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'AAPL', 'MSFT', 'GOOGL', 'NVDA', 'TSLA', 'JPM', 'XOM', 'WMT'],
+
+// These are last-resort fallbacks only (used when DB is empty and no env override)
+// Keep them as a minimal sentinel — real symbols come from DB via getActiveSymbols()
+const FALLBACK_SYMBOLS_BY_REGION = {
+    IN: SEED_SYMBOLS.map(s => `${s}.NS`),
+    US: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'JPM', 'XOM', 'UNH'],
+    GLOBAL: SEED_SYMBOLS.slice(0, 5).map(s => `${s}.NS`),
 };
 
-const getDefaultSymbols = () => {
-    return DEFAULT_STOCK_SYMBOLS_BY_REGION[DEFAULT_MARKET_REGION] || DEFAULT_STOCK_SYMBOLS_BY_REGION.IN;
+// Cache for the DB-resolved list so we don't hit Mongo every request
+let _resolvedSymbolsCache = null;
+let _resolvedSymbolsExpiry = 0;
+const SYMBOLS_CACHE_TTL_MS = 5 * 60 * 1000; // re-read DB every 5 minutes
+
+const getDefaultSymbols = async () => {
+    // 1. Env override (comma-separated)
+    const fromEnv = process.env.STOCK_SYMBOLS;
+    if (fromEnv) {
+        const parsed = fromEnv.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+        if (parsed.length) return parsed;
+    }
+
+    // 2. DB cache
+    const now = Date.now();
+    if (_resolvedSymbolsCache && now < _resolvedSymbolsExpiry) {
+        return _resolvedSymbolsCache;
+    }
+
+    try {
+        const symbols = await getActiveSymbolsWithSuffix();
+        if (symbols.length > 0) {
+            _resolvedSymbolsCache = symbols;
+            _resolvedSymbolsExpiry = now + SYMBOLS_CACHE_TTL_MS;
+            return symbols;
+        }
+    } catch (err) {
+        logger.error(`stockService.getDefaultSymbols DB error: ${err.message}`);
+    }
+
+    // 3. Hardcoded fallback
+    return FALLBACK_SYMBOLS_BY_REGION[DEFAULT_MARKET_REGION] || FALLBACK_SYMBOLS_BY_REGION.IN;
 };
 
 let quotesCache = {
@@ -27,6 +62,10 @@ let quotesCache = {
 };
 
 let quotesInFlightPromise = null;
+
+// Stale-serve: keep the last known-good payload even after expiry
+// so we can serve it when all live providers fail
+let lastKnownGoodQuotes = null;
 
 const providerState = {
     yahoo: { blockedUntil: 0, lastError: null },
@@ -83,33 +122,9 @@ const warnThrottled = (key, message, meta = {}) => {
     logger.warn(message, meta);
 };
 
-const parseStockSymbols = () => {
-    const defaultSymbols = getDefaultSymbols();
-    const fromEnv = process.env.STOCK_SYMBOLS;
-    if (!fromEnv) {
-        return defaultSymbols;
-    }
-
-    const parsed = fromEnv
-        .split(',')
-        .map((value) => value.trim().toUpperCase())
-        .filter(Boolean);
-
-    if (!parsed.length) {
-        return defaultSymbols;
-    }
-
-    const merged = [...parsed];
-    for (const symbol of defaultSymbols) {
-        if (!merged.includes(symbol)) {
-            merged.push(symbol);
-        }
-        if (merged.length >= 12) {
-            break;
-        }
-    }
-
-    return merged;
+const parseStockSymbols = async () => {
+    // getDefaultSymbols already handles env override + DB + fallback
+    return getDefaultSymbols();
 };
 
 const fallbackStockMeta = {
@@ -125,13 +140,60 @@ const fallbackStockMeta = {
     'KOTAKBANK.NS': { name: 'Kotak Mahindra Bank Ltd', sector: 'Financial Services', peRatio: 22.8, dividendYield: 0.09 },
     'BHARTIARTL.NS': { name: 'Bharti Airtel Ltd', sector: 'Communication Services', peRatio: 64.4, dividendYield: 0.23 },
     'BAJFINANCE.NS': { name: 'Bajaj Finance Ltd', sector: 'Financial Services', peRatio: 35.7, dividendYield: 0.34 },
+    // ── No-suffix versions (Yahoo Finance often strips .NS) ──────────────────
+    RELIANCE:    { name: 'Reliance Industries Ltd',       sector: 'Energy',                  peRatio: 24.1,  dividendYield: 0.34 },
+    TCS:         { name: 'Tata Consultancy Services Ltd', sector: 'Information Technology',   peRatio: 30.6,  dividendYield: 1.17 },
+    HDFCBANK:    { name: 'HDFC Bank Ltd',                 sector: 'Financial Services',       peRatio: 18.9,  dividendYield: 0.97 },
+    INFY:        { name: 'Infosys Ltd',                   sector: 'Information Technology',   peRatio: 26.4,  dividendYield: 2.11 },
+    ICICIBANK:   { name: 'ICICI Bank Ltd',                sector: 'Financial Services',       peRatio: 20.2,  dividendYield: 0.72 },
+    SBIN:        { name: 'State Bank of India',           sector: 'Financial Services',       peRatio: 11.8,  dividendYield: 1.62 },
+    LT:          { name: 'Larsen & Toubro Ltd',           sector: 'Industrials',              peRatio: 33.1,  dividendYield: 0.91 },
+    ITC:         { name: 'ITC Ltd',                       sector: 'Consumer Defensive',       peRatio: 28.3,  dividendYield: 3.41 },
+    HINDUNILVR:  { name: 'Hindustan Unilever Ltd',        sector: 'Consumer Defensive',       peRatio: 56.7,  dividendYield: 1.58 },
+    KOTAKBANK:   { name: 'Kotak Mahindra Bank Ltd',       sector: 'Financial Services',       peRatio: 22.8,  dividendYield: 0.09 },
+    BHARTIARTL:  { name: 'Bharti Airtel Ltd',             sector: 'Communication Services',   peRatio: 64.4,  dividendYield: 0.23 },
+    BAJFINANCE:  { name: 'Bajaj Finance Ltd',             sector: 'Financial Services',       peRatio: 35.7,  dividendYield: 0.34 },
+    AXISBANK:    { name: 'Axis Bank Ltd',                 sector: 'Financial Services',       peRatio: 14.8,  dividendYield: 0.10 },
+    HCLTECH:     { name: 'HCL Technologies Ltd',          sector: 'Information Technology',   peRatio: 24.5,  dividendYield: 3.20 },
+    WIPRO:       { name: 'Wipro Ltd',                     sector: 'Information Technology',   peRatio: 22.1,  dividendYield: 0.09 },
+    TECHM:       { name: 'Tech Mahindra Ltd',             sector: 'Information Technology',   peRatio: 28.3,  dividendYield: 2.50 },
+    BAJAJFINSV:  { name: 'Bajaj Finserv Ltd',             sector: 'Financial Services',       peRatio: 16.5,  dividendYield: 0.07 },
+    MARUTI:      { name: 'Maruti Suzuki India Ltd',       sector: 'Consumer Cyclical',        peRatio: 28.9,  dividendYield: 0.86 },
+    TITAN:       { name: 'Titan Company Ltd',             sector: 'Consumer Cyclical',        peRatio: 89.2,  dividendYield: 0.27 },
+    ASIANPAINT:  { name: 'Asian Paints Ltd',              sector: 'Consumer Cyclical',        peRatio: 56.3,  dividendYield: 0.99 },
+    SUNPHARMA:   { name: 'Sun Pharmaceutical Industries', sector: 'Healthcare',               peRatio: 35.6,  dividendYield: 0.70 },
+    DRREDDY:     { name: 'Dr Reddys Laboratories Ltd',   sector: 'Healthcare',               peRatio: 19.8,  dividendYield: 0.52 },
+    CIPLA:       { name: 'Cipla Ltd',                     sector: 'Healthcare',               peRatio: 27.1,  dividendYield: 0.36 },
+    ONGC:        { name: 'Oil & Natural Gas Corporation', sector: 'Energy',                  peRatio: 8.2,   dividendYield: 4.80 },
+    NTPC:        { name: 'NTPC Ltd',                      sector: 'Utilities',                peRatio: 14.2,  dividendYield: 2.50 },
+    POWERGRID:   { name: 'Power Grid Corporation',        sector: 'Utilities',                peRatio: 17.1,  dividendYield: 3.90 },
+    COALINDIA:   { name: 'Coal India Ltd',                sector: 'Energy',                  peRatio: 7.4,   dividendYield: 6.20 },
+    TATASTEEL:   { name: 'Tata Steel Ltd',                sector: 'Basic Materials',          peRatio: 14.3,  dividendYield: 1.20 },
+    JSWSTEEL:    { name: 'JSW Steel Ltd',                 sector: 'Basic Materials',          peRatio: 18.6,  dividendYield: 0.95 },
+    HINDALCO:    { name: 'Hindalco Industries Ltd',       sector: 'Basic Materials',          peRatio: 11.2,  dividendYield: 0.70 },
+    ULTRACEMCO:  { name: 'UltraTech Cement Ltd',          sector: 'Basic Materials',          peRatio: 39.4,  dividendYield: 0.35 },
+    GRASIM:      { name: 'Grasim Industries Ltd',         sector: 'Basic Materials',          peRatio: 18.7,  dividendYield: 0.48 },
+    TATAMOTORS:  { name: 'Tata Motors Ltd',               sector: 'Consumer Cyclical',        peRatio: 9.1,   dividendYield: 0.40 },
+    M_M:         { name: 'Mahindra & Mahindra Ltd',       sector: 'Consumer Cyclical',        peRatio: 27.3,  dividendYield: 0.75 },
+    'M&M':       { name: 'Mahindra & Mahindra Ltd',       sector: 'Consumer Cyclical',        peRatio: 27.3,  dividendYield: 0.75 },
+    EICHERMOT:   { name: 'Eicher Motors Ltd',             sector: 'Consumer Cyclical',        peRatio: 31.5,  dividendYield: 1.20 },
+    HEROMOTOCO:  { name: 'Hero MotoCorp Ltd',             sector: 'Consumer Cyclical',        peRatio: 22.4,  dividendYield: 3.10 },
+    BPCL:        { name: 'Bharat Petroleum Corporation',  sector: 'Energy',                  peRatio: 5.9,   dividendYield: 5.70 },
+    IOC:         { name: 'Indian Oil Corporation Ltd',    sector: 'Energy',                  peRatio: 5.1,   dividendYield: 7.20 },
+    ADANIENT:    { name: 'Adani Enterprises Ltd',         sector: 'Industrials',              peRatio: 85.2,  dividendYield: 0.05 },
+    ADANIPORTS:  { name: 'Adani Ports & SEZ Ltd',         sector: 'Industrials',              peRatio: 28.4,  dividendYield: 0.60 },
+    ADANIGREEN:  { name: 'Adani Green Energy Ltd',        sector: 'Utilities',                peRatio: 210.5, dividendYield: 0 },
+    INDUSINDBK:  { name: 'IndusInd Bank Ltd',             sector: 'Financial Services',       peRatio: 10.2,  dividendYield: 1.40 },
+    HDFCLIFE:    { name: 'HDFC Life Insurance',           sector: 'Financial Services',       peRatio: 88.3,  dividendYield: 0.30 },
+    SBILIFE:     { name: 'SBI Life Insurance',            sector: 'Financial Services',       peRatio: 72.5,  dividendYield: 0.20 },
+    // ── US stocks ────────────────────────────────────────────────────────────
     AAPL: { name: 'Apple Inc.', sector: 'Technology', peRatio: 29.4, dividendYield: 0.52 },
     MSFT: { name: 'Microsoft Corporation', sector: 'Technology', peRatio: 36.1, dividendYield: 0.74 },
     GOOGL: { name: 'Alphabet Inc.', sector: 'Communication Services', peRatio: 24.3, dividendYield: 0.42 },
     AMZN: { name: 'Amazon.com Inc.', sector: 'Consumer Cyclical', peRatio: 52.8, dividendYield: 0 },
     META: { name: 'Meta Platforms Inc.', sector: 'Communication Services', peRatio: 28.9, dividendYield: 0.41 },
-    NVDA: { name: 'NVIDIA Corporation', sector: 'Semiconductors', peRatio: 64.2, dividendYield: 0.03 },
-    TSLA: { name: 'Tesla Inc.', sector: 'Automotive', peRatio: 62.5, dividendYield: 0 },
+    NVDA: { name: 'NVIDIA Corporation', sector: 'Technology', peRatio: 64.2, dividendYield: 0.03 },
+    TSLA: { name: 'Tesla Inc.', sector: 'Consumer Cyclical', peRatio: 62.5, dividendYield: 0 },
     JPM: { name: 'JPMorgan Chase & Co.', sector: 'Financial Services', peRatio: 13.7, dividendYield: 2.32 },
     XOM: { name: 'Exxon Mobil Corporation', sector: 'Energy', peRatio: 12.3, dividendYield: 3.41 },
     UNH: { name: 'UnitedHealth Group Incorporated', sector: 'Healthcare', peRatio: 21.1, dividendYield: 1.57 },
@@ -159,6 +221,14 @@ const fallbackStockMeta = {
             face_value: 10.00
         }
     },
+};
+
+// Lookup sector for a symbol — checks both suffixed and plain versions
+const resolveSectorForSymbol = (symbol) => {
+    const s = String(symbol || '').toUpperCase();
+    const meta = fallbackStockMeta[s]
+        || fallbackStockMeta[s.replace(/\.(NS|BO)$/i, '')];
+    return meta?.sector || null;
 };
 
 const fallbackPriceMap = {
@@ -222,17 +292,21 @@ const hasEnoughLiveData = (quotes) => {
     return validPriced >= Math.max(4, Math.floor(quotes.length * 0.5));
 };
 
-const buildStockDetails = (symbol, marketCap, sector, longName, peRatio, dividendYield) => ({
-    pe_ratio: Number.isFinite(peRatio) ? peRatio : fallbackStockMeta[symbol]?.peRatio ?? null,
-    market_cap: Number.isFinite(marketCap) ? `$${(marketCap / 1e9).toFixed(2)}B` : 'N/A',
-    dividend_yield: Number.isFinite(dividendYield)
-        ? dividendYield.toFixed(2)
-        : Number.isFinite(fallbackStockMeta[symbol]?.dividendYield)
-            ? Number(fallbackStockMeta[symbol].dividendYield).toFixed(2)
-            : 'N/A',
-    sector: sector || fallbackStockMeta[symbol]?.sector || 'Unknown',
-    about: `${longName || fallbackStockMeta[symbol]?.name || symbol} market data sourced from live providers.`,
-});
+const buildStockDetails = (symbol, marketCap, sector, longName, peRatio, dividendYield) => {
+    const resolvedSector = sector || resolveSectorForSymbol(symbol) || 'Unknown';
+    const meta = fallbackStockMeta[symbol] || fallbackStockMeta[String(symbol || '').replace(/\.(NS|BO)$/i, '')] || {};
+    return {
+        pe_ratio: Number.isFinite(peRatio) ? peRatio : meta.peRatio ?? null,
+        market_cap: Number.isFinite(marketCap) ? `$${(marketCap / 1e9).toFixed(2)}B` : 'N/A',
+        dividend_yield: Number.isFinite(dividendYield)
+            ? dividendYield.toFixed(2)
+            : Number.isFinite(meta.dividendYield)
+                ? Number(meta.dividendYield).toFixed(2)
+                : 'N/A',
+        sector: resolvedSector,
+        about: `${longName || meta.name || symbol} market data sourced from live providers.`,
+    };
+};
 
 const toStooqSymbol = (symbol) => {
     const normalized = String(symbol || '').toUpperCase();
@@ -289,6 +363,9 @@ const fetchYahooQuotes = async (symbols) => {
             name: item.longName || item.shortName || item.symbol,
             price: Number(item.regularMarketPrice) || 0,
             change: Number(item.regularMarketChangePercent) || 0,
+            volume: Number(item.regularMarketVolume) || 0,
+            dayLow: Number(item.regularMarketDayLow) || Number(item.regularMarketPrice) || 0,
+            dayHigh: Number(item.regularMarketDayHigh) || Number(item.regularMarketPrice) || 0,
             type: 'STOCK',
             details: buildStockDetails(
                 item.symbol.toUpperCase(),
@@ -321,6 +398,9 @@ const fetchYahooChartQuotes = async (symbols) => {
 
             const result = response.data?.chart?.result?.[0];
             const closes = result?.indicators?.quote?.[0]?.close || [];
+            const volumes = result?.indicators?.quote?.[0]?.volume || [];
+            const lows = result?.indicators?.quote?.[0]?.low || [];
+            const highs = result?.indicators?.quote?.[0]?.high || [];
             const validCloses = closes.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0);
 
             if (!validCloses.length) {
@@ -330,12 +410,18 @@ const fetchYahooChartQuotes = async (symbols) => {
             const last = validCloses[validCloses.length - 1];
             const previous = validCloses.length > 1 ? validCloses[validCloses.length - 2] : last;
             const change = previous > 0 ? Number((((last - previous) / previous) * 100).toFixed(2)) : 0;
+            const lastVol = volumes.length > 0 ? Number(volumes[volumes.length - 1]) : 0;
+            const lastLow = lows.length > 0 ? Number(lows[lows.length - 1]) : Number(last);
+            const lastHigh = highs.length > 0 ? Number(highs[highs.length - 1]) : Number(last);
 
             return {
                 symbol: normalizedSymbol,
                 name: result?.meta?.longName || result?.meta?.shortName || fallbackStockMeta[normalizedSymbol]?.name || normalizedSymbol,
                 price: Number(last.toFixed(2)),
                 change,
+                volume: Number.isFinite(lastVol) ? lastVol : 0,
+                dayLow: Number.isFinite(lastLow) ? Number(lastLow.toFixed(2)) : Number(last.toFixed(2)),
+                dayHigh: Number.isFinite(lastHigh) ? Number(lastHigh.toFixed(2)) : Number(last.toFixed(2)),
                 type: 'STOCK',
                 details: buildStockDetails(
                     normalizedSymbol,
@@ -837,26 +923,27 @@ const fetchYahooHistory = async (symbol, interval = '1D') => {
             }
 
             return {
-                date: new Date(timestamp * 1000).toLocaleString(),
+                timestamp: timestamp * 1000,
+                date: new Date(timestamp * 1000).toISOString(),
                 price: close,
             };
         })
         .filter(Boolean);
 };
 
-const fetchStockData = async () => {
+const fetchStockData = async (customSymbols = null) => {
     const now = Date.now();
-    if (quotesCache.data && now < quotesCache.expiresAt) {
+    if (!customSymbols && quotesCache.data && now < quotesCache.expiresAt) {
         return quotesCache.data;
     }
 
-    if (quotesInFlightPromise) {
+    if (!customSymbols && quotesInFlightPromise) {
         return quotesInFlightPromise;
     }
 
-    const symbols = parseStockSymbols();
+    const symbols = customSymbols || await parseStockSymbols();
 
-    quotesInFlightPromise = (async () => {
+    const fetchPromise = (async () => {
         let data = null;
 
         if (!isProviderBlocked('yahoo')) {
@@ -993,22 +1080,36 @@ const fetchStockData = async () => {
             }
         }
 
-        if (!data) {
-            warnThrottled(
-                'quotes:synthetic-fallback',
-                'All quote providers returned sparse/invalid data. Using synthetic fallback quotes.',
-            );
-            data = buildFallbackQuotes(symbols);
+        // Persist the fresh payload as last-known-good
+        if (data) {
+            lastKnownGoodQuotes = data;
         }
 
-        quotesCache = {
-            data,
-            expiresAt: Date.now() + QUOTE_CACHE_TTL_MS,
-        };
+        if (!data) {
+            if (lastKnownGoodQuotes) {
+                logger.warn(`All live quote providers failed. Serving stale cache for ${symbols.length} symbols.`);
+                return lastKnownGoodQuotes;
+            }
+            // Truly nothing available — log but don't crash; return empty so caller degrades gracefully
+            logger.error(`Live quotes unavailable for ${symbols.slice(0, 5).join(', ')}${symbols.length > 5 ? '...' : ''} — no stale fallback either.`);
+            return [];
+        }
+
+        if (!customSymbols) {
+            quotesCache = {
+                data,
+                expiresAt: Date.now() + QUOTE_CACHE_TTL_MS,
+            };
+        }
 
         return data;
     })();
 
+    if (customSymbols) {
+        return fetchPromise;
+    }
+
+    quotesInFlightPromise = fetchPromise;
     try {
         return await quotesInFlightPromise;
     } finally {
@@ -1017,7 +1118,7 @@ const fetchStockData = async () => {
 };
 
 const fetchStockHistory = async (symbol, interval = '1D', options = {}) => {
-    const { allowSynthetic = true } = options;
+    const { allowSynthetic = false } = options;
     const normalizedSymbol = String(symbol || '').toUpperCase();
     const normalizedInterval = String(interval || '1D').toUpperCase();
     const requiresIntraday = ['5M', '15M', '1H'].includes(normalizedInterval);
@@ -1148,8 +1249,10 @@ const fetchStockHistory = async (symbol, interval = '1D', options = {}) => {
                 if (parts.length < 5) return null;
                 const close = parseFloat(parts[4]);
                 if (!Number.isFinite(close)) return null;
+                const parsedDate = new Date(parts[0]);
                 return {
-                    date: new Date(parts[0]).toLocaleDateString(),
+                    timestamp: parsedDate.getTime(),
+                    date: parsedDate.toISOString(),
                     price: close
                 };
             }).filter(item => item !== null).reverse();

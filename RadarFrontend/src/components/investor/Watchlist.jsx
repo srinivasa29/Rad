@@ -178,7 +178,7 @@ const GridCard = ({ stock, onRemove }) => {
             <div className="bg-slate-50/50 border border-slate-100/60 rounded-xl p-3 mb-5">
                  <div className="flex justify-between items-center mb-1.5">
                      <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Buy Target</div>
-                     <div className="text-[11px] font-bold text-slate-600">{stock.targetPrice || 'â‚¹' + Math.floor(parseInt(stock.price.replace(/[^0-9]/g, '')) * 0.93).toLocaleString('en-IN')}</div>
+                     <div className="text-[11px] font-bold text-slate-600">{stock.targetPrice || '₹' + Math.floor(parseInt(stock.price.replace(/[^0-9]/g, '')) * 0.93).toLocaleString('en-IN')}</div>
                  </div>
                  
                  <div className="w-full bg-slate-200 rounded-full h-1.5 mb-1.5 overflow-hidden">
@@ -193,7 +193,10 @@ const GridCard = ({ stock, onRemove }) => {
             </div>
 
             <div className="flex items-center gap-2 mt-auto">
-                <button className="flex-1 bg-white border border-slate-200 hover:border-blue-500 hover:text-blue-700 text-slate-600 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm">
+                <button 
+                    onClick={() => alert(`Alert set for ${stock.name} at current levels.`)}
+                    className="flex-1 bg-white border border-slate-200 hover:border-blue-500 hover:text-blue-700 text-slate-600 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+                >
                      Set Alert
                 </button>
                  <button className="flex flex-[1.5] justify-center items-center gap-1.5 bg-[#3E84F6] hover:bg-[#3472d4] text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-md">
@@ -254,7 +257,7 @@ const DrillDownModal = ({ isOpen, onClose, metric, stockList }) => {
     const chartData = stockList.map(s => {
         let val = 0;
         if (metric.key === 'pe') {
-            val = parseFloat(s.pe.value.replace(/[^0-9.]/g, ''));
+            val = parseFloat(s.pe?.value?.replace(/[^0-9.]/g, '') || 0);
         } else {
             val = s[metric.key];
         }
@@ -309,7 +312,7 @@ const DrillDownModal = ({ isOpen, onClose, metric, stockList }) => {
                         <div>
                             <div className="text-[11px] font-black uppercase text-blue-600 tracking-wider mb-1">Stock Intelligence Insight</div>
                             <div className="text-[14px] font-bold text-slate-700 leading-relaxed">
-                                <span className="text-blue-700">{chartData[0].name}</span> {metric.insightPrefix} indicating {metric.insightSuffix} compared to others on your watchlist.
+                                <span className="text-blue-700">{chartData[0]?.name || 'N/A'}</span> {metric.insightPrefix} indicating {metric.insightSuffix} compared to others on your watchlist.
                             </div>
                         </div>
                     </div>
@@ -341,10 +344,14 @@ const HeatmapTile = ({ metric, leader, onClick }) => (
         </div>
         
         <div className="relative z-10">
-            <div className="text-[13px] font-black text-slate-800 mb-0.5 group-hover:text-blue-700 transition-colors">{leader.name}</div>
+            <div className="text-[13px] font-black text-slate-800 mb-0.5 group-hover:text-blue-700 transition-colors">{leader ? leader.name : 'N/A'}</div>
             <div className="flex items-baseline gap-1.5">
                 <span className={`text-[17px] font-black ${metric.colorClass}`}>
-                    {metric.key === 'pe' ? leader.pe.value : leader[metric.key]}
+                    {leader ? (
+                        metric.key === 'pe'
+                            ? (leader.pe?.value && leader.pe.value !== '...' ? leader.pe.value : '-')
+                            : (leader[metric.key] != null && leader[metric.key] !== '' ? leader[metric.key] : '-')
+                    ) : '-'}
                     <span className="text-[10px] ml-0.5 opacity-70">{metric.unit}</span>
                 </span>
             </div>
@@ -364,11 +371,7 @@ const HeatmapTile = ({ metric, leader, onClick }) => (
 const WatchlistHeatmap = ({ watchlist }) => {
     const [selectedMetric, setSelectedMetric] = useState(null);
 
-    const displayData = watchlist.length > 0 ? watchlist : [
-        { id: 's1', name: 'HDFC', price: '1650', changePercent: 0.4, valStatus: 'undervalued', beta: 0.85, pe: { value: '18.2' }, momentum: 5.2, volumeScore: 1.2, roe: 16.5 },
-        { id: 's2', name: 'REL', price: '2980', changePercent: 1.1, valStatus: 'fair', beta: 1.05, pe: { value: '24.5' }, momentum: 8.1, volumeScore: 2.1, roe: 14.2 },
-        { id: 's3', name: 'INFY', price: '1420', changePercent: -0.2, valStatus: 'fair', beta: 0.95, pe: { value: '21.0' }, momentum: -1.5, volumeScore: 0.8, roe: 28.4 }
-    ];
+    const displayData = watchlist;
 
     const metrics = [
         { 
@@ -458,8 +461,8 @@ const WatchlistHeatmap = ({ watchlist }) => {
             let valB = 0;
             
             if (metricKey === 'pe') {
-                valA = parseFloat(a.pe.value.replace(/[^0-9.]/g, ''));
-                valB = parseFloat(b.pe.value.replace(/[^0-9.]/g, ''));
+                valA = parseFloat(a.pe?.value?.replace(/[^0-9.]/g, '') || 0);
+                valB = parseFloat(b.pe?.value?.replace(/[^0-9.]/g, '') || 0);
             } else {
                 valA = a[metricKey];
                 valB = b[metricKey];
@@ -684,11 +687,38 @@ const Watchlist = () => {
     }, [on]);
     
     const stats = React.useMemo(() => {
-        const displayData = watchlist.length > 0 ? watchlist : [
-            { id: 's1', name: 'HDFC', price: '1650', changeToday: '+0.4%', isPositive: true, valStatus: 'undervalued', beta: 0.85, pe: { value: '18.2' }, sector: 'Banking' },
-            { id: 's2', name: 'REL', price: '2980', changeToday: '+1.1%', isPositive: true, valStatus: 'fair', beta: 1.05, pe: { value: '24.5' }, sector: 'Energy' },
-            { id: 's3', name: 'INFY', price: '1420', changeToday: '-0.2%', isPositive: false, valStatus: 'fair', beta: 0.95, pe: { value: '21.0' }, sector: 'IT' }
-        ];
+        const displayData = watchlist;
+
+        if (displayData.length === 0) {
+            return {
+                total: 0,
+                avgPE: 'N/A',
+                gains: 0,
+                losses: 0,
+                valuation: { label: 'N/A', breakdown: 'ADD STOCKS TO VIEW', color: 'slate' },
+                risk: { label: 'N/A', avgBeta: 'N/A', insight: 'No data available', color: 'slate' },
+                marketMirror: {
+                    volatility: {
+                        user: 'N/A',
+                        market: "1.00",
+                        isHigher: false,
+                        label: 'Add stocks to view'
+                    },
+                    sector: {
+                        top: 'N/A',
+                        perc: 0,
+                        isConcentrated: false,
+                        label: 'Add stocks to view'
+                    },
+                    valuation: {
+                        userPE: 'N/A',
+                        marketPE: 22.5,
+                        isHigher: false,
+                        label: 'Add stocks to view'
+                    }
+                }
+            };
+        }
 
         const total = displayData.length;
         const counts = { undervalued: 0, fair: 0, overvalued: 0 };
@@ -715,16 +745,16 @@ const Watchlist = () => {
         };
 
         let valStatusLabel = "Mixed Valuation";
-        let valColor = "text-amber-500";
-        if (percs.undervalued > 50) { valStatusLabel = "Undervalued Opportunity"; valColor = "text-blue-600"; }
-        else if (counts.fair > total / 2) { valStatusLabel = "Fairly Valued"; valColor = "text-amber-600"; }
-        else if (percs.overvalued > 50) { valStatusLabel = "Overvalued Zone"; valColor = "text-rose-600"; }
+        let valColorKey = "amber";
+        if (percs.undervalued > 50) { valStatusLabel = "Undervalued Opportunity"; valColorKey = "blue"; }
+        else if (counts.fair > total / 2) { valStatusLabel = "Fairly Valued"; valColorKey = "amber"; }
+        else if (percs.overvalued > 50) { valStatusLabel = "Overvalued Zone"; valColorKey = "rose"; }
 
         const avgBeta = displayData.reduce((acc, s) => acc + (s.beta || 1), 0) / total;
         let riskLabel = "Moderate Risk";
-        let riskColor = "text-amber-500";
-        if (avgBeta < 0.8) { riskLabel = "Low Risk"; riskColor = "text-blue-600"; }
-        else if (avgBeta > 1.2) { riskLabel = "High Risk"; riskColor = "text-rose-600"; }
+        let riskColorKey = "amber";
+        if (avgBeta < 0.8) { riskLabel = "Low Risk"; riskColorKey = "blue"; }
+        else if (avgBeta > 1.2) { riskLabel = "High Risk"; riskColorKey = "rose"; }
 
         const sectorCounts = {};
         displayData.forEach(s => {
@@ -738,18 +768,18 @@ const Watchlist = () => {
         const benchmarkTopSector = "Banking";
         
         return {
-            total: watchlist.length, // Show actual total for the badge
+            total: watchlist.length,
             avgPE,
             gains: displayData.filter(s => s.isPositive).length,
             losses: displayData.filter(s => !s.isPositive).length,
             valuation: {
                 label: valStatusLabel,
-                color: valColor,
-                breakdown: `${percs.fair}% Fair â€¢ ${percs.overvalued}% Over â€¢ ${percs.undervalued}% Under`
+                colorKey: valColorKey,
+                breakdown: `${percs.fair}% Fair • ${percs.overvalued}% Over • ${percs.undervalued}% Under`
             },
             risk: {
                 label: riskLabel,
-                color: riskColor,
+                colorKey: riskColorKey,
                 avgBeta: avgBeta.toFixed(2),
                 insight: avgBeta > 1.05 ? "More volatile than market" : (avgBeta < 0.95 ? "Less volatile than market" : "Market-aligned volatility")
             },
@@ -776,6 +806,46 @@ const Watchlist = () => {
         };
     }, [watchlist]);
 
+    const dynamicAttentionStocks = React.useMemo(() => {
+        if (!watchlist.length) return [];
+        return [...watchlist]
+            .filter(s => !s.isPositive || (s.beta > 1.2) || parseFloat(s.pe?.value || '0') > 30)
+            .sort((a, b) => {
+                const aChange = parseFloat(a.changeToday?.replace(/[^0-9.-]/g, '') || 0);
+                const bChange = parseFloat(b.changeToday?.replace(/[^0-9.-]/g, '') || 0);
+                return aChange - bChange;
+            })
+            .slice(0, 3)
+            .map(s => ({
+                id: s.id,
+                name: s.name,
+                price: s.price,
+                change: s.changeToday,
+                isPositive: s.isPositive,
+                tagTop: !s.isPositive ? 'Price Drop' : (s.beta > 1.2 ? 'High Volatility' : 'Valuation Alert'),
+                tagTopColor: !s.isPositive ? 'rose' : (s.beta > 1.2 ? 'amber' : 'amber'),
+                insight: !s.isPositive ? `Stock has dropped ${s.changeToday} today, breaking recent support levels.` : `Trading at elevated risk metrics compared to historical averages.`
+            }));
+    }, [watchlist]);
+
+    const dynamicRecentChanges = React.useMemo(() => {
+        if (!watchlist.length) return [];
+        return [...watchlist]
+            .sort((a, b) => {
+                const aChange = Math.abs(parseFloat(a.changeToday?.replace(/[^0-9.-]/g, '') || 0));
+                const bChange = Math.abs(parseFloat(b.changeToday?.replace(/[^0-9.-]/g, '') || 0));
+                return bChange - aChange;
+            })
+            .slice(0, 2)
+            .map(s => ({
+                title: `${s.name} ${s.isPositive ? 'Momentum Shift' : 'Volume Breakout'}`,
+                desc: s.isPositive ? `Strong upward movement of ${s.changeToday} observed in recent sessions.` : `Significant downward pressure of ${s.changeToday} triggering volume alerts.`,
+                type: s.isPositive ? 'positive' : 'negative',
+                date: 'Today',
+                time: 'Live'
+            }));
+    }, [watchlist]);
+
     const handleRemoveFromWatchlist = async (stockSymbol) => {
         // Optimistic UI update
         const backup = [...watchlist];
@@ -797,12 +867,17 @@ const Watchlist = () => {
             id: Date.now(), 
             name: stockSymbol.split('.')[0], 
             sym: stockSymbol, 
-            price: 'â‚¹...', 
+            price: '₹...', 
             changeToday: '...', 
             isPositive: true, 
             pe: { value: '...' }, 
             valStatus: 'fair', 
             beta: 1.0, 
+            delivery: null,
+            momentum: null,
+            volumeScore: null,
+            roe: null,
+            sector: 'Equity',
             sparkline: mockSparklinePositive 
         };
         setWatchlist(prev => [...prev, placeholder]);
@@ -854,17 +929,28 @@ const Watchlist = () => {
                     </div>
                 </div>
 
-            {/* Dashboard structure is now permanent to keep the "essence" */}
             <div className="space-y-6">
-                {watchlist.length === 0 && !isLoadingLive && (
-                    <div className="bg-blue-600/5 border border-blue-200 border-dashed rounded-[20px] p-4 text-center mb-4">
-                        <p className="text-[12px] font-bold text-blue-700 flex items-center justify-center gap-2">
-                            <Info size={14} /> 
-                            Your personal watchlist is empty. Showing live market suggestions to keep your Intelligence Hub active.
-                        </p>
+
+                {/* Loading state */}
+                {isLoadingLive && (
+                    <div className="flex flex-col items-center justify-center p-16 bg-white rounded-[20px] border border-slate-100 shadow-sm min-h-[400px]">
+                        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+                            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                        <div className="text-slate-800 font-bold mb-1">Syncing Intelligence Hub</div>
+                        <div className="text-slate-500 text-[12px]">Connecting to live market feeds...</div>
                     </div>
                 )}
-                    {}
+
+                {/* Empty state — no stocks tracked */}
+                {!isLoadingLive && watchlist.length === 0 && (
+                    <EmptyState onAdd={handleAddToWatchlist} />
+                )}
+
+                {/* Full dashboard — only shown when stocks exist */}
+                {!isLoadingLive && watchlist.length > 0 && (
+                    <>
+                    {/* Watchlist Overview */}
                     <div className="bg-white rounded-[20px] shadow-sm border border-slate-100 p-5 md:p-6">
                         <div className="text-[11px] font-black uppercase text-slate-400 tracking-widest mb-4 flex items-center">
                             Watchlist Overview
@@ -888,14 +974,12 @@ const Watchlist = () => {
                                         Watchlist Valuation Snapshot
                                         <TooltipInfo text="Based on valuation classification of tracked stocks" />
                                     </div>
-                                    <div className="text-lg font-black text-slate-800">
-                                        {stats?.valuation?.label}
-                                    </div>
+                                    <div className="text-lg font-black text-slate-800">{stats?.valuation?.label}</div>
                                     <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{stats?.valuation?.breakdown}</div>
                                 </div>
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${
-                                    stats?.valuation?.color.includes('blue') ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                    stats?.valuation?.color.includes('rose') ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+                                    stats?.valuation?.colorKey === 'blue' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                    stats?.valuation?.colorKey === 'rose' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100'
                                 }`}>
                                     {stats?.valuation?.label === "Undervalued Opportunity" ? <TrendingUp size={18}/> : stats?.valuation?.label === "Overvalued Zone" ? <TrendingDown size={18}/> : <CheckCircle size={18}/>}
                                 </div>
@@ -913,8 +997,8 @@ const Watchlist = () => {
                                     <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 italic pr-2">"{stats?.risk?.insight}"</div>
                                 </div>
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${
-                                    stats?.risk?.color.includes('blue') ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                    stats?.risk?.color.includes('rose') ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+                                    stats?.risk?.colorKey === 'blue' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                    stats?.risk?.colorKey === 'rose' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100'
                                 }`}>
                                    <Activity size={18}/>
                                 </div>
@@ -923,7 +1007,7 @@ const Watchlist = () => {
                             <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex items-center justify-between cursor-pointer hover:border-slate-200 transition-colors group">
                                 <div>
                                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Needs Attention</div>
-                                    <div className="text-2xl font-black text-amber-600">3 <span className="text-[11px] font-bold opacity-70 text-slate-500">Stocks</span></div>
+                                    <div className="text-2xl font-black text-amber-600">{dynamicAttentionStocks.length} <span className="text-[11px] font-bold opacity-70 text-slate-500">Stocks</span></div>
                                 </div>
                                 <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform border border-amber-100/50">
                                     <AlertTriangle size={18} />
@@ -932,9 +1016,8 @@ const Watchlist = () => {
                         </div>
                     </div>
 
-                    {}
+                    {/* What Needs Attention + Recent Changes */}
                     <div className="flex flex-col lg:flex-row gap-6">
-                        {}
                         <div className="lg:w-[65%] bg-white rounded-[20px] shadow-sm border border-slate-100 p-5 md:p-6 transition-all">
                             <div className="flex items-center justify-between mb-5">
                                 <h3 className="text-[15px] font-black text-slate-800 flex items-center gap-2">
@@ -945,28 +1028,30 @@ const Watchlist = () => {
                                 <span className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-md">Priority Review</span>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {mockAttentionStocks.map(stock => (
+                                {dynamicAttentionStocks.length > 0 ? dynamicAttentionStocks.map(stock => (
                                     <AttentionCard key={stock.id} stock={stock} />
-                                ))}
+                                )) : (
+                                    <div className="col-span-1 md:col-span-3 py-8 text-center text-slate-500 text-[13px] font-medium border border-dashed border-slate-200 rounded-xl">
+                                        All clear — no stocks require immediate attention.
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        {}
                         <div className="lg:w-[35%] bg-white rounded-[20px] shadow-sm border border-slate-100 p-6 md:p-8 flex flex-col h-full min-h-[380px]">
                             <h3 className="text-[16px] font-black text-slate-800 mb-6 flex items-center gap-2">
                                 <Activity size={18} className="text-blue-500" />
                                 Recent Changes
                                 <TooltipInfo text="A chronological activity log of objective, factual events affecting the stocks on your watchlist." />
                             </h3>
-                            
                             <div className="flex-grow space-y-6">
-                                {mockRecentChanges.map((change, i) => (
+                                {dynamicRecentChanges.map((change, i) => (
                                     <div key={i} className="flex gap-4 relative">
                                         <div className="mt-1.5 flex flex-col items-center">
-                                            {change.type === 'positive' ? <div className="w-3 h-3 rounded-full bg-blue-500 ring-4 ring-blue-50 relative z-10"></div> : 
-                                             change.type === 'negative' ? <div className="w-3 h-3 rounded-full bg-rose-500 ring-4 ring-rose-50 relative z-10"></div> : 
+                                            {change.type === 'positive' ? <div className="w-3 h-3 rounded-full bg-blue-500 ring-4 ring-blue-50 relative z-10"></div> :
+                                             change.type === 'negative' ? <div className="w-3 h-3 rounded-full bg-rose-500 ring-4 ring-rose-50 relative z-10"></div> :
                                              <div className="w-3 h-3 rounded-full bg-amber-500 ring-4 ring-amber-50 relative z-10"></div>}
-                                            {i !== mockRecentChanges.length - 1 && <div className="w-px h-full bg-slate-100 absolute top-4"></div>}
+                                            {i !== dynamicRecentChanges.length - 1 && <div className="w-px h-full bg-slate-100 absolute top-4"></div>}
                                         </div>
                                         <div className="pb-2 w-full">
                                             <div className="flex justify-between items-start w-full">
@@ -978,7 +1063,6 @@ const Watchlist = () => {
                                     </div>
                                 ))}
                             </div>
-                            
                             <div className="mt-auto pt-6">
                                 <button className="w-full text-[12px] font-bold text-blue-700 bg-blue-50/50 border border-blue-100/60 py-3 rounded-[12px] hover:bg-blue-50 hover:border-blue-200 transition-colors">
                                     View Full Activity Log
@@ -987,17 +1071,14 @@ const Watchlist = () => {
                         </div>
                     </div>
 
-                    {}
+                    {/* Watchlist Holdings grid */}
                     <div className="bg-white rounded-[20px] shadow-sm border border-slate-100 p-5 md:p-6">
-                        {}
                         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                             <h3 className="text-[15px] font-black text-slate-800 flex items-center">
                                 Watchlist Holdings
                                 <TooltipInfo text="Your primary grid of tracked stocks, displaying real-time technicals, valuations, and customized target proximity bars." />
                             </h3>
-                            
                             <div className="flex items-center gap-3">
-                                {}
                                 <div className="relative group">
                                     <button className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-slate-600 text-[11px] font-bold hover:bg-slate-50 hover:text-blue-700 hover:border-blue-200 transition-all shadow-sm">
                                         <Filter size={13} className="text-slate-400 group-hover:text-blue-500" />
@@ -1005,83 +1086,30 @@ const Watchlist = () => {
                                         <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[9px] ml-1 group-hover:bg-blue-50 group-hover:text-blue-700">All Tracks</span>
                                         <ChevronDown size={14} className="ml-1 opacity-60" />
                                     </button>
-                                    
-                                    {}
-                                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 overflow-hidden transform origin-top-right scale-95 group-hover:scale-100">
-                                        <div className="px-3 py-2 border-b border-slate-100 text-[10px] uppercase font-bold text-slate-400">Filter By Tag</div>
-                                        <div className="p-1">
-                                            <button className="w-full text-left px-3 py-2 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg mb-1 flex items-center justify-between">
-                                                 All Tracks
-                                                 <CheckCircle size={12} className="text-blue-500" />
-                                            </button>
-                                            <button className="w-full text-left px-3 py-2 text-[12px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg mb-1">
-                                                 Undervalued
-                                            </button>
-                                            <button className="w-full text-left px-3 py-2 text-[12px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg mb-1">
-                                                 Momentum
-                                            </button>
-                                            <button className="w-full text-left px-3 py-2 text-[12px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg">
-                                                 Risk Alert
-                                            </button>
-                                        </div>
-                                    </div>
                                 </div>
-
-                                {}
                                 <div className="relative group">
                                     <button className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-slate-600 text-[11px] font-bold hover:bg-slate-100 transition-colors shadow-sm">
                                         Sort: <span className="text-blue-700">Valuation Gap</span>
                                         <ChevronDown size={14} />
                                     </button>
-                                    
-                                    {}
-                                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 overflow-hidden transform origin-top-right scale-95 group-hover:scale-100">
-                                        <div className="px-3 py-2 border-b border-slate-100 text-[10px] uppercase font-bold text-slate-400">Sort By</div>
-                                        <div className="p-1">
-                                            <button className="w-full text-left px-3 py-2 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg mb-1 flex items-center justify-between">
-                                                 Valuation Gap (Target)
-                                                 <CheckCircle size={12} className="text-blue-500" />
-                                            </button>
-                                            <button className="w-full text-left px-3 py-2 text-[12px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg mb-1">
-                                                 % Change: Gainers
-                                            </button>
-                                            <button className="w-full text-left px-3 py-2 text-[12px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg mb-1">
-                                                 % Change: Losers
-                                            </button>
-                                            <button className="w-full text-left px-3 py-2 text-[12px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg mb-1">
-                                                 Highest Volume
-                                            </button>
-                                            <button className="w-full text-left px-3 py-2 text-[12px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg">
-                                                 Alphabetical A-Z
-                                            </button>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
-
-                        {}
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {(watchlist.length > 0 ? watchlist : [
-                                { id: 'suggest-1', name: 'HDFC Bank', sym: 'HDFCBANK.NS', price: 'â‚¹1,652', changeToday: '+0.4%', isPositive: true, pe: { value: '18.2' }, valStatus: 'undervalued', beta: 0.8 },
-                                { id: 'suggest-2', name: 'Reliance', sym: 'RELIANCE.NS', price: 'â‚¹2,980', changeToday: '+1.1%', isPositive: true, pe: { value: '24.5' }, valStatus: 'fair', beta: 1.0 },
-                                { id: 'suggest-3', name: 'Infosys', sym: 'INFY.NS', price: 'â‚¹1,420', changeToday: '-0.2%', isPositive: false, pe: { value: '21.0' }, valStatus: 'fair', beta: 0.9 },
-                            ]).map(stock => (
-                                <GridCard 
-                                    key={stock.id} 
-                                    stock={stock} 
-                                    onRemove={() => handleRemoveFromWatchlist(stock.sym)} 
+                            {watchlist.map(stock => (
+                                <GridCard
+                                    key={stock.id}
+                                    stock={stock}
+                                    onRemove={() => handleRemoveFromWatchlist(stock.sym)}
                                 />
                             ))}
                         </div>
                     </div>
 
-                    {}
+                    {/* Market Behavior Mirror + Heatmap */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {}
                         <MarketBehaviorMirror stats={stats} />
 
-                        {}
                         <div className="bg-white rounded-[20px] shadow-sm border border-slate-100 p-5 md:p-6 opacity-95">
                             <div className="flex items-center justify-between mb-1">
                                 <div className="flex items-center gap-2 text-slate-800 font-black text-[15px]">
@@ -1092,14 +1120,15 @@ const Watchlist = () => {
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Research Tool</span>
                             </div>
                             <div className="text-[11px] font-medium text-slate-500 mb-5">Click any tile to compare all tracked stocks</div>
-                            
                             <div className="h-[250px] sm:h-[300px]">
                                 <WatchlistHeatmap watchlist={watchlist} />
                             </div>
                         </div>
                     </div>
-                </div>
+                    </>
+                )}
             </div>
+        </div>
         </div>
         </div>
     );

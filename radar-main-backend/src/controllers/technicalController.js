@@ -1,10 +1,30 @@
+const Watchlist = require('../models/Watchlist');
 const { fetchStockData } = require('../services/stockService');
 const { getTechnicalIndicators, getTrendMatrix } = require('../services/indicatorService');
 const { getInstrumentScore } = require('../services/scoringService');
 const { detectPatterns } = require('../services/patternService');
+
 const getWatchlistData = async (req, res) => {
     try {
-        const stocks = await fetchStockData();
+        let customSymbols = null;
+        if (req.user && req.user._id) {
+            const watchlists = await Watchlist.find({ userId: req.user._id });
+            if (watchlists && watchlists.length > 0) {
+                const allSymbols = new Set();
+                watchlists.forEach(wl => {
+                    if (wl.items && Array.isArray(wl.items)) {
+                        wl.items.forEach(item => {
+                            if (item.symbol) allSymbols.add(item.symbol);
+                        });
+                    }
+                });
+                if (allSymbols.size > 0) {
+                    customSymbols = Array.from(allSymbols);
+                }
+            }
+        }
+
+        const stocks = await fetchStockData(customSymbols);
         const technicalWatchlist = stocks.map(stock => {
             const currentPrice = stock.price;
             const vwap = (currentPrice * 0.98).toFixed(2);
@@ -21,9 +41,11 @@ const getWatchlistData = async (req, res) => {
         });
         res.json(technicalWatchlist);
     } catch (error) {
+        console.error('Error in getWatchlistData:', error);
         res.status(500).json({ error: 'Server Error' });
     }
 };
+
 const getBreakoutAlerts = (req, res) => {
     res.json([
         { symbol: "NVDA", type: "Resistance Breakout", price: 460.18, time: "10:30 AM" },
@@ -33,23 +55,16 @@ const getBreakoutAlerts = (req, res) => {
 
 const getIndicatorSignals = (req, res) => {
     res.json([
-        { symbol: "RSI", value: "Overbought (>70)", stocks: ["TSLA", "META"] },
-        { symbol: "MACD", value: "Bullish Crossover", stocks: ["AAPL", "AMZN"] }
+        { symbol: "AAPL", signal: "BULLISH", indicator: "RSI Oversold", strength: "High" },
+        { symbol: "TSLA", signal: "BEARISH", indicator: "MACD Crossover", strength: "Medium" }
     ]);
 };
 
 const getQuickOrderData = (req, res) => {
-    const { symbol } = req.params;
     res.json({
-        symbol: symbol.toUpperCase(),
-        bids: [
-            { price: 150.00, size: 500 },
-            { price: 149.95, size: 300 }
-        ],
-        asks: [
-            { price: 150.05, size: 200 },
-            { price: 150.10, size: 600 }
-        ]
+        availableBalance: 25420.50,
+        buyingPower: 101682.00,
+        marginUsed: 0.00
     });
 };
 

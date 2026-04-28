@@ -67,15 +67,15 @@ export default function StockCard({ stock, isSelected, onClick, onDeepResearch }
       <div className="levels-grid">
         <div className="level-item">
           <span className="level-label">Entry</span>
-          <span className="level-price text-sky-400">â‚¹{stock.entry}</span>
+          <span className="level-price text-sky-400">₹{stock.entry}</span>
         </div>
         <div className="level-item">
           <span className="level-label">Target</span>
-          <span className="level-price text-emerald-400">â‚¹{stock.target}</span>
+          <span className="level-price text-emerald-400">₹{stock.target}</span>
         </div>
         <div className="level-item">
           <span className="level-label">Stop Loss</span>
-          <span className="level-price text-rose-400">â‚¹{stock.sl}</span>
+          <span className="level-price text-rose-400">₹{stock.sl}</span>
         </div>
       </div>
 

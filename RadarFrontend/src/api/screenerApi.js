@@ -9,3 +9,19 @@ export const runScreenerScan = async (filters) => {
         throw error;
     }
 };
+
+export const createCustomFilter = async ({ name, options, logicQuery }) => {
+    const response = await api.post('/screener/filters', { name, options, logicQuery });
+    return response.data;
+};
+
+export const getCustomFilters = async () => {
+    const response = await api.get('/screener/filters');
+    return response.data;
+};
+
+export const deleteCustomFilter = async (id) => {
+    const response = await api.delete(`/screener/filters/${id}`);
+    return response.data;
+};
+

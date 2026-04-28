@@ -4,6 +4,7 @@ const { calculatePortfolioRisk } = require('../services/portfolioRiskService');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const asyncHandler = require('express-async-handler');
+const sendEmail = require('../services/mailService');
 const logger = require('../config/logger');
 
 
@@ -134,14 +135,92 @@ const loginUser = asyncHandler(async (req, res) => {
 });
 
 const getUserProfile = asyncHandler(async (req, res) => {
+    const u = req.user;
     res.json({
-        _id: req.user._id,
-        username: req.user.username,
-        email: req.user.email || null,
-        preferredMode: req.user.preferredMode,
-        watchlist: req.user.watchlist,
-        settings: req.user.settings || {}
+        _id:          u._id,
+        username:     u.username,
+        email:        u.email || null,
+        preferredMode: u.preferredMode,
+        createdAt:    u.createdAt,
+        joinedDate:   u.createdAt
+            ? `Joined ${new Date(u.createdAt).toLocaleString('en-US', { month: 'short', year: 'numeric' })}`
+            : null,
+        watchlist:    u.watchlist,
+        settings:     u.settings || {},
+        investorDNA:  u.investorDNA || null,
+        notificationPreferences: u.notificationPreferences || {
+            priceAlerts: true,
+            earningsUpdates: true,
+            importantNews: true
+        }
     });
+});
+
+const updateUserProfile = asyncHandler(async (req, res) => {
+    const { username, email } = req.body;
+    const user = req.user;
+
+    if (username && username !== user.username) {
+        const taken = await User.findOne({ username, _id: { $ne: user._id } });
+        if (taken) return res.status(400).json({ error: 'Username already taken' });
+        user.username = username.trim();
+    }
+    if (email && email !== user.email) {
+        user.email = email.trim().toLowerCase();
+    }
+
+    await user.save();
+    res.json({
+        success: true,
+        data: { username: user.username, email: user.email }
+    });
+});
+
+const saveInvestorDNA = asyncHandler(async (req, res) => {
+    const {
+        dominant, personaName, personaDescription,
+        investorPercent, traderPercent, traits,
+        hybridLine, confidence, metrics
+    } = req.body;
+
+    const user = req.user;
+    user.investorDNA = {
+        dominant,
+        personaName,
+        personaDescription,
+        investorPercent,
+        traderPercent,
+        traits: traits || [],
+        hybridLine,
+        confidence,
+        metrics: metrics || {},
+        completedAt: new Date()
+    };
+    // Also update preferredMode to match DNA result
+    if (dominant === 'TRADER' || dominant === 'INVESTOR') {
+        user.preferredMode = dominant;
+    }
+
+    await user.save();
+    res.json({ success: true, data: user.investorDNA });
+});
+
+const updateNotificationPreferences = asyncHandler(async (req, res) => {
+    const { priceAlerts, earningsUpdates, importantNews } = req.body;
+    const user = req.user;
+
+    if (!user.notificationPreferences) {
+        user.notificationPreferences = {};
+    }
+    if (priceAlerts     !== undefined) user.notificationPreferences.priceAlerts     = Boolean(priceAlerts);
+    if (earningsUpdates !== undefined) user.notificationPreferences.earningsUpdates = Boolean(earningsUpdates);
+    if (importantNews   !== undefined) user.notificationPreferences.importantNews   = Boolean(importantNews);
+
+    // Mark the nested path as modified (Mongoose quirk for nested objects)
+    user.markModified('notificationPreferences');
+    await user.save();
+
+    res.json({ success: true, data: user.notificationPreferences });
 });
 
 const getMode = asyncHandler(async (req, res) => {
@@ -179,6 +258,7 @@ const getUserPortfolio = asyncHandler(async (req, res) => {
         dayChange: Number(dayChange.toFixed(2)),
         dayChangePercent: Number(((dayChange / currentValue) * 100).toFixed(2)),
         riskLevel: riskData.riskLevel,
+        sectorWeights: riskData.sectorWeights,
         chartData: [2100, 2150, 2120, 2180, 2200, 2190, 2250] // Mock growth chart
     });
 });
@@ -201,15 +281,13 @@ const getUserPerformance = asyncHandler(async (req, res) => {
 });
 
 const getUserHoldings = asyncHandler(async (req, res) => {
-    const portfolio = await Portfolio.findOne({ user: req.user._id });
-    const holdings = (portfolio?.holdings || []).map(h => ({
-        symbol: h.symbol,
-        quantity: h.quantity,
-        avgPrice: h.avgBuyPrice,
-        currentPrice: h.avgBuyPrice * (1 + (Math.random() * 0.2 - 0.1)), // Mock current price
-        allocation: 25, // Mock allocation
-        pnl: 1500,
-        pnlPercent: 5.4
+    const riskData = await calculatePortfolioRisk(req.user._id);
+    const holdings = riskData.concentration.map(c => ({
+        symbol: c.symbol,
+        sector: c.sector,
+        currentPrice: c.price,
+        allocation: c.weightPct,
+        value: c.value
     }));
     
     res.json(holdings);
@@ -227,8 +305,17 @@ const getUserInsights = asyncHandler(async (req, res) => {
         insights.push({ type: 'info', text: `High exposure to ${riskData.concentration[0].symbol} (${riskData.concentration[0].weightPct.toFixed(1)}%). Consider rebalancing.` });
     }
 
-    insights.push({ type: 'success', text: "Outperforming Nifty 50 by 4.2% over the last 6 months." });
-    insights.push({ type: 'info', text: "Technology sector allocation (45%) is higher than benchmark." });
+    if (riskData.sectorWeights.length > 0 && riskData.sectorWeights[0].weightPct > 40) {
+        insights.push({ type: 'info', text: `${riskData.sectorWeights[0].name} sector allocation (${riskData.sectorWeights[0].weightPct.toFixed(1)}%) is higher than typical benchmarks.` });
+    }
+
+    // Dynamic positive insight
+    const user = req.user;
+    if (user.investorDNA?.personaName) {
+        insights.push({ type: 'success', text: `Your ${user.investorDNA.personaName} persona is currently aligned with the market mood.` });
+    } else {
+        insights.push({ type: 'success', text: "Portfolio strategy is currently aligned with market mood." });
+    }
 
     res.json(insights);
 });
@@ -251,10 +338,92 @@ const getUserEvents = asyncHandler(async (req, res) => {
     ]);
 });
 
+const forgotPassword = asyncHandler(async (req, res) => {
+    const user = await User.findOne({ email: req.body.email });
+
+    if (!user) {
+        return res.status(404).json({ error: 'There is no user with that email' });
+    }
+
+    // Get reset token
+    const resetToken = user.getResetPasswordToken();
+
+    await user.save({ validateBeforeSave: false });
+
+    // Create reset URL
+    const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+    const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please click the link below to reset your password: \n\n ${resetUrl}`;
+
+    try {
+        await sendEmail({
+            email: user.email,
+            subject: 'Password recovery link',
+            message,
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <h2 style="color: #10706B;">Password Reset Request</h2>
+                    <p>You are receiving this email because you (or someone else) has requested the reset of a password for your RADAR account.</p>
+                    <p>Please click the button below to reset your password. This link is valid for 10 minutes.</p>
+                    <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #10706B; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a>
+                    <p style="margin-top: 20px; font-size: 0.8em; color: #777;">If you did not request this, please ignore this email and your password will remain unchanged.</p>
+                </div>
+            `
+        });
+
+        res.status(200).json({ success: true, data: 'Email sent' });
+    } catch (err) {
+        console.error(err);
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+
+        await user.save({ validateBeforeSave: false });
+
+        return res.status(500).json({ error: 'Email could not be sent' });
+    }
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+    // Get hashed token
+    const resetPasswordToken = crypto
+        .createHash('sha256')
+        .update(req.params.resetToken)
+        .digest('hex');
+
+    const user = await User.findOne({
+        resetPasswordToken,
+        resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+        return res.status(400).json({ error: 'Invalid or expired token' });
+    }
+
+    // Set new password
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+    res.status(200).json({
+        success: true,
+        data: 'Password reset successful',
+        token: generateToken(user._id)
+    });
+});
+
 module.exports = { 
     registerUser, 
     loginUser, 
-    getUserProfile, 
+    googleAuth,
+    forgotPassword,
+    resetPassword,
+    getUserProfile,
+    updateUserProfile,
+    saveInvestorDNA,
+    updateNotificationPreferences,
     getMode, 
     updateMode, 
     googleAuth,
