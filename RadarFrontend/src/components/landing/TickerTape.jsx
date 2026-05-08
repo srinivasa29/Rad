@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchMarketData } from "../../api/marketApi";
+import { fetchLiveUniversePrices } from "../../services/apiHelpers";
 
 /* ─── Keyframes injected once into the document head ─── */
 const STYLE_ID = "ticker-tape-keyframes";
@@ -72,18 +72,16 @@ export default function TickerTape({ variant = "dark" }) {
             try {
                 setLoading(true);
                 setError(false);
-                const res = await fetchMarketData({ category: "index", limit: 8 });
+                const res = await fetchLiveUniversePrices();
                 if (res && res.length > 0) {
-                    setItems(res.map((item) => {
-                        const type        = (item.type || item.category || "").toLowerCase();
-                        const isCrypto    = type === "crypto" || type === "cryptocurrency";
-                        const currSymbol  = isCrypto ? "$" : "₹";
-                        const price       = Number(item.price);
+                    // Take first 8 items; map them to display format
+                    setItems(res.slice(0, 8).map((item) => {
+                        const price       = Number(item.price ?? item.ltp ?? 0);
                         return {
-                            symbol: String(item.symbol || item.name || "ASSET").split(".")[0].substring(0, 10),
-                            value:  Number.isFinite(price) ? `${currSymbol}${price.toLocaleString()}` : "--",
+                            symbol: String(item.symbol || "ASSET").split(".")[0].substring(0, 10),
+                            value:  Number.isFinite(price) ? `₹${price.toLocaleString()}` : "--",
                             change: (() => {
-                                const raw  = Number(item.change_24h ?? item.change ?? 0);
+                                const raw  = Number(item.change_24h ?? item.changePercent ?? item.pChange ?? 0);
                                 const safe = Number.isFinite(raw) ? raw : 0;
                                 return `${safe > 0 ? "+" : ""}${safe.toFixed(2)}%`;
                             })(),

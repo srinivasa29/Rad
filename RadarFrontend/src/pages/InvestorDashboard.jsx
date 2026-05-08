@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useNavigate, Link, Navigate } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import YourInvestments from '../components/investor/YourInvestments';
 import MostBoughtStocks from '../components/investor/MostBoughtStocks';
 import SharedTickerTape from '../components/landing/TickerTape';
@@ -7,6 +7,7 @@ import Watchlist from '../components/investor/Watchlist';
 import Screeners from '../components/investor/Screeners';
 import Header from '../components/common/Header';
 import LearningAcademy from './LearningAcademy';
+import { ProfilePage } from './ContractPages';
 
 import {
     LayoutDashboard,
@@ -54,6 +55,7 @@ import { fetchDiscoveryShelves, fetchMarketMood, fetchValuation } from "../api/f
 import { fetchSectorPerformance, fetchMarketData, fetchTrendingSearches, logSearchQuery, fetchMarketNews } from "../api/marketApi";
 import { fetchEconomicCalendar } from "../api/calendarApi";
 import { updateUserMode } from "../api/userApi";
+import { fetchUserWatchlist } from "../api/watchlistApi";
 import { useHeaderData } from "../hooks/useHeaderData";
 import { useSocket } from "../hooks/useSocket";
 import { formatPrice } from "../utils/currency";
@@ -144,7 +146,13 @@ const themes = {
 };
 
 const InvestorMode = ({ onToggleMode }) => {
-    const [activeModule, setActiveModule] = useState("DASHBOARD");
+    const params = useParams();
+    const routeModule = String(params?.module || '').trim().toUpperCase();
+    const [activeModule, setActiveModule] = useState(routeModule || "DASHBOARD");
+
+    useEffect(() => {
+        setActiveModule(routeModule || "DASHBOARD");
+    }, [routeModule]);
 
     useEffect(() => {
         const currentTheme = 'blue';
@@ -1425,6 +1433,14 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                             {item.category || "General"}
                         </span>
 
+                        {/* Watchlist Symbol Tag — shown only in watchlist mode */}
+                        {item.affectedSymbol && (
+                            <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                                <Star size={9} className="fill-amber-500 text-amber-500" />
+                                {item.affectedSymbol}
+                            </span>
+                        )}
+
                         {/* Stock Snippets if available */}
                         {(item.affectedStocks || []).length > 0 && <div className="h-3 w-[1px] bg-slate-200 mx-1"></div>}
                         <div className="flex items-center gap-2.5">
@@ -1553,17 +1569,20 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
 
 
 const InvestorNewsFeed = () => {
-    // Remove static mock data - now strictly live-only
+    const [region, setRegion] = useState("India");
+    // Cache keyed by region so India and Global news don't overwrite each other
     const [rawNews, setRawNews] = useState(() => {
-        const cached = localStorage.getItem('radar_investor_news');
+        const cached = localStorage.getItem('radar_investor_news_v2_india_stocks');
         return cached ? JSON.parse(cached) : [];
     });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedCategories, setSelectedCategories] = useState([]);
     const [assetClass, setAssetClass] = useState("Stocks");
-    const [region, setRegion] = useState("India");
     const [isWatchlistOnly, setIsWatchlistOnly] = useState(false);
+
+    // Cache key per region+assetClass — v2 busts old uncategorised cache entries
+    const cacheKey = `radar_investor_news_v2_${region.toLowerCase()}_${assetClass.toLowerCase()}`;
 
     // Toggle multi-select category logic
     const toggleCategory = (cat) => {
@@ -1609,18 +1628,64 @@ const InvestorNewsFeed = () => {
             setIsLoading(true);
             setError(null);
 
-            // To support robust frontend filtering, we fetch a broader set of news (All Category)
-            const data = await fetchMarketNews({
-                category: "all",
-                region: region.toLowerCase(),
-                assetClass: assetClass.toLowerCase(),
-                watchlist: isWatchlistOnly
-            });
+            let data;
+
+            if (isWatchlistOnly) {
+                // --- WATCHLIST MODE: fetch per-symbol news and merge ---
+                const symbols = await fetchUserWatchlist();
+
+                if (!symbols.length) {
+                    // Empty watchlist — show friendly empty state
+                    setRawNews([]);
+                    setError("Your watchlist is empty. Add stocks to see watchlist-specific news.");
+                    data = [];
+                } else {
+                    // Fire parallel requests for each symbol (cap at 5 to avoid rate limits)
+                    const top5 = symbols.slice(0, 5);
+                    const results = await Promise.allSettled(
+                        top5.map(sym =>
+                            fetchMarketNews({ symbol: sym, limit: 4 })
+                        )
+                    );
+
+                    // Merge all articles, tag with symbol, deduplicate by title
+                    const seen = new Set();
+                    const merged = [];
+                    results.forEach((res, idx) => {
+                        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+                            res.value.forEach(article => {
+                                const key = article.title?.toLowerCase().trim();
+                                if (key && !seen.has(key)) {
+                                    seen.add(key);
+                                    merged.push({
+                                        ...article,
+                                        isToday: true,
+                                        affectedSymbol: top5[idx],
+                                    });
+                                }
+                            });
+                        }
+                    });
+                    data = merged;
+                }
+            } else {
+                // --- NORMAL MODE: fetch regional/asset news with higher limit ---
+                data = await fetchMarketNews({
+                    category: "all",
+                    region: region.toLowerCase(),
+                    assetClass: assetClass.toLowerCase(),
+                    limit: 15,
+                });
+            }
+
 
             if (data && Array.isArray(data) && data.length > 0) {
                 const processed = data.map(item => ({ ...item, isToday: true }));
                 setRawNews(processed);
-                localStorage.setItem('radar_investor_news', JSON.stringify(processed));
+                if (!isWatchlistOnly) {
+                    // Only cache non-watchlist results (watchlist changes frequently)
+                    localStorage.setItem(cacheKey, JSON.stringify(processed));
+                }
             } else if (!rawNews.length) {
                 // High-fidelity fallback if everything fails and no cache
                 const fallbacks = [
@@ -1652,7 +1717,9 @@ const InvestorNewsFeed = () => {
     };
 
     useEffect(() => {
-        // Automatically fetch fresh news when critical backend filters change
+        // Clear stale news from previous region immediately, then fetch fresh
+        const regionCache = localStorage.getItem(cacheKey);
+        setRawNews(regionCache ? JSON.parse(regionCache) : []);
         loadNews();
     }, [region, assetClass, isWatchlistOnly]);
 
@@ -1807,8 +1874,11 @@ function InvestorView({ activeModule, setActiveModule }) {
     };
 
     if (activeModule === 'WATCHLIST') {
-        // Navigate to the dedicated watchlist page instead of rendering inline
-        return <Navigate to="/investor/watchlists" replace />;
+        return <Watchlist />;
+    }
+
+    if (activeModule === 'PROFILE') {
+        return <ProfilePage embedded />;
     }
 
     if (activeModule === 'SCREENERS') {

@@ -127,7 +127,7 @@ class FinnhubService {
 
   
   convertToFinnhubSymbol(symbol) {
-    return symbol.replace('.NS', '').replace('.BO', '');
+    return symbol;
   }
 
   

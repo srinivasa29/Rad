@@ -1,212 +1,239 @@
 /**
  * fundamentalsEnrichmentService.js
  *
- * Fetches real fundamental + technical metadata for a stock symbol using
- * yahoo-finance2's `quoteSummary` module.
+ * Fetch strategy:
+ *   1. MongoDB (FundamentalsSnapshot) — served instantly if < 24h old
+ *   2. Yahoo Finance quoteSummary    — on cache miss or forced refresh
+ *   3. Persist to MongoDB            — so next call hits DB
+ *   4. In-memory NodeCache (6 h)     — hot-path layer within same process
  *
- * Fields returned:
- *   pe           – trailing P/E ratio
- *   beta         – 5-year monthly beta vs S&P 500 (Yahoo)
- *   roe          – Return on Equity (%)
- *   deliveryPct  – estimated delivery % (approximated from short ratio)
- *   momentum     – 1-month price return (%)
- *   sector       – GICS sector string
- *   industry     – GICS industry string
- *   marketCap    – raw market cap number
- *   valStatus    – 'undervalued' | 'fair' | 'overvalued' based on PE
+ * Fields stored:
+ *   pe, forwardPe, pb, ps, evEbitda, peg
+ *   roe, roa, profitMargins, operatingMargins, grossMargins
+ *   revenueGrowth, earningsGrowth
+ *   debtToEquity, currentRatio, quickRatio
+ *   marketCap, beta, dividendYield, payoutRatio
+ *   fiftyTwoWeekHigh, fiftyTwoWeekLow
+ *   volumeRatio, averageVolume
+ *   sector, industry, country, longBusinessSummary, website
+ *   valStatus, deliveryPct, asOf
  */
 
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
-const NodeCache   = require('node-cache');
-const logger      = require('../config/logger');
+const NodeCache    = require('node-cache');
+const logger       = require('../config/logger');
+const FundamentalsSnapshot = require('../models/FundamentalsSnapshot');
 
-// Cache fundamentals for 6 hours — they rarely change intraday
-const cache = new NodeCache({ stdTTL: 6 * 60 * 60, checkperiod: 60 * 30 });
+// In-memory hot layer — avoids repeated Mongo queries for same symbol within same process
+const memCache = new NodeCache({ stdTTL: 6 * 60 * 60, checkperiod: 30 * 60 });
 
-// Known crypto short-codes — these must NEVER get a .NS suffix
+// How old a DB snapshot can be before we consider it stale (default 24 h)
+const DB_STALE_HOURS = Number(process.env.FUNDAMENTALS_STALE_HOURS || 24);
+
 const CRYPTO_SYMBOLS = new Set([
     'BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK',
     'AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT',
     'ARB','OP','INJ','SUI','SEI','PEPE','WIF','TON','FLOKI','BONK',
 ]);
 
-function isCryptoSymbol(symbol) {
+const isCryptoSymbol = (symbol) => {
     const s = String(symbol || '').toUpperCase().replace(/USDT$/i, '').replace(/\.(NS|BO)$/i, '');
     return CRYPTO_SYMBOLS.has(s) || String(symbol).toUpperCase().endsWith('USDT');
-}
+};
 
-/**
- * Ensure the symbol has the correct Yahoo Finance suffix for Indian stocks.
- * HDFCBANK → HDFCBANK.NS
- * BTC, ETH, etc. → returned as-is (Yahoo uses BTC-USD, but we skip Yahoo for crypto anyway)
- */
-function normalizeSymbol(symbol) {
+const normalizeSymbol = (symbol) => {
     const s = String(symbol || '').trim().toUpperCase();
-    // Never append .NS to crypto assets
     if (isCryptoSymbol(s)) return s;
     if (s.endsWith('.NS') || s.endsWith('.BO')) return s;
-    // Assume NSE for Indian stocks (most common)
     return `${s}.NS`;
-}
+};
 
-/**
- * Classify valuation based on trailing PE vs sector norms.
- */
-function classifyValuation(pe) {
+const classifyValuation = (pe) => {
     if (pe == null || isNaN(pe)) return 'fair';
-    if (pe < 15)  return 'undervalued';
-    if (pe > 35)  return 'overvalued';
+    if (pe < 15) return 'undervalued';
+    if (pe > 35) return 'overvalued';
     return 'fair';
+};
+
+const pct = (v) => (v != null ? parseFloat((v * 100).toFixed(2)) : null);
+const num = (v, dp = 2) => (v != null && Number.isFinite(Number(v)) ? parseFloat(Number(v).toFixed(dp)) : null);
+
+// ── Crypto null-safe object ───────────────────────────────────────────────────
+const CRYPTO_SNAPSHOT = (changePercent = 0) => ({
+    pe: null, forwardPe: null, pb: null, ps: null, evEbitda: null, peg: null,
+    roe: null, roa: null, profitMargins: null, operatingMargins: null, grossMargins: null,
+    revenueGrowth: null, earningsGrowth: null, earningsQuarterlyGrowth: null,
+    debtToEquity: null, currentRatio: null, quickRatio: null,
+    marketCap: null, beta: null, dividendYield: null, payoutRatio: null,
+    fiftyTwoWeekHigh: null, fiftyTwoWeekLow: null,
+    volumeRatio: 1, averageVolume: null,
+    sector: 'Cryptocurrency', industry: 'Digital Assets', country: null,
+    longBusinessSummary: null, fullTimeEmployees: null, website: null,
+    valStatus: 'fair', deliveryPct: null,
+    momentum: changePercent,
+    asOf: new Date(),
+    source: 'yahoo',
+});
+
+// ── Fetch fresh data from Yahoo Finance ──────────────────────────────────────
+async function fetchFromYahoo(yahooSym, changePercent = 0) {
+    const summary = await yahooFinance.quoteSummary(yahooSym, {
+        modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'assetProfile'],
+    });
+
+    const sd = summary?.summaryDetail        || {};
+    const ks = summary?.defaultKeyStatistics || {};
+    const fd = summary?.financialData        || {};
+    const ap = summary?.assetProfile         || {};
+
+    const shortPct = ks.shortPercentOfFloat;
+    const deliveryPct = shortPct != null ? parseFloat((Math.max(0, (1 - shortPct) * 100)).toFixed(1)) : null;
+
+    const price = sd.regularMarketPrice;
+    const ma50  = sd.fiftyDayAverage;
+    const momentum = price && ma50 && ma50 !== 0
+        ? parseFloat(((price - ma50) / ma50 * 100).toFixed(2))
+        : changePercent;
+
+    return {
+        pe:              num(sd.trailingPE ?? ks.trailingPE, 1),
+        forwardPe:       num(sd.forwardPE  ?? ks.forwardPE, 1),
+        pb:              num(sd.priceToBook ?? ks.priceToBook, 2),
+        ps:              num(ks.priceToSalesTrailing12Months, 2),
+        evEbitda:        num(ks.enterpriseToEbitda, 2),
+        peg:             num(ks.pegRatio, 2),
+
+        roe:             pct(fd.returnOnEquity),
+        roa:             pct(fd.returnOnAssets),
+        profitMargins:   pct(fd.profitMargins),
+        operatingMargins: pct(fd.operatingMargins),
+        grossMargins:    pct(fd.grossMargins),
+
+        revenueGrowth:   pct(fd.revenueGrowth),
+        earningsGrowth:  pct(fd.earningsGrowth),
+        earningsQuarterlyGrowth: pct(ks.earningsQuarterlyGrowth),
+
+        debtToEquity:    fd.debtToEquity != null ? parseFloat((fd.debtToEquity / 100).toFixed(2)) : null,
+        currentRatio:    num(fd.currentRatio, 2),
+        quickRatio:      num(fd.quickRatio, 2),
+
+        marketCap:       num(sd.marketCap ?? ks.marketCap, 0),
+        beta:            num(sd.beta, 2),
+        dividendYield:   sd.dividendYield != null ? parseFloat((sd.dividendYield * 100).toFixed(2)) : null,
+        payoutRatio:     pct(sd.payoutRatio),
+        fiftyTwoWeekHigh: num(sd.fiftyTwoWeekHigh, 2),
+        fiftyTwoWeekLow:  num(sd.fiftyTwoWeekLow, 2),
+
+        volumeRatio:     sd.averageVolume10days > 0 && sd.averageVolume > 0
+            ? parseFloat((sd.averageVolume10days / sd.averageVolume).toFixed(2))
+            : 1,
+        averageVolume:   num(sd.averageVolume, 0),
+
+        sector:          ap.sector   || null,
+        industry:        ap.industry || null,
+        country:         ap.country  || null,
+        longBusinessSummary: ap.longBusinessSummary || null,
+        fullTimeEmployees: ap.fullTimeEmployees || null,
+        website:         ap.website  || null,
+
+        valStatus:       classifyValuation(sd.trailingPE ?? ks.trailingPE),
+        deliveryPct,
+        momentum,
+        asOf:            new Date(),
+        source:          'yahoo',
+    };
 }
 
-/**
- * Calculate 1-month momentum from the summary detail's 52-week range.
- * If regularMarketPrice and fiftyDayAverage are available, we use the
- * deviation from 50-day MA as a momentum proxy.
- */
-function approximateMomentum(summaryDetail, defaultChange = 0) {
+// ── Persist to MongoDB ────────────────────────────────────────────────────────
+async function persistToDb(symbol, data) {
     try {
-        const price = summaryDetail?.regularMarketPrice;
-        const ma50  = summaryDetail?.fiftyDayAverage;
-        if (price && ma50 && ma50 !== 0) {
-            return parseFloat(((price - ma50) / ma50 * 100).toFixed(2));
-        }
-    } catch (_) {}
-    return defaultChange;
+        await FundamentalsSnapshot.findOneAndUpdate(
+            { symbol: String(symbol).toUpperCase() },
+            { ...data, symbol: String(symbol).toUpperCase() },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        logger.debug(`[Fundamentals] Persisted ${symbol} to MongoDB`);
+    } catch (err) {
+        logger.warn(`[Fundamentals] DB persist failed for ${symbol}: ${err.message}`);
+    }
 }
 
-/**
- * Approximate delivery % from short percentage of float.
- * Higher short % → lower implied delivery conviction.
- * This is a proxy; real delivery data requires NSE direct feed.
- */
-function approximateDelivery(defaultKeyStatistics) {
-    try {
-        const shortPct = defaultKeyStatistics?.shortPercentOfFloat;
-        if (shortPct != null) {
-            // Invert and scale: low short % → high delivery %
-            return parseFloat((Math.max(0, (1 - shortPct) * 100)).toFixed(1));
-        }
-    } catch (_) {}
-    return 55; // neutral fallback
-}
-
-/**
- * Main enrichment function.
- * @param {string} symbol - Any format: 'HDFCBANK', 'HDFCBANK.NS', etc.
- * @param {number} [changePercent=0] - Current day % change, used as fallback for momentum
- * @returns {Promise<object>} Enriched fundamentals object
- */
-async function getFundamentals(symbol, changePercent = 0) {
+// ── Main public function ──────────────────────────────────────────────────────
+async function getFundamentals(symbol, changePercent = 0, { forceRefresh = false } = {}) {
     const yahooSym = normalizeSymbol(symbol);
-    const cacheKey = `fundamentals:${yahooSym}`;
+    const dbKey    = String(symbol).toUpperCase().replace(/\.(NS|BO)$/i, '');
+    const memKey   = `fund:${yahooSym}`;
 
-    // Crypto assets have no equity fundamentals — return null-safe object immediately
-    if (isCryptoSymbol(symbol)) {
-        return {
-            pe: null, beta: null, roe: null, debtToEquity: null,
-            revenueGrowth: null, profitMargins: null, deliveryPct: null,
-            momentum: changePercent, volumeRatio: 1,
-            sector: 'Cryptocurrency', industry: 'Digital Assets',
-            marketCap: null, valStatus: 'fair',
-        };
+    // Crypto: no fundamental data from Yahoo — return null-safe object
+    if (isCryptoSymbol(symbol)) return CRYPTO_SNAPSHOT(changePercent);
+
+    // ── Layer 1: In-memory (hot path) ─────────────────────────────────────
+    if (!forceRefresh) {
+        const hot = memCache.get(memKey);
+        if (hot) return hot;
     }
 
-    // Return cached value if available
-    const cached = cache.get(cacheKey);
-    if (cached) {
-        logger.debug(`[Fundamentals] Cache hit for ${yahooSym}`);
-        return cached;
+    // ── Layer 2: MongoDB (warm path) ──────────────────────────────────────
+    if (!forceRefresh) {
+        try {
+            const doc = await FundamentalsSnapshot.findOne({ symbol: dbKey }).lean();
+            if (doc) {
+                const ageHours = (Date.now() - new Date(doc.updatedAt || doc.asOf).getTime()) / 3_600_000;
+                if (ageHours < DB_STALE_HOURS) {
+                    const result = { ...doc, _id: undefined, __v: undefined };
+                    memCache.set(memKey, result);
+                    logger.debug(`[Fundamentals] DB hit for ${dbKey} (${ageHours.toFixed(1)}h old)`);
+                    return result;
+                }
+                logger.info(`[Fundamentals] DB stale for ${dbKey} (${ageHours.toFixed(1)}h) — refreshing`);
+            }
+        } catch (err) {
+            logger.warn(`[Fundamentals] DB lookup failed for ${dbKey}: ${err.message}`);
+        }
     }
 
+    // ── Layer 3: Yahoo Finance (cold path) ────────────────────────────────
     try {
         logger.info(`[Fundamentals] Fetching from Yahoo Finance for ${yahooSym}`);
-
-        const summary = await yahooFinance.quoteSummary(yahooSym, {
-            modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'assetProfile'],
-        });
-
-        const sd  = summary?.summaryDetail        || {};
-        const ks  = summary?.defaultKeyStatistics || {};
-        const fd  = summary?.financialData        || {};
-        const ap  = summary?.assetProfile         || {};
-
-        const pe           = sd.trailingPE ?? ks.trailingPE ?? null;
-        const beta         = sd.beta ?? null;
-        const roe          = fd.returnOnEquity != null ? parseFloat((fd.returnOnEquity * 100).toFixed(2)) : null;
-        const debtToEquity = fd.debtToEquity != null ? parseFloat((fd.debtToEquity / 100).toFixed(2)) : null;
-        const revenueGrowth = fd.revenueGrowth != null ? parseFloat((fd.revenueGrowth * 100).toFixed(2)) : null;
-        const profitMargins = fd.profitMargins != null ? parseFloat((fd.profitMargins * 100).toFixed(2)) : null;
-        const deliveryPct  = approximateDelivery(ks);
-        const momentum     = approximateMomentum(sd, changePercent);
-        const sector       = ap.sector   || 'Equity';
-        const industry     = ap.industry || '';
-        const marketCap    = sd.marketCap ?? ks.marketCap ?? null;
-        const volumeRatio  = sd.averageVolume10days > 0 && sd.averageVolume > 0
-            ? parseFloat((sd.averageVolume10days / sd.averageVolume).toFixed(2))
-            : 1;
-
-        const result = {
-            pe:          pe   != null ? parseFloat(pe.toFixed(1))   : null,
-            beta:        beta != null ? parseFloat(beta.toFixed(2))  : null,
-            roe:         roe,
-            debtToEquity,
-            revenueGrowth,
-            profitMargins,
-            deliveryPct,
-            momentum,
-            volumeRatio,
-            sector,
-            industry,
-            marketCap,
-            valStatus:   classifyValuation(pe),
-        };
-
-        cache.set(cacheKey, result);
-        logger.info(`[Fundamentals] ✅ Enriched ${yahooSym}: PE=${result.pe}, Beta=${result.beta}, ROE=${result.roe}%`);
+        const result = await fetchFromYahoo(yahooSym, changePercent);
+        memCache.set(memKey, result);
+        await persistToDb(dbKey, result); // fire-and-forget persist
+        logger.info(`[Fundamentals] ✅ ${yahooSym}: PE=${result.pe}, ROE=${result.roe}%, MktCap=${result.marketCap}`);
         return result;
-
     } catch (err) {
-        logger.warn(`[Fundamentals] Failed for ${yahooSym}: ${err.message}`);
-        // Return safe nulls — frontend handles these gracefully
+        logger.warn(`[Fundamentals] Yahoo failed for ${yahooSym}: ${err.message}`);
+        // Try returning stale DB data as last resort
+        try {
+            const stale = await FundamentalsSnapshot.findOne({ symbol: dbKey }).lean();
+            if (stale) {
+                logger.info(`[Fundamentals] Serving stale DB snapshot for ${dbKey}`);
+                return stale;
+            }
+        } catch (_) {}
+        // Hard null-safe fallback
         return {
-            pe:          null,
-            beta:        null,
-            roe:         null,
-            debtToEquity: null,
-            revenueGrowth: null,
-            profitMargins: null,
-            deliveryPct: null,
-            momentum:    changePercent,
-            volumeRatio: 1,
-            sector:      isCryptoSymbol(symbol) ? 'Cryptocurrency' : 'Equity',
-            industry:    isCryptoSymbol(symbol) ? 'Digital Assets' : '',
-            marketCap:   null,
-            valStatus:   'fair',
+            pe: null, forwardPe: null, pb: null, roe: null, debtToEquity: null,
+            revenueGrowth: null, profitMargins: null, marketCap: null,
+            beta: null, dividendYield: null, sector: 'Equity', industry: '',
+            valStatus: 'fair', deliveryPct: null, momentum: changePercent,
+            volumeRatio: 1, asOf: new Date(), source: 'fallback',
         };
     }
 }
 
-/**
- * Batch enrichment — runs in parallel with a small concurrency cap.
- * @param {Array<{symbol: string, changePercent?: number}>} items
- * @returns {Promise<Map<string, object>>} symbol → fundamentals
- */
+// ── Batch enrichment ─────────────────────────────────────────────────────────
 async function getBatchFundamentals(items, concurrency = 3) {
     const results = new Map();
-    const queue = [...items];
-
-    async function worker() {
-        while (queue.length > 0) {
-            const item = queue.shift();
-            if (!item) break;
+    const queue   = [...items];
+    const worker  = async () => {
+        let item;
+        while ((item = queue.shift())) {
             const sym = item.symbol || item;
             const chg = item.changePercent || 0;
             results.set(sym, await getFundamentals(sym, chg));
         }
-    }
-
+    };
     await Promise.all(Array.from({ length: concurrency }, worker));
     return results;
 }

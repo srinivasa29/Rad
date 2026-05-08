@@ -1,6 +1,8 @@
 const { fetchStockData } = require('./stockService');
 const { fetchMarketNews } = require('./newsService');
 const { getFilingsForSymbol } = require('./secService');
+const { getFundamentals: enrichFundamentals } = require('./fundamentalsEnrichmentService');
+const FundamentalsSnapshot = require('../models/FundamentalsSnapshot');
 const axios = require('axios');
 const logger = require('../utils/logger');
 
@@ -32,69 +34,95 @@ const ensureStockFound = async (symbol) => {
     return stock;
 };
 
+const DB_STALE_HOURS = 24;
+
 const getStockFundamentals = async (symbol) => {
-    const stock = await ensureStockFound(symbol);
-    const normalized = normalizeSymbol(stock.symbol);
-    const pe = toNumber(stock?.details?.pe_ratio, NaN);
-    const pb = toNumber(stock?.details?.pb_ratio, NaN);
-    const dividendYield = toNumber(stock?.details?.dividend_yield, NaN);
+    const cleanSym = String(symbol || '').toUpperCase().replace(/\.(NS|BO)$/i, '');
 
-    const result = {
-        symbol: normalized,
-        name: stock.name || normalized,
-        snapshot: {
-            price: toNumber(stock.price, NaN),
-            change: toNumber(stock.change, NaN),
-            marketCap: stock?.details?.market_cap || null,
-            peRatio: Number.isFinite(pe) ? Number(pe.toFixed(2)) : null,
-            pbRatio: Number.isFinite(pb) ? Number(pb.toFixed(2)) : null,
-            dividendYield: Number.isFinite(dividendYield) ? Number(dividendYield.toFixed(2)) : null,
-            sector: stock?.details?.sector || 'Unknown',
-        },
-        financialStatements: {
-            incomeStatement: stock?.financials?.income_statement || [],
-            balanceSheet: stock?.financials?.balance_sheet || [],
-            cashFlow: stock?.financials?.cash_flow || [],
-        },
-        notes: stock?.financials
-            ? 'Financial statements sourced from provider payload'
-            : 'Detailed statements unavailable in current provider payload',
-    };
-
-    if (process.env.FMP_API_KEY) {
-        try {
-            const ticker = stripSuffix(normalized);
-            const key = process.env.FMP_API_KEY;
-            const [profileRes, ratiosRes] = await Promise.all([
-                axios.get(`${FMP_BASE_URL}/profile/${encodeURIComponent(ticker)}`, {
-                    params: { apikey: key },
-                    timeout: 7000,
-                }),
-                axios.get(`${FMP_BASE_URL}/ratios-ttm/${encodeURIComponent(ticker)}`, {
-                    params: { apikey: key },
-                    timeout: 7000,
-                }),
-            ]);
-
-            const profile = Array.isArray(profileRes.data) ? profileRes.data[0] : null;
-            const ratios = Array.isArray(ratiosRes.data) ? ratiosRes.data[0] : null;
-            const peFromFmp = toNumber(ratios?.peRatioTTM, NaN);
-            const pbFromFmp = toNumber(ratios?.priceToBookRatioTTM, NaN);
-            const dyFromFmp = toNumber(profile?.lastDiv, NaN);
-            const marketCap = toNumber(profile?.mktCap, NaN);
-
-            if (Number.isFinite(peFromFmp)) result.snapshot.peRatio = Number(peFromFmp.toFixed(2));
-            if (Number.isFinite(pbFromFmp)) result.snapshot.pbRatio = Number(pbFromFmp.toFixed(2));
-            if (Number.isFinite(dyFromFmp)) result.snapshot.dividendYield = Number(dyFromFmp.toFixed(2));
-            if (Number.isFinite(marketCap)) result.snapshot.marketCap = `$${(marketCap / 1e9).toFixed(2)}B`;
-            if (profile?.sector) result.snapshot.sector = profile.sector;
-            result.notes = 'Fundamentals enriched by FMP with provider fallback to market data.';
-        } catch (error) {
-            logger.warn('FMP fundamentals fetch failed, using stock snapshot fallback.', { error: error.message });
+    // ── Layer 1: MongoDB snapshot (fast path) ─────────────────────────────
+    try {
+        const doc = await FundamentalsSnapshot.findOne({ symbol: cleanSym }).lean();
+        if (doc) {
+            const ageHours = (Date.now() - new Date(doc.updatedAt || doc.asOf).getTime()) / 3_600_000;
+            if (ageHours < DB_STALE_HOURS) {
+                logger.debug(`[StockInsights] Fundamentals DB hit for ${cleanSym} (${ageHours.toFixed(1)}h old)`);
+                return buildFundamentalsResponse(cleanSym, doc, null);
+            }
         }
+    } catch (err) {
+        logger.warn(`[StockInsights] DB lookup failed for ${cleanSym}: ${err.message}`);
     }
 
-    return result;
+    // ── Layer 2: Live enrichment (cold path — also persists to DB) ────────
+    let stockData = null;
+    try {
+        const stocks = await fetchStockData();
+        stockData = findStock(stocks, symbol);
+    } catch (_) {}
+
+    const changePercent = stockData ? toNumber(stockData.change, 0) : 0;
+    const enriched = await enrichFundamentals(cleanSym, changePercent, { forceRefresh: true });
+
+    return buildFundamentalsResponse(cleanSym, enriched, stockData);
+};
+
+/** Shape the final API response from either a DB doc or a fresh enriched object */
+const buildFundamentalsResponse = (cleanSym, data, stockData) => {
+    const livePrice    = stockData ? toNumber(stockData.price, null) : null;
+    const liveChange   = stockData ? toNumber(stockData.change, null) : null;
+    const liveName     = stockData?.name || cleanSym;
+
+    return {
+        symbol: cleanSym,
+        name:   liveName,
+        asOf:   data.asOf || null,
+        source: data.source || 'yahoo',
+        snapshot: {
+            price:         livePrice,
+            change:        liveChange,
+            marketCap:     data.marketCap,
+            peRatio:       data.pe,
+            forwardPe:     data.forwardPe,
+            pbRatio:       data.pb,
+            psRatio:       data.ps,
+            evEbitda:      data.evEbitda,
+            peg:           data.peg,
+            roe:           data.roe,
+            roa:           data.roa,
+            profitMargins: data.profitMargins,
+            operatingMargins: data.operatingMargins,
+            grossMargins:  data.grossMargins,
+            revenueGrowth: data.revenueGrowth,
+            earningsGrowth: data.earningsGrowth,
+            debtToEquity:  data.debtToEquity,
+            currentRatio:  data.currentRatio,
+            quickRatio:    data.quickRatio,
+            beta:          data.beta,
+            dividendYield: data.dividendYield,
+            payoutRatio:   data.payoutRatio,
+            fiftyTwoWeekHigh: data.fiftyTwoWeekHigh,
+            fiftyTwoWeekLow:  data.fiftyTwoWeekLow,
+            volumeRatio:   data.volumeRatio,
+            averageVolume: data.averageVolume,
+            sector:        data.sector,
+            industry:      data.industry,
+            country:       data.country,
+            valStatus:     data.valStatus,
+        },
+        description: {
+            summary:  data.longBusinessSummary || null,
+            employees: data.fullTimeEmployees || null,
+            website:  data.website || null,
+        },
+        financialStatements: {
+            incomeStatement: stockData?.financials?.income_statement || [],
+            balanceSheet:    stockData?.financials?.balance_sheet    || [],
+            cashFlow:        stockData?.financials?.cash_flow        || [],
+        },
+        notes: data.source === 'fallback'
+            ? 'Using cached fallback — live data temporarily unavailable'
+            : `Fundamentals served from ${data.source || 'yahoo'} (${data.asOf ? new Date(data.asOf).toLocaleDateString('en-IN') : 'cached'})`,
+    };
 };
 
 const getStockEarningsCalendar = async (symbol) => {

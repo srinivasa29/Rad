@@ -77,6 +77,52 @@ const allFilters = [
 ];
 
 
+// ── Translate human-readable UI filter values → backend numeric format ──────
+const translateFilters = (uiFilters) => {
+    const out = {};
+
+    // Change %
+    const changeMap = { '> 0%': { minChange: 0 }, '> 2%': { minChange: 2 }, '> 5%': { minChange: 5 }, '< 0%': { maxChange: -0.01 } };
+    if (uiFilters.change && changeMap[uiFilters.change]) Object.assign(out, changeMap[uiFilters.change]);
+
+    // P/E
+    const peMap = { 'Low (<15)': { maxPe: 15 }, 'Medium': { minPe: 15, maxPe: 30 }, 'High': { minPe: 30 } };
+    if (uiFilters.pe && peMap[uiFilters.pe]) Object.assign(out, peMap[uiFilters.pe]);
+
+    // Price
+    const priceMap = { '< ₹500': { maxPrice: 500 }, '₹500 - ₹2k': { minPrice: 500, maxPrice: 2000 }, '> ₹2k': { minPrice: 2000 } };
+    if (uiFilters.price && priceMap[uiFilters.price]) Object.assign(out, priceMap[uiFilters.price]);
+
+    // Market Cap (in INR)
+    const mcapMap = { 'Large': { minMarketCap: 200_000_000_000 }, 'Mid': { minMarketCap: 20_000_000_000, maxMarketCap: 200_000_000_000 }, 'Small': { minMarketCap: 1_000_000_000, maxMarketCap: 20_000_000_000 }, 'Micro': { maxMarketCap: 1_000_000_000 } };
+    if (uiFilters.mcap && mcapMap[uiFilters.mcap]) Object.assign(out, mcapMap[uiFilters.mcap]);
+
+    // Sector
+    if (uiFilters.sector && uiFilters.sector !== 'All') out.sectors = [uiFilters.sector];
+
+    // ROE (minChange uses score as proxy here; ROE isn't in backend directly)
+    const roeMap = { '> 10%': { minScore: 50 }, '> 15%': { minScore: 60 }, '> 20%': { minScore: 70 } };
+    if (uiFilters.roe && roeMap[uiFilters.roe]) Object.assign(out, roeMap[uiFilters.roe]);
+
+    // RSI
+    const rsiMap = { 'Oversold (<30)': { maxRsi: 30 }, 'Neutral': { minRsi: 40, maxRsi: 60 }, 'Overbought (>70)': { minRsi: 70 } };
+    if (uiFilters.rsi && rsiMap[uiFilters.rsi]) Object.assign(out, rsiMap[uiFilters.rsi]);
+
+    // Strategy-level quick signals (already in numeric form)
+    if (uiFilters.minChange !== undefined) out.minChange = uiFilters.minChange;
+    if (uiFilters.maxChange !== undefined) out.maxChange = uiFilters.maxChange;
+    if (uiFilters.minRsi !== undefined) out.minRsi = uiFilters.minRsi;
+    if (uiFilters.maxRsi !== undefined) out.maxRsi = uiFilters.maxRsi;
+    if (uiFilters.minScore !== undefined) out.minScore = uiFilters.minScore;
+    if (uiFilters.volume) {
+        const volMap = { 'High': 'high', 'Very High': 'very_high', 'Extreme': 'very_high', 'Low': 'low', 'Normal': 'normal' };
+        out.volumeStatus = volMap[uiFilters.volume] || uiFilters.volume.toLowerCase();
+    }
+
+    return out;
+};
+
+
 const Screeners = ({ isHero = false, initialFilters = {} }) => {
     const [activeFilters, setActiveFilters] = useState(initialFilters);
     const [visibleFilters, setVisibleFilters] = useState(['mcap', 'price', 'change', 'sector', 'roe', 'pe']);
@@ -111,7 +157,10 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
     const handleStrategySelect = (strat) => {
         setShowSignalModal(strat);
         setActiveStrategy(strat.id);
-        setActiveFilters(prev => ({ ...prev, ...strat.filters }));
+        const newFilters = { ...strat.filters };
+        setActiveFilters(newFilters);
+        // Immediately trigger a scan with the strategy filters
+        setTimeout(() => runScanWithFilters(newFilters), 0);
     };
 
     const addMoreFilter = (id) => {
@@ -200,20 +249,40 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
         return true;
     });
 
-    const runScan = async () => {
+    const runScanWithFilters = async (filtersToUse) => {
         try {
             setIsLoading(true);
-            const data = await runScreenerScan(activeFilters);
-            if (data && Array.isArray(data) && data.length > 0) {
-                setResults(data);
-                localStorage.setItem('radar_screener_results', JSON.stringify(data));
+            const backendFilters = translateFilters(filtersToUse || activeFilters);
+            const response = await runScreenerScan({ filters: backendFilters });
+            const data = response?.data?.results || [];
+
+            if (data && Array.isArray(data)) {
+                const formatted = data.map(stock => ({
+                    id: stock.symbol,
+                    price: `₹${stock.price}`,
+                    change: `${stock.change > 0 ? '+' : ''}${stock.change}%`,
+                    isPositive: stock.change >= 0,
+                    sector: stock.sector,
+                    mcap: stock.marketCap || '-',
+                    pe: stock.pe != null ? stock.pe : '-',
+                    roe: '-',
+                    yield: '-',
+                    confidence: stock.confidence,
+                    why: stock.why,
+                    tags: stock.tags,
+                    trend: [stock.price * 0.98, stock.price * 0.99, stock.price, stock.price * 1.01, stock.price]
+                }));
+                setResults(formatted);
+                localStorage.setItem('radar_screener_results', JSON.stringify(formatted));
             }
         } catch (err) {
-            console.error("Screener scan failed:", err);
+            console.error('Screener scan failed:', err);
         } finally {
             setIsLoading(false);
         }
     };
+
+    const runScan = () => runScanWithFilters(activeFilters);
 
     const exportToExcel = () => {
         if (!filteredResults.length) return;
@@ -250,14 +319,10 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
     };
 
     React.useEffect(() => {
-        // Initial scan if we have filters or if cache is empty
-        if (Object.keys(activeFilters).length > 0) {
-            runScan();
-        } else if (results.length === 0 || results === MOCK_FALLBACK_RESULTS) {
-            // Trigger a default scan to get real data if we only have mocks
-            runScan();
-        }
-    }, [activeFilters]);
+        // Auto-scan on mount to populate results
+        runScan();
+    }, []);
+
 
     React.useEffect(() => {
         loadMyFilters();
@@ -346,7 +411,8 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
                             <h1 className="text-2xl font-black text-slate-800">Smart Market Screener</h1>
                             <p className="text-[12px] font-bold text-slate-500 flex items-center gap-1.5 uppercase tracking-wider">
                                 <ShieldCheck size={14} className="text-blue-500" />
-                                âš¡ Tailored for you: {userMode === 'TRADER' ? 'Active Trader' : 'Long-term Investor'}
+                                <Zap size={13} className="text-amber-500 fill-amber-400" />
+                                Tailored for you: {userMode === 'TRADER' ? 'Active Trader' : 'Long-term Investor'}
                             </p>
                         </div>
                     </div>
@@ -465,6 +531,14 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
                                 );
                             })}
                         </div>
+                        <button
+                            onClick={runScan}
+                            disabled={isLoading}
+                            className="ml-auto bg-blue-600 text-white px-5 py-1.5 rounded-full text-[12px] font-black flex items-center gap-2 shadow-md hover:bg-blue-700 transition-all disabled:opacity-60"
+                        >
+                            <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+                            {isLoading ? 'Scanning...' : 'Run Scan'}
+                        </button>
                     </div>
                 </div>
 
@@ -518,7 +592,11 @@ const Screeners = ({ isHero = false, initialFilters = {} }) => {
                                 return (
                                     <div 
                                         key={item.id} 
-                                        onClick={() => handleFilterChange('preset', item.id)}
+                                        onClick={() => {
+                                            const newFilters = { ...item.filters };
+                                            setActiveFilters(newFilters);
+                                            runScanWithFilters(newFilters);
+                                        }}
                                         className="min-w-[300px] bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer group"
                                     >
                                         <div className="flex items-center gap-4 mb-3">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
     LayoutDashboard,
     Star,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useHeaderData } from "../../hooks/useHeaderData";
 import { fetchMarketData, fetchTrendingSearches, logSearchQuery } from "../../api/marketApi";
+import { isValidSymbolSync } from "../../services/universeService";
 import { updateUserMode } from "../../api/userApi";
 
 const displaySymbol = (value) => String(value || '').replace(/\.(NS|BO)$/i, '');
@@ -38,6 +39,7 @@ const formatNotificationTime = (value) => {
 
 const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
     const navigate = useNavigate();
+    const location = useLocation();
     const {
         profile,
         userInitial,
@@ -118,21 +120,36 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
         navigate(`${path}${encodeURIComponent(symbol.toUpperCase())}`);
     };
 
+    const navigateInvestorModule = (moduleId) => {
+        if (moduleId === 'DASHBOARD') {
+            navigate('/investor/dashboard');
+            return;
+        }
+
+        navigate(`/investor/dashboard/${moduleId.toLowerCase()}`);
+    };
+
     const handleSearchSelect = async (item) => {
-        const label = item?.symbol || item?.name || '';
-        setSearchQuery(label);
+        const raw = item?.symbol || item?.name || '';
+        const symbol = displaySymbol(raw);
+        if (!symbol) return;
+
+        setSearchQuery(symbol);
         setShowSearchDropdown(false);
         if (setActiveModule) setActiveModule('WATCHLIST');
-        openStockPage(label);
-        if (label) await logSearchQuery(label);
+        openStockPage(symbol);
+        if (symbol) await logSearchQuery(symbol);
     };
 
     const handleTrendingSelect = async (term) => {
-        setSearchQuery(term);
+        const symbol = displaySymbol(term);
+        if (!symbol) return;
+
+        setSearchQuery(symbol);
         setShowSearchDropdown(false);
         if (setActiveModule) setActiveModule('WATCHLIST');
-        openStockPage(term);
-        await logSearchQuery(term);
+        openStockPage(symbol);
+        await logSearchQuery(symbol);
     };
 
     return (
@@ -156,7 +173,18 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                     ].map((item) => (
                         <button
                             key={item.id}
-                            onClick={() => setActiveModule ? setActiveModule(item.id) : navigate('/investor/dashboard')}
+                                onClick={() => {
+                                    if (setActiveModule) {
+                                        setActiveModule(item.id);
+                                    }
+
+                                    if (location.pathname.startsWith('/investor/dashboard')) {
+                                        navigateInvestorModule(item.id);
+                                        return;
+                                    }
+
+                                    navigate(item.id === 'DASHBOARD' ? '/investor/dashboard' : `/investor/dashboard/${item.id.toLowerCase()}`);
+                                }}
                             className="flex items-center gap-2.5 text-[13px] font-black tracking-tight transition-all duration-300 opacity-100 hover:text-blue-700"
                             style={{ color: '#3E84F6' }}
                         >

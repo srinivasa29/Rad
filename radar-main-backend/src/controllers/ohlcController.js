@@ -23,7 +23,7 @@ const getHistoricalData = asyncHandler(async (req, res) => {
         throw new Error('Symbol is required');
     }
 
-    const result = await ohlcService.getOHLCData({
+    let result = await ohlcService.getOHLCData({
         symbol,
         exchange,
         timeframe,
@@ -31,6 +31,31 @@ const getHistoricalData = asyncHandler(async (req, res) => {
         endDate: actualEndDate,
         limit: parseInt(limit),
     });
+
+    if (result.count === 0) {
+        // Fallback to live data if DB is empty (e.g. crypto symbols)
+        const { fetchCryptoHistory } = require('../services/cryptoService');
+        const { fetchStockHistory } = require('../services/stockService');
+        try {
+            let fallbackData = [];
+            const knownCryptos = ['BTC', 'ETH', 'SOL', 'ADA', 'XRP', 'DOGE', 'DOT', 'BNB', 'MATIC', 'AVAX', 'LINK', 'LTC'];
+            const bare = symbol.replace(/\.(NS|BO)$/i, '').replace(/-USD$/i, '');
+            if (knownCryptos.includes(bare)) {
+                fallbackData = await fetchCryptoHistory(bare, timeframe);
+            } else {
+                fallbackData = await fetchStockHistory(symbol, timeframe, { allowSynthetic: true });
+            }
+            if (fallbackData && fallbackData.length > 0) {
+                result = {
+                    success: true,
+                    count: fallbackData.length,
+                    data: fallbackData
+                };
+            }
+        } catch (e) {
+            console.error('OHLC Fallback failed:', e.message);
+        }
+    }
 
     if (!result.success) {
         res.status(500);

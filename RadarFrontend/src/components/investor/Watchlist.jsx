@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, ChevronDown, CheckCircle, AlertTriangle, Eye, ShieldAlert, Plus, Bell, Activity, TrendingUp, TrendingDown, Info, ArrowRight, CornerRightDown, AlignLeft, Filter, BookOpen, Bookmark, SlidersHorizontal, Trash2, PieChart, BarChart3 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Cell, CartesianGrid } from 'recharts';
 import api from '../../api/api';
+import { createWatchlist as createBackendWatchlist } from '../../api/watchlistApi';
 import { useSocket } from '../../hooks/useSocket';
 
 const mockSparklinePositive = Array.from({ length: 15 }, (_, i) => ({ value: 60 + Math.sin(i / 2) * 20 }));
@@ -108,10 +109,90 @@ const AttentionCard = ({ stock }) => (
     </div>
 );
 
+const AlertModal = ({ stock, onClose, onSave, existingAlertPrice }) => {
+    const [price, setPrice] = useState(() => {
+        if (existingAlertPrice) return existingAlertPrice;
+        const rawPrice = stock.price.replace(/[^0-9.]/g, '');
+        return Math.floor(parseFloat(rawPrice) * 0.95);
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async () => {
+        if (!price || isNaN(price)) return;
+        setIsSubmitting(true);
+        try {
+            await api.post('/alerts', { symbol: stock.name, targetPrice: parseFloat(price) });
+            onSave(parseFloat(price));
+        } catch (err) {
+            console.error(err);
+            alert('Failed to set alert.');
+        } finally {
+            setIsSubmitting(false);
+            onClose();
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
+            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 className="text-[15px] font-black text-slate-800 flex items-center gap-2">
+                        <Bell size={18} className="text-blue-600" /> Set Price Alert
+                    </h3>
+                    <button onClick={onClose} className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 shadow-sm">
+                        <Trash2 size={14} className="rotate-45" />
+                    </button>
+                </div>
+                <div className="p-6">
+                    <div className="flex justify-between items-end mb-4">
+                        <div>
+                            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">{stock.name}</div>
+                            <div className="text-[20px] font-black text-slate-800 leading-none">{stock.price}</div>
+                        </div>
+                    </div>
+                    
+                    <div className="relative mb-6">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Target Price (₹)</label>
+                        <input 
+                            type="number"
+                            value={price}
+                            onChange={(e) => setPrice(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[16px] font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            autoFocus
+                        />
+                    </div>
+                    
+                    <div className="flex gap-2">
+                        <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-[13px] hover:bg-slate-50 transition-colors">
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={handleSubmit} 
+                            disabled={isSubmitting}
+                            className="flex-[2] py-2.5 rounded-xl bg-blue-600 text-white font-bold text-[13px] hover:bg-blue-700 transition-colors shadow-md disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                    Saving...
+                                </>
+                            ) : 'Create Alert'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const GridCard = ({ stock, onRemove }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [thesis, setThesis] = useState(stock.note || '');
     const [hasNote, setHasNote] = useState(stock.hasNote || false);
+    const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+    const [alertSuccess, setAlertSuccess] = useState(false);
+    const [activeAlertPrice, setActiveAlertPrice] = useState(null);
 
     const handleSave = () => {
         if (thesis.trim()) {
@@ -174,34 +255,34 @@ const GridCard = ({ stock, onRemove }) => {
                  </div>
             </div>
 
-            {}
-            <div className="bg-slate-50/50 border border-slate-100/60 rounded-xl p-3 mb-5">
-                 <div className="flex justify-between items-center mb-1.5">
-                     <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Buy Target</div>
-                     <div className="text-[11px] font-bold text-slate-600">{stock.targetPrice || '₹' + Math.floor(parseInt(stock.price.replace(/[^0-9]/g, '')) * 0.93).toLocaleString('en-IN')}</div>
-                 </div>
-                 
-                 <div className="w-full bg-slate-200 rounded-full h-1.5 mb-1.5 overflow-hidden">
-                     <div className={`h-1.5 rounded-full ${parseInt(stock.proximity || '93') >= 95 ? 'bg-blue-500' : 'bg-slate-400'}`} style={{ width: stock.proximity || '93%' }}></div>
-                 </div>
-                 
-                 <div className="text-[10px] font-medium text-slate-500">
-                     <span className={`font-bold ${parseInt(stock.proximity || '93') >= 95 ? 'text-blue-600' : 'text-slate-600'}`}>
-                        {100 - parseInt(stock.proximity || '93')}% away
-                     </span> from target entry
-                 </div>
-            </div>
+            {activeAlertPrice && (
+                <div className="bg-slate-50 border border-emerald-100 rounded-xl p-3 mb-4 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                        <Bell size={14} className="text-emerald-500" />
+                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-widest">Active Alert</span>
+                    </div>
+                    <div className="text-[13px] font-black text-emerald-600">
+                        ₹{activeAlertPrice}
+                    </div>
+                </div>
+            )}
 
             <div className="flex items-center gap-2 mt-auto">
                 <button 
-                    onClick={() => alert(`Alert set for ${stock.name} at current levels.`)}
-                    className="flex-1 bg-white border border-slate-200 hover:border-blue-500 hover:text-blue-700 text-slate-600 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+                    onClick={() => setIsAlertModalOpen(true)}
+                    className={`flex-1 border py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 ${
+                        alertSuccess 
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-600' 
+                        : 'bg-white border-slate-200 hover:border-blue-500 hover:text-blue-700 text-slate-600'
+                    }`}
                 >
-                     Set Alert
+                    {alertSuccess ? (
+                        <><CheckCircle size={14} /> Alert Set</>
+                    ) : (
+                        <><Bell size={14} className="opacity-70" /> {activeAlertPrice ? 'Edit Alert' : 'Set Alert'}</>
+                    )}
                 </button>
-                 <button className="flex flex-[1.5] justify-center items-center gap-1.5 bg-[#3E84F6] hover:bg-[#3472d4] text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-md">
-                    Add to Portfolio
-                </button>
+
                 <button 
                     onClick={(e) => { e.stopPropagation(); onRemove && onRemove(stock.id); }}
                     className="p-2.5 bg-white border border-slate-200 text-slate-400 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200 rounded-xl transition-all shadow-sm flex items-center justify-center group/trash"
@@ -247,6 +328,19 @@ const GridCard = ({ stock, onRemove }) => {
                          + Add investment thesis
                      </button>
                 </div>
+            )}
+            
+            {isAlertModalOpen && (
+                <AlertModal 
+                    stock={stock} 
+                    existingAlertPrice={activeAlertPrice}
+                    onClose={() => setIsAlertModalOpen(false)} 
+                    onSave={(price) => {
+                        setActiveAlertPrice(price);
+                        setAlertSuccess(true);
+                        setTimeout(() => setAlertSuccess(false), 3000);
+                    }}
+                />
             )}
         </div>
     );
@@ -623,15 +717,30 @@ const Watchlist = () => {
         const load = async () => {
             setIsLoadingLive(true);
             try {
-                // 1. Fetch user's watchlist symbols
-                const wlRes = await api.get('/watchlists');
+                // 1. Fetch user's watchlist symbols - Investor mode
+                const wlRes = await api.get('/watchlist', { params: { mode: 'investor' } });
                 const wlData = wlRes.data?.data ?? wlRes.data;
+                
+                // The Watchlist model stores items as objects: {symbol: "RELIANCE.NS", addedAt: ...}
+                // Handle both plain strings and {symbol: string} objects
+                const extractSymbol = (item) => {
+                    if (!item) return null;
+                    if (typeof item === 'string') return item;
+                    if (typeof item === 'object') return item.symbol || item.sym || null;
+                    return null;
+                };
+
                 const symbols = (Array.isArray(wlData)
-                    ? wlData.flatMap(w => w.symbols ?? w.stocks ?? [])
+                    ? wlData.flatMap(w => (w.items ?? w.symbols ?? w.stocks ?? []).map(extractSymbol))
                     : []).filter(Boolean);
                 
                 if (Array.isArray(wlData) && wlData.length > 0) {
                     setWatchlistId(wlData[0]._id || wlData[0].id);
+                } else if (Array.isArray(wlData) && wlData.length === 0) {
+                    const created = await createBackendWatchlist('Investor Portfolio', 'investor');
+                    if (created?._id || created?.id) {
+                        setWatchlistId(created._id || created.id);
+                    }
                 }
 
                 if (!symbols.length || !active) { setIsLoadingLive(false); return; }
@@ -846,6 +955,12 @@ const Watchlist = () => {
             }));
     }, [watchlist]);
 
+    const holdingsGridClass = watchlist.length <= 1
+        ? 'grid grid-cols-1 gap-6'
+        : watchlist.length === 2
+            ? 'grid grid-cols-1 lg:grid-cols-2 gap-6'
+            : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6';
+
     const handleRemoveFromWatchlist = async (stockSymbol) => {
         // Optimistic UI update
         const backup = [...watchlist];
@@ -853,7 +968,7 @@ const Watchlist = () => {
 
         if (!watchlistId) return;
         try {
-            await api.delete(`/watchlists/${watchlistId}/remove/${encodeURIComponent(stockSymbol)}`);
+            await api.delete(`/watchlist/${watchlistId}/remove/${encodeURIComponent(stockSymbol)}`);
         } catch (err) {
             console.error('Failed to remove stock from backend:', err);
             // Optional: revert if absolutely necessary, but usually better to stay optimistic
@@ -884,7 +999,7 @@ const Watchlist = () => {
 
         if (!watchlistId) return;
         try {
-            await api.post(`/watchlists/${watchlistId}/add`, { symbol: stockSymbol });
+            await api.post(`/watchlist/${watchlistId}/add`, { symbol: stockSymbol });
             // Fetch live data to replace placeholder
             const mktRes = await api.get(`/market/quotes?symbols=${encodeURIComponent(stockSymbol)}`);
             const quotes = mktRes.data?.data ?? mktRes.data;
@@ -1038,7 +1153,7 @@ const Watchlist = () => {
                             </div>
                         </div>
 
-                        <div className="lg:w-[35%] bg-white rounded-[20px] shadow-sm border border-slate-100 p-6 md:p-8 flex flex-col h-full min-h-[380px]">
+                        <div className="lg:w-[35%] bg-white rounded-[20px] shadow-sm border border-slate-100 p-6 md:p-8 flex flex-col h-full min-h-[260px] lg:min-h-[320px]">
                             <h3 className="text-[16px] font-black text-slate-800 mb-6 flex items-center gap-2">
                                 <Activity size={18} className="text-blue-500" />
                                 Recent Changes
@@ -1095,7 +1210,7 @@ const Watchlist = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        <div className={holdingsGridClass}>
                             {watchlist.map(stock => (
                                 <GridCard
                                     key={stock.id}
