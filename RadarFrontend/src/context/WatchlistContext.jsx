@@ -18,7 +18,9 @@ export const WatchlistProvider = ({ children }) => {
     setLoading(true);
     setError('');
     try {
-      const watchlist = await ensureWatchlist('trader', 'Research Watchlist');
+      const mode = String(localStorage.getItem('mode') || 'trader').toLowerCase();
+      const targetName = mode === 'investor' ? 'Investor Portfolio' : 'Research Watchlist';
+      const watchlist = await ensureWatchlist(mode, targetName);
       setWatchlistId(watchlist?._id || watchlist?.id || '');
       const symbols = (watchlist?.items || [])
         .map((item) => (typeof item === 'string' ? item : item?.symbol))
@@ -74,10 +76,16 @@ export const WatchlistProvider = ({ children }) => {
         // ignore
       }
     };
-    if (typeof window !== 'undefined') window.addEventListener('watchlist:changed', onWatchlistChanged);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('watchlist:changed', onWatchlistChanged);
+      window.addEventListener('watchlist_updated', onWatchlistChanged);
+    }
     return () => {
       clearInterval(interval);
-      if (typeof window !== 'undefined') window.removeEventListener('watchlist:changed', onWatchlistChanged);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('watchlist:changed', onWatchlistChanged);
+        window.removeEventListener('watchlist_updated', onWatchlistChanged);
+      }
     };
   }, [load]);
 
@@ -97,12 +105,12 @@ export const WatchlistProvider = ({ children }) => {
       return false;
     }
 
-    let listId = watchlistId;
-    if (!listId) {
-      const watchlist = await ensureWatchlist('trader', 'Research Watchlist');
-      listId = watchlist?._id || watchlist?.id || '';
-      setWatchlistId(listId);
-    }
+    const mode = String(localStorage.getItem('mode') || 'trader').toLowerCase();
+    const targetName = mode === 'investor' ? 'Investor Portfolio' : 'Research Watchlist';
+    const watchlist = await ensureWatchlist(mode, targetName);
+    const listId = watchlist?._id || watchlist?.id || '';
+    setWatchlistId(listId);
+
     if (!listId) {
       setError('Could not open your watchlist. Please sign in and try again.');
       return false;
@@ -114,6 +122,8 @@ export const WatchlistProvider = ({ children }) => {
       await addSymbolToWatchlist(listId, withNseSuffix(symbol));
       await load();
       setSelectedSymbol(symbol);
+      window.dispatchEvent(new Event('watchlist_updated'));
+      window.dispatchEvent(new CustomEvent('watchlist:changed'));
       return true;
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to add stock to watchlist');
@@ -121,13 +131,24 @@ export const WatchlistProvider = ({ children }) => {
     } finally {
       setAdding(false);
     }
-  }, [watchlistId, load]);
+  }, [load]);
 
   const removeSymbol = useCallback(async (symbol) => {
-    if (!watchlistId) return;
-    await removeSymbolFromWatchlist(watchlistId, symbol);
-    await load();
-  }, [watchlistId, load]);
+    try {
+      const mode = String(localStorage.getItem('mode') || 'trader').toLowerCase();
+      const targetName = mode === 'investor' ? 'Investor Portfolio' : 'Research Watchlist';
+      const watchlist = await ensureWatchlist(mode, targetName);
+      const listId = watchlist?._id || watchlist?.id || '';
+      if (!listId) return;
+
+      await removeSymbolFromWatchlist(listId, symbol);
+      await load();
+      window.dispatchEvent(new Event('watchlist_updated'));
+      window.dispatchEvent(new CustomEvent('watchlist:changed'));
+    } catch (err) {
+      console.error('Failed to remove symbol:', err);
+    }
+  }, [load]);
 
   const reorderSymbols = useCallback(async (symbols) => {
     try {

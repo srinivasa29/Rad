@@ -112,11 +112,13 @@ const ScreenerPage = () => {
       const symbolsToToggle = stocks
         .filter(s => selectedStocks.includes(s.id))
         .map(s => s.symbol);
+      const mode = String(localStorage.getItem('mode') || 'investor').toLowerCase();
+      const targetName = mode === 'investor' ? 'Investor Portfolio' : 'Research Watchlist';
       for (const symbol of symbolsToToggle) {
-        await toggleWatchlist(symbol, 'trader');
+        await toggleWatchlist(symbol, mode);
         count++;
       }
-      pushNotice(`Successfully toggled ${count} stocks in Research Watchlist.`);
+      pushNotice(`Successfully toggled ${count} stocks in ${targetName}.`);
       setSelectedStocks([]);
     } catch (err) {
       pushNotice(`Failed to update watchlist: ${err.message}`);

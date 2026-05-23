@@ -2143,33 +2143,36 @@ const MarketSentiment = () => {
 
 const NewsFlash = ({ variant = "full" }) => {
   const navigate = useNavigate();
-  const [newsItems, setNewsItems] = useState(NEWS_FALLBACK_ITEMS);
+  const [indiaNews, setIndiaNews] = useState([]);
+  const [globalNews, setGlobalNews] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [activeFeed, setActiveFeed] = useState("All");
   const [activeNewsMode, setActiveNewsMode] = useState("Headline Stream");
-  const [region, setRegion] = useState(() => localStorage.getItem('trader_news_region') || 'IN');
+
+  const [spotlightHeadline, setSpotlightHeadline] = useState(null);
 
   const loadNews = useCallback(async (silent = false) => {
     try {
       if (!silent) {
         setIsLoading(true);
       }
-      const response = await fetchMarketNews({ region });
-      setNewsItems(
-        Array.isArray(response) && response.length
-          ? response
-          : NEWS_FALLBACK_ITEMS
-      );
+      const [inRes, globalRes] = await Promise.all([
+        fetchMarketNews({ region: 'IN' }).catch(() => []),
+        fetchMarketNews({ region: 'GLOBAL' }).catch(() => [])
+      ]);
+      setIndiaNews(Array.isArray(inRes) && inRes.length ? inRes : NEWS_FALLBACK_ITEMS);
+      setGlobalNews(Array.isArray(globalRes) && globalRes.length ? globalRes : NEWS_FALLBACK_ITEMS);
     } catch (error) {
       console.error("Failed to load market news:", error);
-      setNewsItems(NEWS_FALLBACK_ITEMS);
+      setIndiaNews(NEWS_FALLBACK_ITEMS);
+      setGlobalNews(NEWS_FALLBACK_ITEMS);
     } finally {
       if (!silent) {
         setIsLoading(false);
       }
     }
-  }, [region]);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -2187,60 +2190,61 @@ const NewsFlash = ({ variant = "full" }) => {
   }, [loadNews]);
 
   const sourceStatsMap = {};
-  (newsItems || []).forEach((item) => {
+  const allNewsItems = [...indiaNews, ...globalNews];
+  allNewsItems.forEach((item) => {
     const key = String(item.source || "Radar");
     sourceStatsMap[key] = (sourceStatsMap[key] || 0) + 1;
   });
 
-  const filtered = (newsItems || [])
-    .map((item, index) => ({ item, meta: deriveNewsMeta(item, index) }))
-    .filter(({ item, meta }) => {
-      const term = search.trim().toLowerCase();
-      const source = String(item.source || "").toLowerCase();
+  const filterFeed = (items) => {
+    return (items || [])
+      .map((item, index) => ({ item, meta: deriveNewsMeta(item, index) }))
+      .filter(({ item, meta }) => {
+        const term = search.trim().toLowerCase();
+        const source = String(item.source || "").toLowerCase();
 
-      if (activeFeed !== "All" && source !== activeFeed.toLowerCase()) return false;
-      if (activeNewsMode === "Catalyst Watch" && !meta.isCatalyst) return false;
-      if (!term) return true;
+        if (activeFeed !== "All" && source !== activeFeed.toLowerCase()) return false;
+        if (activeNewsMode === "Catalyst Watch" && !meta.isCatalyst) return false;
+        if (!term) return true;
 
-      return `${item.source} ${item.title}`.toLowerCase().includes(term);
-    })
-    .sort((a, b) => {
-      const timeA = new Date(a.item?.publishedAt || 0).getTime() || 0;
-      const timeB = new Date(b.item?.publishedAt || 0).getTime() || 0;
+        return `${item.source} ${item.title}`.toLowerCase().includes(term);
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.item?.publishedAt || 0).getTime() || 0;
+        const timeB = new Date(b.item?.publishedAt || 0).getTime() || 0;
 
-      if (activeNewsMode === "Source Radar") {
-        const sourceA = String(a.item?.source || "Radar");
-        const sourceB = String(b.item?.source || "Radar");
-        const countA = sourceStatsMap[sourceA] || 0;
-        const countB = sourceStatsMap[sourceB] || 0;
-        if (countA !== countB) return countB - countA;
-      }
+        if (activeNewsMode === "Source Radar") {
+          const sourceA = String(a.item?.source || "Radar");
+          const sourceB = String(b.item?.source || "Radar");
+          const countA = sourceStatsMap[sourceA] || 0;
+          const countB = sourceStatsMap[sourceB] || 0;
+          if (countA !== countB) return countB - countA;
+        }
 
-      return timeB - timeA;
-    })
-    .map(({ item }) => item);
+        return timeB - timeA;
+      })
+      .map(({ item }) => item);
+  };
+
+  const combinedNews = filterFeed(allNewsItems);
+
   const sourceStats = Object.entries(sourceStatsMap)
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 4);
   const feeds = ["All", ...sourceStats.map((item) => item.name)];
 
-  const headline = filtered[0];
-  const avgPerSource = sourceStats.length > 0
-    ? (sourceStats.reduce((acc, item) => acc + item.value, 0) / sourceStats.length).toFixed(1)
-    : "0.0";
+  const headline = spotlightHeadline || combinedNews[0];
+
   const handleNewsClick = (newsItem) => {
     const url = String(newsItem?.url || '').trim();
     if (!url || url === '#') return;
     window.open(url, '_blank', 'noopener');
   };
 
-  const handleRegionChange = (nextRegion) => {
-    setRegion(nextRegion);
-    localStorage.setItem('trader_news_region', nextRegion);
-  };
-
   if (variant === "compact") {
+    const activeNews = combinedNews;
+
     return (
       <div className="tr-card flex flex-col h-full overflow-hidden bg-gradient-to-b from-[#0e1a2d] via-[#0a1320] to-[#070d17]">
         <div className="relative px-4 py-3 border-b border-white/10">
@@ -2262,29 +2266,7 @@ const NewsFlash = ({ variant = "full" }) => {
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
               Live
             </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">{filtered.length} stories</span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">{sourceStats.length} sources</span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">{headline ? formatNewsTime(headline.publishedAt) : "--:--"}</span>
-            <div className="ml-auto inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
-              <button
-                type="button"
-                onClick={() => handleRegionChange('IN')}
-                className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-all ${region === 'IN'
-                  ? "bg-amber-400/20 text-amber-100"
-                  : "text-slate-300 hover:text-slate-100"}`}
-              >
-                India
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRegionChange('GLOBAL')}
-                className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-all ${region === 'GLOBAL'
-                  ? "bg-cyan-400/20 text-cyan-100"
-                  : "text-slate-300 hover:text-slate-100"}`}
-              >
-                Global
-              </button>
-            </div>
+            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">{activeNews.length} stories</span>
           </div>
 
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-2.5">
@@ -2322,8 +2304,8 @@ const NewsFlash = ({ variant = "full" }) => {
 
         <div className="flex-1 min-h-0 max-h-[500px] overflow-y-auto custom-scrollbar px-3 py-4 space-y-3">
           {isLoading && <div className="py-8 text-center text-[#8b909a] text-xs">Loading news...</div>}
-          {!isLoading && filtered.length === 0 && <div className="py-8 text-center text-[#8b909a] text-xs">No matching headlines.</div>}
-          {!isLoading && filtered.map((news, i) => {
+          {!isLoading && activeNews.length === 0 && <div className="py-8 text-center text-[#8b909a] text-xs">No matching headlines.</div>}
+          {!isLoading && activeNews.map((news, i) => {
             const { indicatorColor, isBreaking, tag } = deriveNewsMeta(news, i);
 
             return (
@@ -2369,43 +2351,31 @@ const NewsFlash = ({ variant = "full" }) => {
   return (
     <div className="w-full min-h-screen px-6 py-6 text-[#dce9ff]">
       <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap"></div>
-
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center border-b border-white/5 pb-4">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {feeds.map((feed) => (
-              <button
-                key={feed}
-                type="button"
-                onClick={() => setActiveFeed(feed)}
-                className={`h-8 shrink-0 rounded-full border px-4 text-[12px] font-semibold transition ${activeFeed === feed ? "border-cyan-300/35 bg-cyan-400/15 text-white shadow-[0_0_0_1px_rgba(34,211,238,0.12)]" : "border-white/10 bg-white/5 text-slate-300 hover:border-cyan-300/25 hover:bg-cyan-400/8"}`}
-              >
-                {feed}
-              </button>
-            ))}
+        <div className="flex items-center justify-between gap-4 border-b border-white/5 pb-4 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 shadow-[0_0_16px_rgba(34,211,238,0.16)]">
+              <Newspaper size={18} className="text-cyan-200" />
+            </div>
+            <div>
+              <h1 className="text-lg font-black tracking-[0.2em] text-white uppercase">Radar News Terminal</h1>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Dedicated Regional & Global Coverage</p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap xl:justify-end">
-            <div className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
-              <button
-                type="button"
-                onClick={() => handleRegionChange('IN')}
-                className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-all ${region === 'IN'
-                  ? "bg-amber-400/20 text-amber-100"
-                  : "text-slate-300 hover:text-slate-100"}`}
-              >
-                India
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRegionChange('GLOBAL')}
-                className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-all ${region === 'GLOBAL'
-                  ? "bg-cyan-400/20 text-cyan-100"
-                  : "text-slate-300 hover:text-slate-100"}`}
-              >
-                Global
-              </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {feeds.map((feed) => (
+                <button
+                  key={feed}
+                  type="button"
+                  onClick={() => setActiveFeed(feed)}
+                  className={`h-8 shrink-0 rounded-full border px-4 text-[12px] font-semibold transition ${activeFeed === feed ? "border-cyan-300/35 bg-cyan-400/15 text-white shadow-[0_0_0_1px_rgba(34,211,238,0.12)]" : "border-white/10 bg-white/5 text-slate-300 hover:border-cyan-300/25 hover:bg-cyan-400/8"}`}
+                >
+                  {feed}
+                </button>
+              ))}
             </div>
+
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#7f95b8]" />
               <input
@@ -2418,65 +2388,76 @@ const NewsFlash = ({ variant = "full" }) => {
           </div>
         </div>
 
-        <p className="mt-2 inline-flex items-center rounded-full bg-amber-100/15 text-amber-200 border border-amber-300/30 px-3 py-1 text-[11px] font-bold shadow-sm">
-          Note: free sources prioritized; extended coverage available via paid APIs.
-        </p>
-
-        {/* Top Source / Source Breadth / Avg per Source cards removed */}
-
         <div className="grid grid-cols-12 gap-6 mt-6">
-          <div className="col-span-12 xl:col-span-8 min-h-0">
-            <div className="grid grid-cols-[1.2fr_0.75fr_0.45fr_0.45fr] gap-2 border-b border-white/5 px-2 pb-3 text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">
-              <span>Headline</span>
-              <span>Source</span>
-              <span>Time</span>
-              <span>Open</span>
+          {/* Main News Column */}
+          <div className="col-span-12 lg:col-span-8 min-h-0 flex flex-col">
+            <div className="flex items-center justify-between border-b border-cyan-500/15 pb-3 px-2 mb-3">
+              <span className="text-xs font-black uppercase tracking-[0.24em] text-cyan-300 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
+                Live Market Feed
+              </span>
+              <span className="text-[10px] font-mono text-slate-400">{combinedNews.length} items</span>
             </div>
 
-            <div className="max-h-[68vh] overflow-y-auto custom-scrollbar pr-1 pt-4">
-              {isLoading && <div className="py-10 text-center text-sm text-[#8ea1be]">Loading news feed...</div>}
-              {!isLoading && filtered.length === 0 && <div className="py-10 text-center text-sm text-[#8ea1be]">No matching headlines.</div>}
-
-              <div className="space-y-3">
-                {filtered.map((news, index) => (
-                  <motion.button
-                    key={`${news.publishedAt || "ts"}-${index}`}
-                    type="button"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.02, duration: 0.2 }}
-                    whileHover={{ scale: 1.005 }}
-                    onClick={() => handleNewsClick(news)}
-                    className="w-full text-left cursor-pointer rounded-xl border border-white/5 bg-[rgba(30,41,59,0.42)] px-3 py-3 shadow-[0_14px_30px_rgba(0,0,0,0.18)] transition-all hover:border-cyan-300/30 hover:shadow-[0_0_26px_rgba(6,182,212,0.18)]"
-                  >
-                    <div className="grid grid-cols-[1.2fr_0.75fr_0.45fr_0.45fr] gap-2 items-center">
-                      <div className="min-w-0">
-                        <div className="truncate text-[15px] font-black tracking-tight text-[#eef5ff]">{news.title}</div>
-                      </div>
-                      <div className="text-[12px] text-[#aac0e0] flex items-center gap-2"><Globe size={12} /> {news.source || "Radar"}</div>
-                      <div className="text-[12px] text-[#aac0e0]">{formatNewsTime(news.publishedAt)}</div>
-                      <div className="text-[12px] text-cyan-200 inline-flex items-center gap-1"><ExternalLink size={12} /> Open</div>
+            <div className="max-h-[68vh] overflow-y-auto custom-scrollbar pr-1 space-y-3">
+              {isLoading && <div className="py-10 text-center text-xs text-slate-500">Loading feed...</div>}
+              {!isLoading && combinedNews.length === 0 && <div className="py-10 text-center text-xs text-slate-500">No headlines matching filters.</div>}
+              {!isLoading && combinedNews.map((news, index) => (
+                <motion.button
+                  key={`news-${news.publishedAt || "ts"}-${index}`}
+                  type="button"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.01, duration: 0.2 }}
+                  whileHover={{ scale: 1.005 }}
+                  onMouseEnter={() => setSpotlightHeadline(news)}
+                  onClick={() => handleNewsClick(news)}
+                  className="w-full text-left cursor-pointer rounded-xl border border-white/5 bg-[rgba(30,41,59,0.3)] px-4 py-3.5 shadow-md hover:border-cyan-400/30 hover:bg-[rgba(30,41,59,0.5)] transition-all"
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <div className="text-[14px] font-bold tracking-tight text-[#eef5ff] line-clamp-2 leading-snug">{news.title}</div>
+                    <div className="flex items-center justify-between text-[11px] text-[#aac0e0]">
+                      <span className="flex items-center gap-1.5 font-medium"><Globe size={11} className="text-cyan-400" /> {news.source || "Radar"}</span>
+                      <span className="font-mono text-slate-400">{formatNewsTime(news.publishedAt)}</span>
                     </div>
-                  </motion.button>
-                ))}
-              </div>
+                  </div>
+                </motion.button>
+              ))}
             </div>
           </div>
 
-          <div className="col-span-12 xl:col-span-4 min-h-0">
-            <div className="flex h-full min-h-[520px] flex-col gap-3 rounded-[24px] border border-white/5 bg-[rgba(8,22,43,0.44)] p-4 shadow-[0_0_26px_rgba(34,211,238,0.14)]">
+          {/* Spotlight Column */}
+          <div className="col-span-12 lg:col-span-4 min-h-0">
+            <div className="flex h-full min-h-[520px] flex-col gap-3 rounded-[24px] border border-white/5 bg-[rgba(8,22,43,0.44)] p-5 shadow-[0_0_26px_rgba(34,211,238,0.14)] sticky top-6">
               <div>
                 <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Headline spotlight</div>
-                <h4 className="mt-2 text-2xl font-black tracking-tight text-white leading-tight">{headline?.title || "Select a headline"}</h4>
-                <p className="mt-2 text-sm leading-relaxed text-[#9fb2cf]">{headline ? `${headline.source || "Radar"} at ${formatNewsTime(headline.publishedAt)}` : "Use the feed to inspect the strongest market stories."}</p>
+                <h4 className="mt-2 text-xl font-black tracking-tight text-white leading-tight">{headline?.title || "Hover any headline to inspect"}</h4>
+                {headline && (
+                  <>
+                    <p className="mt-2 text-xs leading-relaxed text-[#9fb2cf]">
+                      Published by <span className="text-[#eef5ff] font-semibold">{headline.source || "Radar"}</span> at {formatNewsTime(headline.publishedAt)}
+                    </p>
+                    <p className="mt-4 text-sm leading-relaxed text-slate-300 font-sans border-t border-white/5 pt-4">
+                      {headline.summary || headline.description || "No full summary description was returned by the provider feed."}
+                    </p>
+                  </>
+                )}
               </div>
 
-              {/* Source Breakdown removed */}
+              {headline && headline.url && headline.url !== '#' && (
+                <button
+                  onClick={() => handleNewsClick(headline)}
+                  className="mt-auto w-full py-3 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-400/20 hover:border-cyan-400/40 rounded-xl text-xs font-bold uppercase tracking-wider text-cyan-200 transition-all flex items-center justify-center gap-2"
+                >
+                  <ExternalLink size={13} />
+                  Open Full Article Source
+                </button>
+              )}
 
-              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3 mt-3">
                 <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Research Cue</div>
-                <div className="mt-2 text-sm text-[#b7cae4] inline-flex items-center gap-2">
-                  <Zap size={14} className="text-amber-300" />
+                <div className="mt-2 text-xs text-[#b7cae4] inline-flex items-center gap-2">
+                  <Zap size={14} className="text-amber-300 shrink-0" />
                   Track cross-source confirmation before thesis updates.
                 </div>
               </div>
@@ -2867,6 +2848,9 @@ function ResearchView({ activeModule, onRequestModuleChange }) {
                   <h1 className="trader-dashboard-title">Structured market research workspace</h1>
                   <p className="trader-dashboard-subtitle">
                     Advanced analysis panels and high-fidelity research data for data-driven decisions.
+                  </p>
+                  <p className="mt-2 inline-flex items-center rounded-full bg-amber-100/15 text-amber-200 border border-amber-300/30 px-3 py-1 text-[11px] font-bold shadow-sm">
+                    Note: free sources prioritized; extended coverage available via paid APIs.
                   </p>
                 </section>
 

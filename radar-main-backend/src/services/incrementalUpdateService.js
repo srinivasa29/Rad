@@ -217,25 +217,52 @@ class IncrementalUpdateService {
         };
       }
 
-      const savePromises = newData.map(candle => 
-        ohlcService.saveOHLC({
-          ...candle,
-          symbol, // Remove .NS suffix for storage
-          exchange: 'NSE',
-          timeframe,
-          source: 'yahoo',
-        })
-      );
+      const cleanSym = symbol.toUpperCase().replace(/\.(NS|BO)$/i, '');
+      const timestamps = newData.map(c => new Date(c.timestamp || (c.time * 1000)));
+      const minDate = new Date(Math.min(...timestamps.map(t => t.getTime())));
+      const maxDate = new Date(Math.max(...timestamps.map(t => t.getTime())));
 
-      await Promise.all(savePromises);
+      // Fetch existing candles in this range to avoid duplicates in timeseries
+      const existingDocs = await OHLC.find({
+        symbol: cleanSym,
+        exchange: 'NSE',
+        timeframe,
+        timestamp: { $gte: minDate, $lte: maxDate }
+      }).select('timestamp').lean();
 
-      logger.info(`Updated ${symbol}: ${newData.length} new candles`);
+      const existingTimes = new Set(existingDocs.map(d => new Date(d.timestamp).getTime()));
+      const newDocs = [];
+
+      for (const c of newData) {
+        const ts = new Date(c.timestamp || (c.time * 1000));
+        if (!existingTimes.has(ts.getTime())) {
+          newDocs.push({
+            timestamp: ts,
+            symbol: cleanSym,
+            exchange: 'NSE',
+            timeframe,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume || 0,
+            source: 'yahoo',
+          });
+        }
+      }
+
+      if (newDocs.length > 0) {
+        await OHLC.insertMany(newDocs, { ordered: false });
+        logger.info(`Updated ${symbol}: Saved ${newDocs.length} new candles to DB`);
+      } else {
+        logger.info(`Updated ${symbol}: No new candles needed`);
+      }
 
       return {
         symbol,
         success: true,
-        newCandles: newData.length,
-        latestDate: newData[newData.length - 1].timestamp,
+        newCandles: newDocs.length,
+        latestDate: newData[newData.length - 1].timestamp || new Date(newData[newData.length - 1].time * 1000).toISOString(),
       };
     } catch (error) {
       logger.error(`Error updating symbol ${symbol}: ${error.message}`);

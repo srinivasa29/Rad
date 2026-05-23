@@ -229,8 +229,6 @@ body {
 
 
 .dashboard-container.investor-theme {
-  background-color: transparent !important;
-  background-image: none !important;
   color: #1e293b;
 }
 
@@ -291,15 +289,16 @@ body {
 
 .dashboard-container.trader-theme .navbar {
   background: transparent !important;
-  border: 1px solid #1F2937;
+  border-bottom: 1px solid #1F2937;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02), 0 4px 20px rgba(0, 0, 0, 0.4);
-  border-radius: 12px;
-  margin: 0.75rem 1rem;
+  margin: 0;
+  border-radius: 0;
   height: 72px;
-  width: auto;
+  width: 100%;
   padding: 0 24px !important;
+  z-index: 100;
 }
 
 .dashboard-container.trader-theme .trader-glass-bar {
@@ -1403,6 +1402,7 @@ body {
 
 .dashboard-container.trader-theme .main-content-area {
   background: transparent;
+  padding: 0;
 }
 
 .dashboard-container.investor-theme .main-content-area {

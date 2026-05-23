@@ -1,5 +1,8 @@
 const axios = require('axios');
 const SymbolModel = require('../models/Symbol');
+const YahooFinance = require('yahoo-finance2').default;
+const yahooFinance = new YahooFinance();
+
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -184,6 +187,29 @@ const searchFallbackSymbols = ({ q, type, limit }) => {
     }));
 };
 
+const searchYahooFinanceSymbols = async (q, limit) => {
+    try {
+        const result = await yahooFinance.search(q, { newsCount: 0 });
+        const quotes = result?.quotes || [];
+        
+        return quotes
+            .filter(quote => quote.symbol)
+            .map(quote => ({
+                symbol: quote.symbol,
+                name: quote.longname || quote.shortname || quote.symbol,
+                exchange: quote.exchDisp || quote.exchange || 'NYSE',
+                country: quote.symbol.endsWith('.NS') ? 'IN' : (quote.symbol.endsWith('.BO') ? 'IN' : 'US'),
+                currency: quote.symbol.endsWith('.NS') ? 'INR' : (quote.symbol.endsWith('.BO') ? 'INR' : 'USD'),
+                type: String(quote.quoteType || quote.typeDisp || 'equity').toLowerCase(),
+                active: true,
+            }))
+            .slice(0, limit);
+    } catch (err) {
+        console.error('Yahoo Finance Search Error:', err);
+        return [];
+    }
+};
+
 const searchSymbolRegistry = async ({ q, type, limit = DEFAULT_LIMIT } = {}) => {
     const cappedLimit = Math.max(1, Math.min(MAX_LIMIT, Number(limit) || DEFAULT_LIMIT));
     const term = String(q || '').trim();
@@ -213,10 +239,27 @@ const searchSymbolRegistry = async ({ q, type, limit = DEFAULT_LIMIT } = {}) => 
             .limit(cappedLimit)
             .lean();
 
+        let results = [];
         if (rows.length > 0) {
-            return rows.map(normalizeResult);
+            results = rows.map(normalizeResult);
+        }
+
+        // If we don't have enough database results, search Yahoo Finance as a live fallback
+        if (results.length < cappedLimit) {
+            const yahooResults = await searchYahooFinanceSymbols(term, cappedLimit - results.length);
+            const existingSymbols = new Set(results.map(r => r.symbol.toUpperCase()));
+            for (const item of yahooResults) {
+                if (!existingSymbols.has(item.symbol.toUpperCase())) {
+                    results.push(item);
+                }
+            }
+        }
+
+        if (results.length > 0) {
+            return results;
         }
     } catch (_error) {
+        console.error("Registry search error:", _error);
     }
 
     return searchFallbackSymbols({ q: term, type, limit: cappedLimit });

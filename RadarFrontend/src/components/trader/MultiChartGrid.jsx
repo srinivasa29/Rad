@@ -218,8 +218,8 @@ const MultiChartGrid = ({ className, onOpenChart, timeframe = "15m", activeIndic
             newHistories[sym] = res.data.map((d) => ({
               ...d,
               time: timeframe === "1D"
-                ? new Date(d.timestamp).toLocaleDateString([], { month: "short", day: "numeric" })
-                : new Date(d.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                ? new Date(d.timestamp || d.datetime || d.date).toLocaleDateString([], { month: "short", day: "numeric" })
+                : new Date(d.timestamp || d.datetime || d.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
               price: Number(d.close),
               open: Number(d.open),
               high: Number(d.high),

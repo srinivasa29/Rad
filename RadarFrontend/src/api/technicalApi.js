@@ -20,9 +20,9 @@ export const fetchTechnicalSummary = async (assetType, symbol, options = {}) => 
     }
 };
 
-export const fetchWatchlistTechnicals = async () => {
+export const fetchWatchlistTechnicals = async (mode = 'trader') => {
     try {
-        const response = await api.get('/watchlist');
+        const response = await api.get('/watchlist', { params: { mode } });
         const payload = response.data?.data ?? response.data;
         return Array.isArray(payload) ? payload : [];
     } catch (error) {

@@ -5,24 +5,16 @@ import App from './App.jsx'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { SettingsProvider } from './context/SettingsContext'
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1051515250499-dummyclientid.apps.googleusercontent.com';
 
 function Root() {
-  const app = (
-    <SettingsProvider>
-      <App />
-    </SettingsProvider>
+  return (
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <SettingsProvider>
+        <App />
+      </SettingsProvider>
+    </GoogleOAuthProvider>
   );
-
-  if (googleClientId) {
-    return (
-      <GoogleOAuthProvider clientId={googleClientId}>
-        {app}
-      </GoogleOAuthProvider>
-    );
-  }
-
-  return app;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

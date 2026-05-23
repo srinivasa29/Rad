@@ -82,7 +82,7 @@ const buildOhlcv = async (symbol, timeframe) => {
     }
 
     return response.data.map(d => ({
-      time: Math.floor(new Date(d.timestamp).getTime() / 1000),
+      time: Math.floor(new Date(d.timestamp || d.datetime || d.date).getTime() / 1000),
       open: Number(d.open),
       high: Number(d.high),
       low: Number(d.low),

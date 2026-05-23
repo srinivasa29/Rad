@@ -29,8 +29,8 @@ const getTechnicalIndicators = async (assetType, symbol, interval = '1D', option
             sma200: null,
             bollinger: null,
             volumeStatus: 'average',
-            lastPrice: history?.length ? history[history.length - 1].price : null,
-            previousPrice: history?.length > 1 ? history[history.length - 2].price : null,
+            lastPrice: history?.length ? (history[history.length - 1].price ?? history[history.length - 1].close) : null,
+            previousPrice: history?.length > 1 ? (history[history.length - 2].price ?? history[history.length - 2].close) : null,
             lastChangePercent: null,
             lastUpdatedAt: history?.length ? history[history.length - 1].date : null,
             status: 'insufficient_data'
@@ -46,7 +46,11 @@ const getTechnicalIndicators = async (assetType, symbol, interval = '1D', option
         signal: validMacd[validMacd.length - 1].signal
     } : null;
 
-    const prices = history.map(h => h.price);
+    const prices = history.map(h => h.price ?? h.close);
+    const closes = prices;
+    const highs = history.map(h => h.high ?? h.price ?? h.close);
+    const lows = history.map(h => h.low ?? h.price ?? h.close);
+
     const ema20Raw = calculateEMA(prices, 20);
     const ema50Raw = calculateEMA(prices, 50);
     const ema200Raw = calculateEMA(prices, 200);
@@ -64,8 +68,8 @@ const getTechnicalIndicators = async (assetType, symbol, interval = '1D', option
 
     let support = null;
     let resistance = null;
-    if (prices.length >= 20) {
-        const recent20 = prices.slice(-20);
+    if (closes.length >= 20) {
+        const recent20 = closes.slice(-20);
         support = parseFloat(Math.min(...recent20).toFixed(2));
         resistance = parseFloat(Math.max(...recent20).toFixed(2));
     }
@@ -73,12 +77,12 @@ const getTechnicalIndicators = async (assetType, symbol, interval = '1D', option
     const volumeStatus = getVolumeStatus(history, 20);
     const last = history[history.length - 1] || null;
     const previous = history[history.length - 2] || null;
-    const lastPrice = Number(last?.price);
-    const previousPrice = Number(previous?.price);
+    const lastPrice = Number(last?.close ?? last?.price);
+    const previousPrice = Number(previous?.close ?? previous?.price);
     const lastChangePercent = Number.isFinite(lastPrice) && Number.isFinite(previousPrice) && previousPrice > 0
         ? Number((((lastPrice - previousPrice) / previousPrice) * 100).toFixed(2))
         : null;
-    const lastUpdatedAt = last?.date || null;
+    const lastUpdatedAt = last?.datetime || last?.date || null;
 
     let atr = null;
     try {

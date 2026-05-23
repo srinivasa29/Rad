@@ -187,28 +187,7 @@ function TraderPanel({ backendSymbol, history, toneClass, quoteStatus, historySt
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
-                <div className="xl:col-span-2 rounded-2xl border border-slate-700 bg-[#111827] p-4 shadow-lg flex flex-col justify-between">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                        <h2 className="text-sm font-black text-slate-100 uppercase tracking-wider">Trading Terminal</h2>
-                        <span className="text-[11px] text-slate-400 font-semibold">{backendSymbol.replace(/\.(NS|BO)$/i, '')}</span>
-                    </div>
-                    <div className="h-[460px] rounded-xl border border-slate-700 overflow-hidden bg-[#0F172A]">
-                        <TraderChartPanel 
-                            symbol={backendSymbol.replace(/\.(NS|BO)$/i, '')} 
-                            price={currentPrice} 
-                            assetType={backendSymbol.endsWith('.NS') || backendSymbol.endsWith('.BO') ? 'STOCK' : 'CRYPTO'} 
-                            variant="advanced" 
-                            hideHeaderSymbol={true} 
-                            hideRightPanel={true} 
-                            height={460}
-                        />
-                    </div>
-                    <p className="mt-2 text-[11px] font-semibold text-slate-400">
-                        Interactive lightweight charts dashboard. Synchronized with live exchange quote updates.
-                    </p>
-                </div>
-
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4 shadow-lg">
                     <h2 className="text-sm font-black text-slate-100 uppercase tracking-wider mb-3">Execution Levels</h2>
                     <div className="space-y-2">

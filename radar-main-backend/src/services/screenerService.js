@@ -1,6 +1,8 @@
 const { fetchStockData } = require('./stockService');
 const { getTechnicalIndicators, getTechnicalIndicatorsFromOHLC } = require('./indicatorService');
 const { getInstrumentScore } = require('./scoringService');
+const yahooFinanceService = require('./yahooFinanceService');
+const logger = require('../utils/logger');
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 200;
@@ -104,6 +106,8 @@ const applyBaseFilters = (rows, filters) => rows.filter((row) => {
     if (!inRange(row.change, filters.minChange, filters.maxChange)) return false;
     if (!inRange(row.pe, filters.minPe, filters.maxPe)) return false;
     if (!inRange(row.marketCapNumeric, filters.minMarketCap, filters.maxMarketCap)) return false;
+    if (!inRange(row.roe, filters.minRoe, filters.maxRoe)) return false;
+    if (!inRange(row.dividendYield, filters.minYield, filters.maxYield)) return false;
 
     if (Array.isArray(filters.sectors) && filters.sectors.length > 0) {
         const normalizedSectors = filters.sectors.map((sector) => String(sector || '').toLowerCase());
@@ -173,12 +177,14 @@ const applyTechnicalFilters = (rows, filters) => rows.filter((row) => {
 
 const parseMarketCap = (value) => {
     if (!value) return NaN;
-    const text = String(value).toUpperCase().replace(/[$,\s]/g, '');
-    const multiplier = text.endsWith('T') ? 1_000_000_000_000
-        : text.endsWith('B') ? 1_000_000_000
-            : text.endsWith('M') ? 1_000_000
-                : 1;
-    const numeric = Number.parseFloat(text.replace(/[TBM]$/, ''));
+    const text = String(value).toUpperCase().replace(/[$,₹\s]/g, '');
+    let multiplier = 1;
+    if (text.endsWith('T')) multiplier = 1_000_000_000_000;
+    else if (text.endsWith('B')) multiplier = 1_000_000_000;
+    else if (text.endsWith('M')) multiplier = 1_000_000;
+    else if (text.endsWith('CR')) multiplier = 10_000_000;
+    
+    const numeric = Number.parseFloat(text.replace(/[TBM]|CR$/g, ''));
     return Number.isFinite(numeric) ? numeric * multiplier : NaN;
 };
 
@@ -394,6 +400,8 @@ const buildRow = (stock) => ({
     bias: 'neutral',
     technicalLive: false,
     technicalSource: 'pending',
+    roe: toNumber(stock.details?.roe, NaN),
+    dividendYield: toNumber(stock.details?.dividend_yield, NaN),
 });
 
 const runScreener = async (payload = {}) => {
@@ -432,52 +440,68 @@ const runScreener = async (payload = {}) => {
 
     const filteredRows = applyTechnicalFilters(enrichedRows, filters);
     const sorted = sortRows(filteredRows, sortBy, sortOrder);
-    const results = sorted.slice(0, limit).map((row) => ({
-        symbol: row.symbol,
-        displaySymbol: row.displaySymbol,
-        name: row.name,
-        price: Number.isFinite(row.price) ? Number(row.price.toFixed(2)) : 0,
-        change: Number.isFinite(row.change) ? Number(row.change.toFixed(2)) : 0,
-        volume: Number.isFinite(row.volume) ? Math.round(row.volume) : 0,
-        sector: row.sector !== 'Unknown' ? row.sector : (row.details?.sector || 'Equity'),
-        pe: Number.isFinite(row.pe) ? Number(row.pe.toFixed(2)) : null,
-        marketCap: row.marketCap,
-        marketCapNumeric: row.marketCapNumeric,
-        rsi: Number.isFinite(row.rsi) ? Number(row.rsi.toFixed(2)) : null,
-        score: Number.isFinite(row.score) ? Number(row.score.toFixed(0)) : null,
-        confidence: Number.isFinite(row.confidence) ? Number(row.confidence.toFixed(0)) : null,
-        bias: row.bias,
-        volumeStatus: row.volumeStatus,
-        technicalLive: row.technicalLive,
-        technicalSource: row.technicalSource,
-        emaCrossover: row.emaCrossover,
-        smaCrossover: row.smaCrossover,
-        bollingerSqueeze: row.bollingerSqueeze,
-        breakoutType: row.breakoutType,
-        riskRewardRatio: row.riskRewardRatio,
-        trendStrength: row.trendStrength,
-        candlestickPattern: row.candlestickPattern,
-        ...(includeIndicators ? {
-            ema20: Number.isFinite(row.ema20) ? Number(row.ema20.toFixed(2)) : null,
-            ema50: Number.isFinite(row.ema50) ? Number(row.ema50.toFixed(2)) : null,
-            ema200: Number.isFinite(row.ema200) ? Number(row.ema200.toFixed(2)) : null,
-            sma50: Number.isFinite(row.sma50) ? Number(row.sma50.toFixed(2)) : null,
-            sma200: Number.isFinite(row.sma200) ? Number(row.sma200.toFixed(2)) : null,
-            bollinger: row.bollinger || null,
-            atr: Number.isFinite(row.atr) ? Number(row.atr.toFixed(2)) : null,
-            support: Number.isFinite(row.support) ? Number(row.support.toFixed(2)) : null,
-            resistance: Number.isFinite(row.resistance) ? Number(row.resistance.toFixed(2)) : null,
-            lastChangePercent: Number.isFinite(row.lastChangePercent) ? Number(row.lastChangePercent.toFixed(2)) : null,
-            lastUpdatedAt: row.lastUpdatedAt || null,
-        } : {}),
-        // Helpful for frontend display
-        signal: row.bias === 'bullish' ? 'BULLISH' : row.bias === 'bearish' ? 'BEARISH' : 'NEUTRAL',
-        why: row.bias === 'bullish'
-            ? `Bullish swing setup. Price is trending with ${row.trendStrength} momentum and MACD buy signal.`
-            : row.bias === 'bearish'
-                ? `Bearish pressure detected. Risk reward ratio is unfavorable at ${row.riskRewardRatio}x.`
-                : `Matched standard filters. Price consolidated near support at ₹${row.support || '—'}.`,
-        tags: [row.sector || 'Equity', row.bias || 'neutral', row.candlestickPattern !== 'none' ? row.candlestickPattern : ''].filter(Boolean),
+    
+    const results = await Promise.all(sorted.slice(0, limit).map(async (row) => {
+        let sparklineData = null;
+        try {
+            // Fetch real-time trend data for the top matched stocks for sparkline rendering
+            const hist = await yahooFinanceService.fetchHistoricalData(row.symbol, '1D', '1mo');
+            if (hist.success && hist.data) {
+                sparklineData = hist.data.slice(-15).map(c => ({ value: c.close || c.price }));
+            }
+        } catch (e) {
+            logger.warn(`Sparkline fetch failed for ${row.symbol}: ${e.message}`);
+        }
+
+        return {
+            symbol: row.symbol,
+            displaySymbol: row.displaySymbol,
+            name: row.name,
+            price: Number.isFinite(row.price) ? Number(row.price.toFixed(2)) : 0,
+            change: Number.isFinite(row.change) ? Number(row.change.toFixed(2)) : 0,
+            volume: Number.isFinite(row.volume) ? Math.round(row.volume) : 0,
+            sector: row.sector !== 'Unknown' ? row.sector : (row.details?.sector || 'Equity'),
+            pe: Number.isFinite(row.pe) ? Number(row.pe.toFixed(2)) : null,
+            marketCap: row.marketCap,
+            marketCapNumeric: row.marketCapNumeric,
+            rsi: Number.isFinite(row.rsi) ? Number(row.rsi.toFixed(2)) : null,
+            score: Number.isFinite(row.score) ? Number(row.score.toFixed(0)) : null,
+            confidence: Number.isFinite(row.confidence) ? Number(row.confidence.toFixed(0)) : null,
+            bias: row.bias,
+            volumeStatus: row.volumeStatus,
+            technicalLive: row.technicalLive,
+            technicalSource: row.technicalSource,
+            emaCrossover: row.emaCrossover,
+            smaCrossover: row.smaCrossover,
+            bollingerSqueeze: row.bollingerSqueeze,
+            breakoutType: row.breakoutType,
+            riskRewardRatio: row.riskRewardRatio,
+            trendStrength: row.trendStrength,
+            candlestickPattern: row.candlestickPattern,
+            roe: Number.isFinite(row.roe) ? Number(row.roe.toFixed(2)) : null,
+            dividendYield: Number.isFinite(row.dividendYield) ? Number(row.dividendYield.toFixed(2)) : null,
+            sparklineData,
+            ...(includeIndicators ? {
+                ema20: Number.isFinite(row.ema20) ? Number(row.ema20.toFixed(2)) : null,
+                ema50: Number.isFinite(row.ema50) ? Number(row.ema50.toFixed(2)) : null,
+                ema200: Number.isFinite(row.ema200) ? Number(row.ema200.toFixed(2)) : null,
+                sma50: Number.isFinite(row.sma50) ? Number(row.sma50.toFixed(2)) : null,
+                sma200: Number.isFinite(row.sma200) ? Number(row.sma200.toFixed(2)) : null,
+                bollinger: row.bollinger || null,
+                atr: Number.isFinite(row.atr) ? Number(row.atr.toFixed(2)) : null,
+                support: Number.isFinite(row.support) ? Number(row.support.toFixed(2)) : null,
+                resistance: Number.isFinite(row.resistance) ? Number(row.resistance.toFixed(2)) : null,
+                lastChangePercent: Number.isFinite(row.lastChangePercent) ? Number(row.lastChangePercent.toFixed(2)) : null,
+                lastUpdatedAt: row.lastUpdatedAt || null,
+            } : {}),
+            signal: row.bias === 'bullish' ? 'BULLISH' : row.bias === 'bearish' ? 'BEARISH' : 'NEUTRAL',
+            why: row.bias === 'bullish'
+                ? `Bullish swing setup. Price is trending with ${row.trendStrength} momentum and MACD buy signal.`
+                : row.bias === 'bearish'
+                    ? `Bearish pressure detected. Risk reward ratio is unfavorable at ${row.riskRewardRatio}x.`
+                    : `Matched standard filters. Price consolidated near support at ₹${row.support || '—'}.`,
+            tags: [row.sector || 'Equity', row.bias || 'neutral', row.candlestickPattern !== 'none' ? row.candlestickPattern : ''].filter(Boolean),
+        };
     }));
 
     const response = {

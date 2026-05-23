@@ -227,6 +227,8 @@ const updateUserProfile = asyncHandler(async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
     }
 
+    let targetUser = user;
+
     if (username && username !== user.username) {
         const taken = await User.findOne({ username, _id: { $ne: user._id } });
         if (taken) return res.status(400).json({ error: 'Username already taken' });

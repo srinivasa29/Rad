@@ -16,6 +16,10 @@ import {
     LogOut,
     Menu,
     GraduationCap,
+    AlertTriangle,
+    Briefcase,
+    Target,
+    Radar,
 } from "lucide-react";
 import { useHeaderData } from "../../hooks/useHeaderData";
 import { fetchMarketData, fetchTrendingSearches, logSearchQuery } from "../../api/marketApi";
@@ -43,6 +47,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
     const {
         profile,
         userInitial,
+        userImage,
         notifications,
         unreadCount,
         isLoadingNotifications,
@@ -113,11 +118,14 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
     }, []);
 
     const openStockPage = (value) => {
-        const symbol = String(value || '').trim();
+        const symbol = String(value || '').trim().toUpperCase().replace(/\.(NS|BO)$/i, '');
         if (!symbol) return;
         const mode = localStorage.getItem('mode') || 'INVESTOR';
-        const path = mode === 'INVESTOR' ? '/investor-stock/' : '/stocks/';
-        navigate(`${path}${encodeURIComponent(symbol.toUpperCase())}`);
+        if (mode === 'INVESTOR') {
+            navigate(`/investor/advanced-charts?symbol=${encodeURIComponent(symbol)}`);
+        } else {
+            navigate(`/stocks/${encodeURIComponent(symbol)}`);
+        }
     };
 
     const navigateInvestorModule = (moduleId) => {
@@ -214,8 +222,12 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                                     e.preventDefault();
                                     setHighlightedIndex((prev) => (prev - 1 + optionsLength) % optionsLength);
                                 } else if (e.key === 'Enter') {
-                                    if (usingSearchResults && searchResults.length > 0) {
-                                        await handleSearchSelect(searchResults[Math.max(0, highlightedIndex)]);
+                                    if (usingSearchResults) {
+                                        if (searchResults.length > 0 && highlightedIndex >= 0) {
+                                            await handleSearchSelect(searchResults[highlightedIndex]);
+                                        } else {
+                                            await handleTrendingSelect(searchQuery.trim().toUpperCase());
+                                        }
                                     } else if (!usingSearchResults && trendingSearches.length > 0) {
                                         await handleTrendingSelect(trendingSearches[Math.max(0, highlightedIndex)]);
                                     }
@@ -228,17 +240,24 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                                 {isSearching ? (
                                     <div className="px-4 py-3 text-xs font-semibold text-slate-500">Searching...</div>
                                 ) : searchQuery.trim().length > 0 ? (
-                                    searchResults.map((item, idx) => (
-                                        <button key={idx} onClick={() => handleSearchSelect(item)} className={`w-full text-left px-4 py-3 border-b border-blue-50 ${highlightedIndex === idx ? 'bg-blue-50' : 'hover:bg-blue-50'}`}>
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-xs font-black text-slate-800">{displaySymbol(item.symbol)}</p>
-                                                    <p className="text-[10px] text-slate-500">{item.name}</p>
+                                    searchResults.length > 0 ? (
+                                        searchResults.map((item, idx) => (
+                                            <button key={idx} onClick={() => handleSearchSelect(item)} className={`w-full text-left px-4 py-3 border-b border-blue-50 ${highlightedIndex === idx ? 'bg-blue-50' : 'hover:bg-blue-50'}`}>
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-xs font-black text-slate-800">{displaySymbol(item.symbol)}</p>
+                                                        <p className="text-[10px] text-slate-500">{item.name}</p>
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-[#3E84F6]">{item.type}</span>
                                                 </div>
-                                                <span className="text-[10px] font-bold text-[#3E84F6]">{item.type}</span>
-                                            </div>
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <button onClick={() => handleTrendingSelect(searchQuery.trim().toUpperCase())} className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors">
+                                            <p className="text-xs font-black text-slate-800">Search for '{searchQuery.toUpperCase()}'</p>
+                                            <p className="text-[10px] text-slate-500">Press Enter to navigate directly</p>
                                         </button>
-                                    ))
+                                    )
                                 ) : (
                                     <div className="px-4 py-3">
                                         <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Trending</p>
@@ -255,63 +274,19 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                         )}
                     </div>
 
-                    {/* Notification & Profile Buttons */}
+                    {/* Profile Button Only */}
                     <div className="flex items-center gap-2 border-l border-blue-100/30 pl-4">
-                        <div className="relative" onMouseEnter={() => setIsNotificationsOpen(true)} onMouseLeave={() => setIsNotificationsOpen(false)}>
-                            <button className="relative w-9 h-9 flex items-center justify-center hover:bg-blue-50 rounded-full text-[#3E84F6]">
-                                <Bell size={20} />
-                                {unreadCount > 0 && <span className="absolute top-1 right-1 min-w-[16px] h-[16px] bg-rose-500 rounded-full text-white text-[9px] flex items-center justify-center font-bold px-1">{unreadCount}</span>}
-                            </button>
-                            {isNotificationsOpen && (
-                                <div className="absolute right-0 top-10 w-80 bg-white border border-blue-100 rounded-xl shadow-2xl py-0 z-[120] animate-in fade-in slide-in-from-top-1 overflow-hidden">
-                                    <div className="px-4 py-3 border-b flex justify-between items-center bg-blue-50/50">
-                                        <h3 className="font-bold text-[11px] uppercase tracking-wider text-blue-900">Notifications</h3>
-                                        <button onClick={markAllNotificationsRead} className="text-[10px] font-bold text-blue-600 hover:underline">Mark all read</button>
-                                    </div>
-                                    <div className="max-h-80 overflow-y-auto">
-                                        {notifications && notifications.length > 0 ? notifications.map((n, i) => (
-                                            <div 
-                                                key={i} 
-                                                onClick={() => markSingleRead(n._id || n.id)}
-                                                className={`px-4 py-3 border-b border-blue-50 cursor-pointer transition-colors hover:bg-blue-50/50 flex gap-3 ${!n.read ? 'bg-blue-50/30' : ''}`}
-                                            >
-                                                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${!n.read ? 'bg-blue-500' : 'bg-transparent'}`} />
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-[11px] font-black text-slate-800 truncate leading-snug">{n.title}</p>
-                                                    <p className="text-[10px] text-slate-600 line-clamp-2 mt-0.5 leading-normal">{n.message}</p>
-                                                    <p className="text-[9px] text-slate-400 mt-1.5 uppercase font-bold tracking-tight">{formatNotificationTime(n.timestamp || n.createdAt)}</p>
-                                                </div>
-                                            </div>
-                                        )) : (
-                                            <div className="p-10 text-center flex flex-col items-center justify-center opacity-40">
-                                                <Bell size={24} className="mb-2 text-slate-300" />
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No new notifications</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
                         <div className="relative">
-                            <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="w-9 h-9 rounded-full bg-[#3E84F6] text-white flex items-center justify-center text-xs font-black cursor-pointer hover:scale-110 transition-all shadow-lg shadow-blue-500/20 overflow-hidden">
-                                {profile?.profilePicture ? (
-                                    <img src={profile.profilePicture} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                    userInitial
-                                )}
+                            <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="w-9 h-9 rounded-full bg-[#3E84F6] text-white flex items-center justify-center text-xs font-black cursor-pointer hover:scale-110 transition-all shadow-lg shadow-blue-500/20">
+                                {userInitial}
                             </div>
                             {isProfileOpen && (
                                 <div className="absolute right-0 top-12 w-[320px] bg-white border border-slate-100 rounded-[28px] shadow-[0_20px_50px_rgba(0,0,0,0.12)] overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2">
                                     {/* Header Section with Avatar */}
                                     <div className="px-6 py-5 bg-[#F8FAFF] flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-500/20 flex-shrink-0 overflow-hidden">
-                                            {profile?.profilePicture ? (
-                                                <img src={profile.profilePicture} alt="" className="w-full h-full object-cover" />
-                                            ) : (
-                                                userInitial
-                                            )}
-                                        </div>
+                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-500/20 flex-shrink-0">
+                                        {userInitial}
+                                    </div>
                                         <div className="overflow-hidden">
                                             <p className="text-base font-black text-slate-900 leading-tight">{profile?.username || 'User'}</p>
                                             <p className="text-xs text-slate-500 font-bold mt-1">{profile?.email || 'user@radar.com'}</p>

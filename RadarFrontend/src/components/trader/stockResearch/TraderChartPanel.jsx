@@ -921,23 +921,14 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
         const arr = Array.isArray(res) ? res : res?.data || [];
         return arr.map(d => {
           let timeVal = NaN;
-          if (d.timestamp) {
-            if (typeof d.timestamp === 'string') {
-              timeVal = new Date(d.timestamp).getTime() / 1000;
-            } else if (typeof d.timestamp === 'number') {
-              timeVal = d.timestamp > 1e11 ? d.timestamp / 1000 : d.timestamp;
-            } else if (d.timestamp instanceof Date) {
-              timeVal = d.timestamp.getTime() / 1000;
-            }
-          }
-          if (isNaN(timeVal)) {
-            const rawTime = d.time || d.timestamp;
-            if (rawTime) {
-              if (typeof rawTime === 'string') {
-                timeVal = new Date(rawTime).getTime() / 1000;
-              } else {
-                timeVal = Number(rawTime) > 1e11 ? Number(rawTime) / 1000 : Number(rawTime);
-              }
+          const rawTime = d.timestamp || d.time || d.datetime || d.date;
+          if (rawTime) {
+            if (typeof rawTime === 'string') {
+              timeVal = new Date(rawTime).getTime() / 1000;
+            } else if (typeof rawTime === 'number') {
+              timeVal = rawTime > 1e11 ? rawTime / 1000 : rawTime;
+            } else if (rawTime instanceof Date) {
+              timeVal = rawTime.getTime() / 1000;
             }
           }
           return {

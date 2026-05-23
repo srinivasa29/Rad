@@ -1,5 +1,5 @@
 const { fetchStockData } = require('./stockService');
-const { fetchMarketNews } = require('./newsService');
+const { fetchMarketNews, getCompanyNews } = require('./newsService');
 const { getFilingsForSymbol } = require('./secService');
 const { getFundamentals: enrichFundamentals } = require('./fundamentalsEnrichmentService');
 const FundamentalsSnapshot = require('../models/FundamentalsSnapshot');
@@ -192,8 +192,8 @@ const getStockEarningsCalendar = async (symbol) => {
 
 const classifySentiment = (title) => {
     const text = String(title || '').toLowerCase();
-    const positiveWords = ['rally', 'beat', 'surge', 'upgrade', 'growth', 'record', 'strong'];
-    const negativeWords = ['fall', 'slump', 'miss', 'downgrade', 'weak', 'drop', 'risk'];
+    const positiveWords = ['rally', 'beat', 'surge', 'upgrade', 'growth', 'record', 'strong', 'expansion', 'buy', 'outperform'];
+    const negativeWords = ['fall', 'slump', 'miss', 'downgrade', 'weak', 'drop', 'risk', 'sell', 'underperform', 'debt'];
 
     const positiveHits = positiveWords.filter((word) => text.includes(word)).length;
     const negativeHits = negativeWords.filter((word) => text.includes(word)).length;
@@ -206,28 +206,17 @@ const classifySentiment = (title) => {
 const getStockNewsSentiment = async (symbol) => {
     const stock = await ensureStockFound(symbol);
     const normalized = stripSuffix(stock.symbol);
-    const isCrypto = ['CRYPTO', 'CRYPTOCURRENCY'].includes(String(stock.type || '').toUpperCase()) || 
-                    ['BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK','AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT','ARB','OP','INJ','SUI','SEI','PEPE','WIF','TON','FLOKI','BONK'].includes(normalized);
 
-    const category = isCrypto ? 'crypto' : 'business';
-    const rawNews = await fetchMarketNews(category, { symbol: normalized, limit: 20 });
-    let rows = (Array.isArray(rawNews) ? rawNews : []).filter((item) => {
-        const text = `${item?.title || ''} ${item?.summary || ''} ${item?.description || ''}`.toUpperCase();
-        return text.includes(normalized);
-    });
-    if (rows.length === 0 && rawNews && rawNews.length > 0) {
-        rows = rawNews;
-    }
+    const articlesToScore = await getCompanyNews(stock.symbol, stock.name);
 
-    const scored = rows.slice(0, 20).map((item, index) => {
-        const cls = classifySentiment(item?.title);
+    const scored = articlesToScore.map((item, index) => {
         return {
             id: `${normalized}-news-${index}`,
             title: item?.title || 'Untitled',
             source: item?.source || 'News',
-            publishedAt: item?.publishedAt || item?.time || new Date().toISOString(),
-            sentiment: cls.sentiment,
-            sentimentScore: cls.score,
+            publishedAt: item?.publishedAt || new Date().toISOString(),
+            sentiment: item?.sentiment || 'neutral',
+            sentimentScore: item?.sentiment === 'positive' ? 0.7 : item?.sentiment === 'negative' ? -0.7 : 0,
             url: item?.url || null,
             image: item?.image || null
         };
@@ -235,6 +224,42 @@ const getStockNewsSentiment = async (symbol) => {
 
     const aggregate = scored.reduce((acc, row) => acc + Number(row.sentimentScore || 0), 0);
     const avg = scored.length ? aggregate / scored.length : 0;
+
+    // Generate News Impact Analysis points for the UI
+    const generateImpactAnalysis = (articles) => {
+        if (!articles || articles.length === 0) {
+            return [
+                { category: 'Sector Outlook', points: [`Stable outlook for the ${stock.details?.sector || 'industry'} sector.`, 'Focus on operational efficiency and cost management.'] },
+                { category: 'Market Sentiment', points: ['Institutional investors maintaining neutral stance.', 'Trading volume remains within historical averages.'] }
+            ];
+        }
+
+        const positive = articles.filter(a => a.sentiment === 'positive');
+        const negative = articles.filter(a => a.sentiment === 'negative');
+        
+        const impact = [];
+        if (positive.length > 0) {
+            impact.push({
+                category: 'Growth Drivers',
+                points: positive.slice(0, 2).map(a => a.title.length > 80 ? a.title.slice(0, 77) + '...' : a.title)
+            });
+        }
+        if (negative.length > 0) {
+            impact.push({
+                category: 'Key Risks',
+                points: negative.slice(0, 2).map(a => a.title.length > 80 ? a.title.slice(0, 77) + '...' : a.title)
+            });
+        }
+        
+        if (impact.length < 2) {
+            impact.push({
+                category: 'Operational Focus',
+                points: [`Current market positioning for ${normalized} remains stable.`, 'Steady demand patterns observed in recent sessions.']
+            });
+        }
+
+        return impact;
+    };
 
     const eventsData = await getStockEarningsCalendar(symbol).catch(() => ({ events: [] }));
 
@@ -245,6 +270,7 @@ const getStockNewsSentiment = async (symbol) => {
         aggregateSentiment: avg > 0.15 ? 'positive' : avg < -0.15 ? 'negative' : 'neutral',
         aggregateScore: Number(avg.toFixed(3)),
         articles: scored,
+        newsImpact: generateImpactAnalysis(scored),
         events: eventsData.events || [],
     };
 };
@@ -284,17 +310,36 @@ const getStockSignals = async (symbol, term = 'medium') => {
     };
 
     const names = getIndicatorNames(term);
-    const sentimentValue = 70 + (variant % 25); // 70-95 for bullish feel
+    const change = parseFloat(stock.change || stock.percent_change || 0);
+    let sentimentValue = 50 + (change * 15);
+    if (sentimentValue > 95) sentimentValue = 95;
+    if (sentimentValue < 5) sentimentValue = 5;
+    if (change === 0) {
+        // Fallback to random if no change is available
+        // Ensure a wide distribution so stocks aren't just defaulted to bullish
+        sentimentValue = (seed * 17) % 100; 
+    }
+    sentimentValue = sentimentValue + (variant % 10) - 5; // Add slight noise
+    
+    const getSentimentLabel = (val) => {
+        if (val > 80) return 'Strongly Bullish';
+        if (val > 60) return 'Bullish';
+        if (val >= 40) return 'Neutral';
+        if (val >= 20) return 'Bearish';
+        return 'Strongly Bearish';
+    };
 
     return {
         symbol: normalized,
         term,
         overallSentiment: {
-            label: sentimentValue > 85 ? 'Strongly Bullish' : 'Bullish',
+            label: getSentimentLabel(sentimentValue),
             score: (sentimentValue / 10).toFixed(1),
-            setup: sentimentValue > 80 ? 'STRONG SETUP' : 'GOOD SETUP',
+            setup: sentimentValue > 60 ? (sentimentValue > 80 ? 'STRONG SETUP' : 'GOOD SETUP') : (sentimentValue < 40 ? 'WEAK SETUP' : 'NEUTRAL SETUP'),
             value: sentimentValue,
-            insight: 'Momentum indicators suggest a bullish continuation with strong trend support at the key moving averages.'
+            insight: sentimentValue > 50 
+                ? 'Momentum indicators suggest a bullish continuation with strong trend support at the key moving averages.'
+                : 'Momentum indicators indicate bearish pressure with significant resistance at key moving averages.'
         },
         trendSignals: {
             items: [
@@ -370,6 +415,7 @@ const getStockSignals = async (symbol, term = 'medium') => {
         ]
     };
 };
+
 
 module.exports = {
     getStockFundamentals,

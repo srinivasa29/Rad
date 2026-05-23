@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import api, { toggleWatchlist } from '../api/api';
-import { fetchCourses, getProgressKey } from '../api/learningApi';
+import { fetchCourses, getProgressKey, fetchProgress } from '../api/learningApi';
 import { submitSupportMessage } from '../api/supportApi';
 import Header from '../components/common/Header';
 import InvestorWatchlist from '../components/investor/Watchlist';
@@ -438,7 +438,7 @@ export function NewsPage() {
             setWatchlistLoading(true);
             setWatchlistError('');
             try {
-                const wlRes = await api.get('/watchlist').catch(() => ({ data: [] }));
+                const wlRes = await api.get('/watchlist', { params: { mode: userMode.toLowerCase() } }).catch(() => ({ data: [] }));
                 const lists = Array.isArray(wlRes.data) ? wlRes.data : [];
                 const symbols = lists.length > 0
                     ? (lists[0].items || []).map(i => {
@@ -1108,6 +1108,8 @@ export function ProfilePage({ embedded = false } = {}) {
     const [portfolio, setPortfolio] = useState(null);
     const [insights, setInsights] = useState([]);
     const [events, setEvents] = useState([]);
+    const [learningProgress, setLearningProgress] = useState([]);
+    const [totalProgress, setTotalProgress] = useState(0);
     const [loading, setLoading] = useState(true);
     const [notifications, setNotifications] = useState({
         priceAlerts:     { enabled: true },
@@ -1162,10 +1164,79 @@ export function ProfilePage({ embedded = false } = {}) {
 
     const [academyProgress, setAcademyProgress] = useState(0);
     const [academyCourses, setAcademyCourses] = useState([]);
+    const [sectorWeights, setSectorWeights] = useState([]);
+
+    // Fetch sector allocation from user's investor watchlist
+    useEffect(() => {
+        let cancelled = false;
+        const loadSectorAllocation = async () => {
+            try {
+                // 1. Get investor watchlist
+                const wlRes = await api.get('/watchlist', { params: { mode: 'investor' } }).catch(() => ({ data: [] }));
+                const lists = Array.isArray(wlRes.data) ? wlRes.data : [];
+                const firstList = lists[0];
+                if (!firstList || !firstList.items || firstList.items.length === 0) return;
+
+                // 2. Extract symbols
+                const symbols = firstList.items
+                    .map(item => {
+                        const sym = String(item?.symbol || item).trim().toUpperCase();
+                        return sym.endsWith('.NS') || sym.endsWith('.BO') ? sym : `${sym}.NS`;
+                    })
+                    .filter(Boolean)
+                    .slice(0, 20); // cap to 20 for performance
+
+                if (symbols.length === 0) return;
+
+                // 3. Fetch quotes (which include sector data)
+                const quotesRes = await api.get(`/market/quotes?symbols=${symbols.join(',')}`).catch(() => ({ data: { data: [] } }));
+                const quotes = quotesRes.data?.data || [];
+
+                // 4. Aggregate by sector
+                const sectorMap = {};
+                quotes.forEach(q => {
+                    const sector = q.details?.sector || q.sector || 'Other';
+                    sectorMap[sector] = (sectorMap[sector] || 0) + 1;
+                });
+
+                const total = Object.values(sectorMap).reduce((s, v) => s + v, 0);
+                const weights = Object.entries(sectorMap)
+                    .map(([name, count]) => ({
+                        name,
+                        value: count,
+                        weightPct: total > 0 ? Math.round((count / total) * 100) : 0
+                    }))
+                    .sort((a, b) => b.value - a.value);
+
+                if (!cancelled) setSectorWeights(weights);
+            } catch (err) {
+                console.warn('Sector allocation fetch failed:', err.message);
+            }
+        };
+
+        loadSectorAllocation();
+        return () => { cancelled = true; };
+    }, []);
+
+    // Re-compute academy progress from localStorage (called on mount + after any progress change)
+    const refreshAcademyProgress = (courses) => {
+        if (!courses || courses.length === 0) return;
+        const totalChapters = courses.reduce((sum, c) => sum + (c.chapters?.length || 0), 0);
+        let doneChapters = 0;
+        courses.forEach(c => {
+            try {
+                const progress = JSON.parse(localStorage.getItem(getProgressKey(c.id, 'investor')) || '{}');
+                doneChapters += Object.values(progress?.chapters || {}).filter(Boolean).length;
+            } catch (e) { /* ignore */ }
+        });
+        setAcademyProgress(totalChapters > 0 ? Math.round((doneChapters / totalChapters) * 100) : 0);
+    };
 
     useEffect(() => {
         const loadDashboardData = async () => {
             try {
+                const userId = localStorage.getItem('userId') || 'anonymous';
+
                 const [profileRes, portfolioRes, insightsRes, eventsRes] = await Promise.all([
                     api.get('/user/profile').catch(() => ({ data: null })),
                     api.get('/user/portfolio').catch(() => ({ data: null })),
@@ -1175,6 +1246,24 @@ export function ProfilePage({ embedded = false } = {}) {
 
                 // Load courses for this persona (investor profile = investor audience)
                 const coursesPayload = await fetchCourses('investor');
+
+                // Sync progress from backend so profile reflects it correctly
+                if (userId && userId !== 'anonymous') {
+                    try {
+                        const backendProgress = await fetchProgress(userId);
+                        Object.entries(backendProgress).forEach(([courseId, data]) => {
+                            const key = getProgressKey(courseId, 'investor');
+                            const localData = JSON.parse(localStorage.getItem(key) || '{}');
+                            const merged = {
+                                ...localData,
+                                ...data,
+                                chapters: { ...(localData.chapters || {}), ...(data.chapters || {}) },
+                                quizScores: { ...(localData.quizScores || {}), ...(data.quizScores || {}) }
+                            };
+                            localStorage.setItem(key, JSON.stringify(merged));
+                        });
+                    } catch (e) { console.warn('Failed to sync progress:', e); }
+                }
 
                 const storedDNA = getStoredInvestorDNA();
                 const profilePayload = toPayload(profileRes.data, null);
@@ -1223,29 +1312,30 @@ export function ProfilePage({ embedded = false } = {}) {
                 setInsights(toPayload(insightsRes.data, []));
                 setEvents(toPayload(eventsRes.data, []));
 
-                // Set courses + compute academy progress
+                // Set courses + compute academy progress from localStorage
                 setAcademyCourses(coursesPayload);
-                if (coursesPayload.length > 0) {
-                    const totalChapters = coursesPayload.reduce((sum, c) => sum + (c.chapters?.length || 0), 0);
-                    let doneChapters = 0;
-                    coursesPayload.forEach(c => {
-                        try {
-                            const progress = JSON.parse(localStorage.getItem(getProgressKey(c.id, 'investor')) || '{}');
-                            doneChapters += Object.values(progress?.chapters || {}).filter(Boolean).length;
-                        } catch (e) { /* ignore */ }
-                    });
-                    setAcademyProgress(totalChapters > 0 ? Math.round((doneChapters / totalChapters) * 100) : 0);
-                }
-
+                refreshAcademyProgress(coursesPayload);
             } catch (error) {
                 console.error("Failed to load profile data", error);
+                setLearningProgress([{ title: `Error: ${error?.message || 'Unknown'}`, status: 'Error', progress: 0, icon: <AlertCircle size={14} /> }]);
             } finally {
                 setLoading(false);
             }
         };
 
         loadDashboardData();
+
+        // Re-read progress whenever the user returns to the profile tab
+        const handleProgressUpdate = () => {
+            setAcademyCourses(prev => {
+                refreshAcademyProgress(prev);
+                return prev;
+            });
+        };
+        window.addEventListener('focus', handleProgressUpdate);
+        return () => window.removeEventListener('focus', handleProgressUpdate);
     }, []);
+
 
     const initial = profile?.username?.[0]?.toUpperCase() || 'U';
 
@@ -1270,6 +1360,7 @@ export function ProfilePage({ embedded = false } = {}) {
             LOADING INVESTOR IDENTITY...
         </div>
     );
+
 
     const dna = profile?.investorDNA || null;
     const hasDNA = dna && dna.dominant;
@@ -1389,25 +1480,31 @@ export function ProfilePage({ embedded = false } = {}) {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie 
-                                            data={portfolio?.sectorWeights?.length > 0 ? portfolio.sectorWeights : [{ name: 'None', value: 1 }]} 
-                                            cx="50%" cy="50%" innerRadius={35} outerRadius={50} paddingAngle={5} dataKey="value"
+                                            data={sectorWeights.length > 0 ? sectorWeights : [{ name: 'Add stocks to watchlist', value: 1 }]} 
+                                            cx="50%" cy="50%" innerRadius={35} outerRadius={50} paddingAngle={sectorWeights.length > 1 ? 5 : 0} dataKey="value"
                                         >
-                                            <Cell fill="#3b82f6" />
-                                            <Cell fill="#60a5fa" />
-                                            <Cell fill="#93c5fd" />
-                                            <Cell fill="#bfdbfe" />
-                                            <Cell fill="#dbeafe" />
+                                            {(sectorWeights.length > 0 ? sectorWeights : [{ name: 'None', value: 1 }]).map((_, idx) => (
+                                                <Cell key={idx} fill={['#3b82f6','#60a5fa','#93c5fd','#818cf8','#a78bfa','#bfdbfe','#c4b5fd','#dbeafe','#e0e7ff','#f0f9ff'][idx % 10]} />
+                                            ))}
                                         </Pie>
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
                             <div className="w-1/2">
                                 <p className="text-[9px] font-black text-slate-400 uppercase">Top Sector</p>
-                                <p className="text-[13px] font-black text-slate-800 truncate">{portfolio?.sectorWeights?.[0]?.name || 'Diversified'}</p>
-                                <p className="text-[11px] text-blue-600 font-bold mt-0.5">{portfolio?.sectorWeights?.[0]?.weightPct || 0}% weight</p>
+                                <p className="text-[13px] font-black text-slate-800 truncate">{sectorWeights[0]?.name || 'No Data'}</p>
+                                <p className="text-[11px] text-blue-600 font-bold mt-0.5">{sectorWeights[0]?.weightPct || 0}% weight</p>
+                                {sectorWeights.length > 1 && (
+                                    <div className="mt-2 space-y-0.5">
+                                        {sectorWeights.slice(1, 4).map((sw, i) => (
+                                            <p key={i} className="text-[9px] text-slate-400 font-bold truncate">{sw.name}: {sw.weightPct}%</p>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
+
                     <div className="p-8 rounded-[24px] bg-slate-50/50 border border-slate-100 space-y-4">
                         <div className="flex justify-between items-center text-emerald-500">
                             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Risk Profile</h3>
@@ -1519,6 +1616,8 @@ export function SettingsPage() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
     const [isSessionsModalOpen, setIsSessionsModalOpen] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(() => localStorage.getItem('profileImage'));
+    const fileInputRef = useRef(null);
 
 
     const [sessions, setSessions] = useState(() => [getCurrentSession()]);
@@ -1529,6 +1628,85 @@ export function SettingsPage() {
         importantNews: { enabled: true }
     });
 
+    const [preferences, setPreferences] = useState({
+        sectors: ['Technology', 'Financials'],
+        risk: 'Moderate',
+        style: 'Growth',
+        horizon: 'Long'
+    });
+
+    const mandatoryIndexes = ['NIFTY', 'SENSEX', 'BANKNIFTY'];
+    const defaultCustom = [];
+    const [customTickers, setCustomTickers] = useState(() => {
+        const saved = localStorage.getItem('investorTickerCustom');
+        return saved ? JSON.parse(saved) : defaultCustom;
+    });
+    const [newTicker, setNewTicker] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
+
+    useEffect(() => {
+        const fetchSearch = async () => {
+            if (!newTicker.trim() || newTicker.length < 2) {
+                setSearchResults([]);
+                setShowDropdown(false);
+                return;
+            }
+            // Avoid searching if they just selected a ticker (has a dot)
+            if (newTicker.includes('.')) {
+                return;
+            }
+            setIsSearching(true);
+            try {
+                const res = await api.get('/market/search', { params: { q: newTicker, limit: 15 } });
+                const data = res.data?.data || [];
+                const indianStocks = data.filter(item => {
+                    const sym = String(item.symbol || '').toUpperCase();
+                    return sym.endsWith('.NS') || sym.endsWith('.BO');
+                });
+                setSearchResults(indianStocks);
+                setShowDropdown(true);
+            } catch (err) {
+                console.error("Search failed", err);
+            } finally {
+                setIsSearching(false);
+            }
+        };
+
+        const timer = setTimeout(fetchSearch, 300);
+        return () => clearTimeout(timer);
+    }, [newTicker]);
+
+    const handleAddTicker = (e) => {
+        e.preventDefault();
+        const symbol = newTicker.trim().toUpperCase();
+        if (!symbol) return;
+        if (mandatoryIndexes.includes(symbol) || customTickers.includes(symbol)) {
+            setStatus('Symbol already in ticker tape.');
+            setTimeout(() => setStatus(''), 3000);
+            return;
+        }
+        // Ensure it has .NS or .BO
+        const finalSymbol = symbol.includes('.') ? symbol : `${symbol}.NS`;
+        
+        const newTickers = [...customTickers, finalSymbol];
+        setCustomTickers(newTickers);
+        localStorage.setItem('investorTickerCustom', JSON.stringify(newTickers));
+        window.dispatchEvent(new Event('ticker_tape_updated'));
+        setNewTicker('');
+        setStatus('Ticker added successfully.');
+        setTimeout(() => setStatus(''), 3000);
+    };
+
+    const handleRemoveTicker = (ticker) => {
+        const newTickers = customTickers.filter(t => t !== ticker);
+        setCustomTickers(newTickers);
+        localStorage.setItem('investorTickerCustom', JSON.stringify(newTickers));
+        window.dispatchEvent(new Event('ticker_tape_updated'));
+        setStatus('Ticker removed successfully.');
+        setTimeout(() => setStatus(''), 3000);
+    };
     useEffect(() => {
         const fullBackground = 'linear-gradient(180deg, #f0f9ff 0%, #e1effe 100%)';
         document.documentElement.style.setProperty('--investor-bg', fullBackground);
@@ -1762,6 +1940,85 @@ export function SettingsPage() {
                         </div>
                     </section>
 
+                    {/* 4. TICKER TAPE CUSTOMIZATION SECTION */}
+                    <section className="pt-12 border-t border-slate-50 space-y-10 animate-in fade-in slide-in-from-bottom-4 delay-300 duration-500 border border-blue-100/80 bg-white shadow-sm p-8 rounded-[24px]">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                                <TrendingUp size={20} />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-black text-slate-800">Ticker Tape Customization</h2>
+                                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-0.5">Manage Indian Market Indexes & Stocks</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-slate-50">
+                            <div className="space-y-4">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Mandatory Indian Indexes</h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {mandatoryIndexes.map((idx) => (
+                                        <div key={idx} className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-600 font-bold text-[11px] rounded-lg">
+                                            {idx} (Locked)
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-[11px] text-slate-400 font-bold leading-relaxed px-1">
+                                    These core indexes cannot be removed to ensure a balanced Indian market overview.
+                                </p>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Custom Indian Stocks</h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {customTickers.map((t) => (
+                                        <div key={t} className="px-3 py-1.5 bg-blue-50 border border-blue-100 text-blue-700 font-bold text-[11px] rounded-lg flex items-center gap-2">
+                                            {t}
+                                            <button onClick={() => handleRemoveTicker(t)} className="text-blue-400 hover:text-blue-600">✕</button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <form onSubmit={handleAddTicker} className="flex gap-2 relative">
+                                    <input 
+                                        type="text" 
+                                        value={newTicker} 
+                                        onChange={(e) => { setNewTicker(e.target.value); setShowDropdown(true); }} 
+                                        placeholder="Add symbol (e.g. RELIANCE)" 
+                                        className="flex-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 transition-all"
+                                        onFocus={() => { if(searchResults.length > 0) setShowDropdown(true); }}
+                                        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                                    />
+                                    <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black shadow-md shadow-blue-100 hover:bg-blue-700 transition-all">Add</button>
+                                    
+                                    {/* UPWARD DROPDOWN */}
+                                    {showDropdown && (isSearching || searchResults.length > 0) && (
+                                        <div className="absolute bottom-full left-0 mb-2 w-full max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl z-50 flex flex-col">
+                                            {isSearching ? (
+                                                <div className="p-3 text-xs text-slate-500 text-center font-bold animate-pulse">Searching Indian Markets...</div>
+                                            ) : (
+                                                searchResults.map((item) => (
+                                                    <div 
+                                                        key={item.symbol} 
+                                                        className="px-3 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0"
+                                                        onClick={() => {
+                                                            setNewTicker(item.symbol);
+                                                            setShowDropdown(false);
+                                                        }}
+                                                    >
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-xs font-black text-slate-800">{item.symbol.split('.')[0]}</span>
+                                                            <span className="text-[9px] font-bold text-slate-400 uppercase">{item.symbol.split('.')[1]}</span>
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-500 truncate">{item.name}</div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </form>
+                            </div>
+                        </div>
+                    </section>
+
                 </div>
 
             </main>
@@ -1787,7 +2044,17 @@ export function SettingsPage() {
                             try {
                                 const res = await api.patch('/user/profile', { username, email });
                                 if (res.data?.success) {
-                                    setProfile(prev => ({ ...prev, username: res.data.data.username, email: res.data.data.email }));
+                                    const updatedUser = res.data.data;
+                                    setProfile(prev => ({ ...prev, username: updatedUser.username, email: updatedUser.email }));
+                                    if (updatedUser.username) localStorage.setItem('username', updatedUser.username);
+                                    if (updatedUser.email) localStorage.setItem('email', updatedUser.email);
+                                    if (updatedUser.token) localStorage.setItem('token', updatedUser.token);
+                                    
+                                    if (selectedImage && selectedImage.startsWith('data:image')) {
+                                        localStorage.setItem('profileImage', selectedImage);
+                                    }
+
+                                    window.dispatchEvent(new Event('profile_updated'));
                                     setStatus('Changes Saved!');
                                     setTimeout(() => setStatus(''), 3000);
                                 }
@@ -1804,7 +2071,29 @@ export function SettingsPage() {
                                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-2xl font-black shadow-xl shadow-blue-100 border-4 border-white">
                                     {profile?.username?.charAt(0).toUpperCase() || 'U'}
                                 </div>
-                                <p className="text-[10px] text-slate-400 font-bold">Profile photo upload coming soon</p>
+                                <input 
+                                    type="file" 
+                                    ref={fileInputRef}
+                                    className="hidden" 
+                                    accept="image/png, image/jpeg"
+                                    onChange={(e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                                setSelectedImage(reader.result);
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+                                    }}
+                                />
+                                <button 
+                                    type="button" 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline"
+                                >
+                                    Change Photo
+                                </button>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1999,6 +2288,8 @@ export function InvestorFilingsPage() {
 export function HelpSupportPage() {
     const [openFaq, setOpenFaq] = useState(null);
     const [formStatus, setFormStatus] = useState(null);
+    const [formError, setFormError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [copied, setCopied] = useState(false);
     const [toast, setToast] = useState(null);
     const contactRef = useRef(null);
@@ -2006,7 +2297,6 @@ export function HelpSupportPage() {
     const faqs = [
         { q: "How are signals and recommendations generated?", a: "Radar uses a proprietary blend of technical indicators, fundamental health scores, and real-time news sentiment to calculate behavioral alignment and investment signals." },
         { q: "How often is the market data updated?", a: "Our price feeds and basic stats are updated in real-time. Core fundamental analysis and behavioral scores are recalculated every 24 hours." },
-        { q: "Is Radar a registered advisor? Is this financial advice?", a: "No. Radar is an intelligence platform designed for education and research. All data provided is for informational purposes only and does not constitute financial advice." },
         { q: "How can I update my profile or investment preferences?", a: "You can update your investor DNA by clicking 'Edit Profile' on your Profile page or by retaking the assessment to recalibrate your persona." }
     ];
 
@@ -2031,12 +2321,12 @@ export function HelpSupportPage() {
     };
 
     const copyEmail = () => {
-        navigator.clipboard.writeText('support@radar.com');
+        navigator.clipboard.writeText('srinivasamannepula7@gmail.com');
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         const form = e.currentTarget;
         const formData = new FormData(form);
@@ -2105,7 +2395,7 @@ export function HelpSupportPage() {
                             </div>
                             <p className="text-slate-500 text-xs font-medium mb-4">Typical response time: Within 24 hours.</p>
                             <div className="mt-auto flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
-                                <span className="text-sm font-black text-slate-700">support@radar.com</span>
+                                <span className="text-sm font-black text-slate-700">srinivasamannepula7@gmail.com</span>
                                 <button 
                                     onClick={copyEmail}
                                     className="p-2 hover:bg-slate-50 rounded-lg transition-all text-blue-600 flex items-center gap-2"
@@ -2127,7 +2417,6 @@ export function HelpSupportPage() {
                             <p className="text-slate-500 text-xs font-medium mb-4">Mon–Sat, 10:00 AM – 6:00 PM IST</p>
                             <div className="mt-auto bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
                                 <div className="text-sm font-black text-slate-700">+91 98765 43210</div>
-                                <div className="text-[9px] text-slate-400 font-bold italic mt-0.5">Note: (For demo purposes only)</div>
                             </div>
                         </div>
                     </div>
@@ -2171,7 +2460,13 @@ export function HelpSupportPage() {
                                 </div>
                             </div>
                         ) : (
-                            <form onSubmit={handleSubmit} className="space-y-6">
+                            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+                                {formError && (
+                                    <div className="bg-red-50 text-red-600 border border-red-200 px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-2 mb-4 animate-in slide-in-from-top-2">
+                                        <AlertCircle size={14} />
+                                        {formError}
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Name</label>

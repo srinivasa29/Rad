@@ -596,6 +596,39 @@
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
+/* Trader Full-Width Overrides */
+.dashboard-container.trader-theme .main-content-area .help-support-page,
+.dashboard-container.trader-theme .main-content-area .settings-container,
+.dashboard-container.trader-theme .main-content-area .trader-profile-page,
+.dashboard-container.trader-theme .main-content-area .screener-page,
+.dashboard-container.trader-theme .main-content-area .max-w-6xl,
+.dashboard-container.trader-theme .main-content-area .max-w-5xl,
+.dashboard-container.trader-theme .main-content-area .max-w-7xl,
+.dashboard-container.trader-theme .main-content-area .max-w-\[1840px\],
+.dashboard-container.trader-theme .main-content-area .max-w-\[1500px\],
+.dashboard-container.trader-theme .main-content-area .max-w-\[1200px\],
+.dashboard-container.trader-theme .main-content-area .max-w-\[1240px\],
+.dashboard-container.trader-theme .main-content-area .watchlist-dashboard {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+}
+
+/* Specific component shell overrides to make them full width */
+.dashboard-container.trader-theme .main-content-area .trader-profile-shell,
+.dashboard-container.trader-theme .main-content-area .help-support-shell {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.dashboard-container.trader-theme .trader-dashboard-container {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+}
+
 /* Responsive Grid Adjustments */
 @media (max-width: 1280px) {
   .tr-span-8, .tr-span-4 {

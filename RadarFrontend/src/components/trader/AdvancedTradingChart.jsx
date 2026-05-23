@@ -144,6 +144,11 @@ const AdvancedTradingChart = ({
         borderColor: '#1e293b',
         timeVisible: true,
         secondsVisible: false,
+        barSpacing: 12,
+        minBarSpacing: 4,
+        rightOffset: 5,
+        fixLeftEdge: false,
+        fixRightEdge: false,
       },
       rightPriceScale: {
         borderColor: '#1e293b',
@@ -168,14 +173,23 @@ const AdvancedTradingChart = ({
 
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
-        chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+        chartRef.current.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight || (showHeader ? height : height + 80),
+        });
       }
     };
 
+    // ResizeObserver for accurate container sizing
+    const resizeObserver = new ResizeObserver(() => handleResize());
+    if (chartContainerRef.current) resizeObserver.observe(chartContainerRef.current);
     window.addEventListener('resize', handleResize);
+    // Initial size set after mount
+    setTimeout(handleResize, 50);
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       chart.remove();
     };
   }, []);
@@ -190,7 +204,7 @@ const AdvancedTradingChart = ({
       });
       
       const data = response.data.map(d => ({
-        time: Math.floor(new Date(d.timestamp).getTime() / 1000),
+        time: Math.floor(new Date(d.timestamp || d.datetime || d.date).getTime() / 1000),
         open: Number(d.open),
         high: Number(d.high),
         low: Number(d.low),
@@ -202,7 +216,7 @@ const AdvancedTradingChart = ({
       
       if (candleSeriesRef.current && data.length > 0) {
         candleSeriesRef.current.setData(data);
-        
+
         const lastCandle = data[data.length - 1];
         const firstCandle = data[0];
         setCurrentPrice(lastCandle.close);
@@ -210,9 +224,14 @@ const AdvancedTradingChart = ({
           value: lastCandle.close - firstCandle.close,
           percent: ((lastCandle.close - firstCandle.close) / firstCandle.close) * 100,
         });
-      }
 
-      chartRef.current?.timeScale().fitContent();
+        // Fit and scroll to show latest candles properly
+        setTimeout(() => {
+          if (chartRef.current) {
+            chartRef.current.timeScale().fitContent();
+          }
+        }, 50);
+      }
       
       if (onChartReady) {
         onChartReady(chartRef.current);

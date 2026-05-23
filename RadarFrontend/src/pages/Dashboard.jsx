@@ -14,6 +14,8 @@ import {
   LogOut,
   GraduationCap,
   Radio,
+  Bell,
+  ChevronDown,
 } from "lucide-react";
 import { updateUserMode } from "../api/userApi";
 import api from "../api/api";
@@ -177,6 +179,7 @@ export default function Dashboard() {
   const {
     profile,
     userInitial,
+    userImage,
     notifications,
     unreadCount,
     isLoadingNotifications,
@@ -356,11 +359,14 @@ export default function Dashboard() {
   }, [showTraderSearchDropdown, traderSearchQuery, traderSearchResults, traderTrendingSearches, traderHighlightedIndex]);
 
   const openTraderStockPage = async (value) => {
-    const symbol = String(value || "").trim();
+    const symbol = String(value || "").trim().toUpperCase().replace(/\.(NS|BO)$/i, '');
     if (!symbol) return;
     const mode = localStorage.getItem('mode') || 'INVESTOR';
-    const path = mode === 'INVESTOR' ? '/investor-stock/' : '/stocks/';
-    navigate(`${path}${encodeURIComponent(symbol.toUpperCase())}`);
+    if (mode === 'INVESTOR') {
+      navigate(`/investor/advanced-charts?symbol=${encodeURIComponent(symbol)}`);
+    } else {
+      navigate(`/stocks/${encodeURIComponent(symbol)}`);
+    }
     await logSearchQuery(symbol);
   };
 
@@ -472,211 +478,194 @@ export default function Dashboard() {
       </AnimatePresence>
       {isTraderMode && (
         <>
-          <header className="navbar trader-glass-bar z-[100] px-6">
-            <div className="max-w-[1920px] mx-auto w-full flex items-center justify-between">
-              {}
-              <div className="flex items-center gap-10">
-                <a href="/" className="brand flex items-center gap-3">
-                  <img
-                    src="/radar-logo-final.jpg"
-                    alt="Radar Logo"
-                    className="w-8 h-8 rounded-full shadow-[0_0_10px_rgba(0,243,255,0.3)]"
-                  />
-                  <span className="brand-name text-lg font-bold tracking-widest text-white">
-                    RADAR
-                  </span>
-                </a>
+          <header className="navbar trader-glass-bar z-[100]" style={{ padding: '0 24px', display: 'flex', alignItems: 'center', height: '64px', width: '100%', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(6,8,18,0.95)', backdropFilter: 'blur(20px)' }}>
 
-                {}
-                <nav className="hidden lg:flex items-center gap-2">
-                  {[
-                    { id: "DASHBOARD", icon: LayoutDashboard, label: "Dashboard" },
-                    { id: "WATCHLIST", icon: Star, label: "Watchlist" },
-                    { id: "SCREENERS", icon: Filter, label: "Screeners" },
-                    { id: "NEWS", icon: Newspaper, label: "News" },
-                    { id: "ACADEMY", icon: GraduationCap, label: "Academy" },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => handleModuleChange(item.id)}
-                      className={`nav-link flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 ${activeModule === item.id
-                        ? isTraderMode
-                          ? "bg-[#00f3ff]/10 text-[#00f3ff] border border-[#00f3ff]/20 shadow-[0_0_15px_rgba(0,243,255,0.1)]"
-                          : "bg-blue-50 text-blue-600"
-                        : isTraderMode
-                          ? "text-gray-400 hover:text-white hover:bg-white/5"
-                          : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-                        }`}
-                    >
-                      <item.icon size={14} />
-                      {item.label}
-                    </button>
-                  ))}
-                </nav>
-              </div>
+            {/* LEFT: Logo + Nav Tabs together */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flex: 1 }}>
+              <a href="/" className="brand" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', flexShrink: 0 }}>
+                <img
+                  src="/radar-logo-final.jpg"
+                  alt="Radar Logo"
+                  style={{ width: '32px', height: '32px', borderRadius: '50%', boxShadow: '0 0 12px rgba(0,243,255,0.35)' }}
+                />
+                <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '17px', fontWeight: 900, letterSpacing: '0.18em', color: '#e2f0ff', textTransform: 'uppercase' }}>
+                  RADAR
+                </span>
+              </a>
 
-              {}
-              <div className="flex items-center gap-6">
-                <div 
-                  className="trader-search-shell-wrap relative hidden xl:block" 
-                  ref={traderSearchContainerRef}
-                  style={{ zIndex: 999999 }}
-                >
-                  <div className="trader-search-shell">
-                    <div className="trader-search-icon" aria-hidden="true">
-                      <Search size={16} />
-                    </div>
-                    <input
-                      type="text"
-                      name="trader_search_unique_xyz"
-                      autoComplete="new-password"
-                      spellCheck="false"
-                      placeholder="Search symbol"
-                      value={traderSearchQuery}
-                      onFocus={() => {
-                        setShowTraderSearchDropdown(true);
-                        setTraderHighlightedIndex(traderSearchQuery.trim().length > 0 ? (traderSearchResults.length > 0 ? 0 : -1) : (traderTrendingSearches.length > 0 ? 0 : -1));
-                      }}
-                      onChange={(e) => {
-                        setTraderSearchQuery(e.target.value);
-                        setShowTraderSearchDropdown(true);
-                        setTraderHighlightedIndex(0);
-                      }}
-                      onKeyDown={async (e) => {
-                        const usingSearchResults = traderSearchQuery.trim().length > 0;
-                        const optionsLength = usingSearchResults ? traderSearchResults.length : traderTrendingSearches.length;
+              {/* Nav Tabs - directly after logo */}
+              <nav style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              {[
+                { id: "DASHBOARD", icon: LayoutDashboard, label: "Dashboard" },
+                { id: "WATCHLIST", icon: Star, label: "Watchlist" },
+                { id: "SCREENERS", icon: Filter, label: "Screeners" },
+                { id: "NEWS", icon: Newspaper, label: "News" },
+                { id: "ACADEMY", icon: GraduationCap, label: "Academy" },
+              ].map((item) => {
+                const isActive = activeModule === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleModuleChange(item.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '7px 14px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                      border: isActive ? '1px solid rgba(0,243,255,0.25)' : '1px solid transparent',
+                      background: isActive ? 'rgba(0,243,255,0.08)' : 'transparent',
+                      color: isActive ? '#00f3ff' : '#94a3b8',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: isActive ? '0 0 18px rgba(0,243,255,0.1)' : 'none',
+                    }}
+                    onMouseEnter={e => { if (!isActive) { e.currentTarget.style.color = '#e2f0ff'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; } }}
+                    onMouseLeave={e => { if (!isActive) { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'transparent'; } }}
+                  >
+                    <item.icon size={13} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
+            </div>
 
-                        if (e.key === "ArrowDown" && optionsLength > 0) {
-                          e.preventDefault();
-                          setShowTraderSearchDropdown(true);
-                          setTraderHighlightedIndex((prev) => (prev + 1 + optionsLength) % optionsLength);
-                          return;
-                        }
+            {/* RIGHT: Search + Profile */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'flex-end' }}>
 
-                        if (e.key === "ArrowUp" && optionsLength > 0) {
-                          e.preventDefault();
-                          setShowTraderSearchDropdown(true);
-                          setTraderHighlightedIndex((prev) => (prev - 1 + optionsLength) % optionsLength);
-                          return;
-                        }
 
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          if (usingSearchResults && traderSearchResults.length > 0) {
-                            const selected = traderSearchResults[Math.max(0, traderHighlightedIndex)] || traderSearchResults[0];
-                            await handleTraderSearchSelect(selected);
-                          } else if (!usingSearchResults && traderTrendingSearches.length > 0) {
-                            const selectedTrend = traderTrendingSearches[Math.max(0, traderHighlightedIndex)] || traderTrendingSearches[0];
-                            await handleTraderTrendingSelect(selectedTrend);
-                          } else if (traderSearchQuery.trim()) {
-                            await submitTraderSearch();
-                          }
-                          return;
-                        }
-
-                        if (e.key === "Escape") {
-                          setShowTraderSearchDropdown(false);
-                          setTraderHighlightedIndex(-1);
-                        }
-                      }}
-                      className="trader-search-input"
-                      style={{ background: 'transparent', backgroundColor: 'transparent', border: 'none', outline: 'none', boxShadow: 'none' }}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={submitTraderSearch}
-                      className="trader-search-go"
-                    >
-                      Go
-                    </button>
+              {/* Search */}
+              <div
+                className="trader-search-shell-wrap relative hidden xl:block"
+                ref={traderSearchContainerRef}
+                style={{ zIndex: 999999, minWidth: '200px' }}
+              >
+                <div className="trader-search-shell">
+                  <div className="trader-search-icon" aria-hidden="true">
+                    <Search size={14} />
                   </div>
+                  <input
+                    type="text"
+                    name="trader_search_unique_xyz"
+                    autoComplete="new-password"
+                    spellCheck="false"
+                    placeholder="Search symbol..."
+                    value={traderSearchQuery}
+                    onFocus={() => {
+                      setShowTraderSearchDropdown(true);
+                      setTraderHighlightedIndex(traderSearchQuery.trim().length > 0 ? (traderSearchResults.length > 0 ? 0 : -1) : (traderTrendingSearches.length > 0 ? 0 : -1));
+                    }}
+                    onChange={(e) => {
+                      setTraderSearchQuery(e.target.value);
+                      setShowTraderSearchDropdown(true);
+                      setTraderHighlightedIndex(0);
+                    }}
+                    onKeyDown={async (e) => {
+                      const usingSearchResults = traderSearchQuery.trim().length > 0;
+                      const optionsLength = usingSearchResults ? traderSearchResults.length : traderTrendingSearches.length;
+                      if (e.key === "ArrowDown" && optionsLength > 0) { e.preventDefault(); setShowTraderSearchDropdown(true); setTraderHighlightedIndex((prev) => (prev + 1 + optionsLength) % optionsLength); return; }
+                      if (e.key === "ArrowUp" && optionsLength > 0) { e.preventDefault(); setShowTraderSearchDropdown(true); setTraderHighlightedIndex((prev) => (prev - 1 + optionsLength) % optionsLength); return; }
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (usingSearchResults && traderSearchResults.length > 0) { const selected = traderSearchResults[Math.max(0, traderHighlightedIndex)] || traderSearchResults[0]; await handleTraderSearchSelect(selected); }
+                        else if (!usingSearchResults && traderTrendingSearches.length > 0) { const selectedTrend = traderTrendingSearches[Math.max(0, traderHighlightedIndex)] || traderTrendingSearches[0]; await handleTraderTrendingSelect(selectedTrend); }
+                        else if (traderSearchQuery.trim()) { await submitTraderSearch(); }
+                        return;
+                      }
+                      if (e.key === "Escape") { setShowTraderSearchDropdown(false); setTraderHighlightedIndex(-1); }
+                    }}
+                    className="trader-search-input"
+                    style={{ background: 'transparent', backgroundColor: 'transparent', border: 'none', outline: 'none', boxShadow: 'none' }}
+                  />
+                  <button type="button" onClick={submitTraderSearch} className="trader-search-go">Go</button>
+                </div>
 
-                  {showTraderSearchDropdown && (
-                    <div 
-                      className="trader-search-dropdown absolute top-11 left-0 right-0 rounded-2xl shadow-xl overflow-hidden z-[9999]"
-                      style={{ background: '#020617', backgroundColor: '#020617', border: '1px solid rgba(34, 211, 238, 0.3)', backdropFilter: 'none' }}
-                    >
-                      {isTraderSearching && (
-                        <div className="px-4 py-3 text-xs font-semibold text-[#9fb4c8]">Searching market...</div>
-                      )}
-
-                      {!isTraderSearching && traderSearchQuery.trim().length > 0 && traderSearchResults.length === 0 && (
-                        <div className="px-4 py-3 text-xs font-semibold text-[#9fb4c8]">No matching assets found.</div>
-                      )}
-
-                      {!isTraderSearching && traderSearchQuery.trim().length > 0 && traderSearchResults.length > 0 && (
-                        <div className="max-h-72 overflow-y-auto">
-                          {traderSearchResults.map((item) => (
-                            <button
-                              key={`${item.type}-${item.symbol}`}
-                              onClick={() => handleTraderSearchSelect(item)}
-                              className={`w-full text-left px-4 py-3 transition-colors border-b border-[#00f3ff]/10 ${traderHighlightedIndex >= 0 && traderSearchResults[traderHighlightedIndex] === item ? 'bg-[#00f3ff]/10' : 'hover:bg-[#00f3ff]/10'}`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-xs font-black text-[#EAF9FF]">{displaySymbol(item.symbol)}</p>
-                                  <p className="text-[11px] text-[#9fb4c8]">{item.name}</p>
-                                </div>
-                                <span className="text-[10px] font-bold text-[#00f3ff]">{item.type}</span>
+                {showTraderSearchDropdown && (
+                  <div
+                    className="trader-search-dropdown absolute top-11 left-0 right-0 rounded-2xl shadow-xl overflow-hidden z-[9999]"
+                    style={{ background: '#020617', backgroundColor: '#020617', border: '1px solid rgba(34, 211, 238, 0.3)', backdropFilter: 'none' }}
+                  >
+                    {isTraderSearching && <div className="px-4 py-3 text-xs font-semibold text-[#9fb4c8]">Searching market...</div>}
+                    {!isTraderSearching && traderSearchQuery.trim().length > 0 && traderSearchResults.length === 0 && <div className="px-4 py-3 text-xs font-semibold text-[#9fb4c8]">No matching assets found.</div>}
+                    {!isTraderSearching && traderSearchQuery.trim().length > 0 && traderSearchResults.length > 0 && (
+                      <div className="max-h-72 overflow-y-auto">
+                        {traderSearchResults.map((item) => (
+                          <button key={`${item.type}-${item.symbol}`} onClick={() => handleTraderSearchSelect(item)}
+                            className={`w-full text-left px-4 py-3 transition-colors border-b border-[#00f3ff]/10 ${traderHighlightedIndex >= 0 && traderSearchResults[traderHighlightedIndex] === item ? 'bg-[#00f3ff]/10' : 'hover:bg-[#00f3ff]/10'}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs font-black text-[#EAF9FF]">{displaySymbol(item.symbol)}</p>
+                                <p className="text-[11px] text-[#9fb4c8]">{item.name}</p>
                               </div>
+                              <span className="text-[10px] font-bold text-[#00f3ff]">{item.type}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {!isTraderSearching && traderSearchQuery.trim().length === 0 && (
+                      <div className="px-4 py-3">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-[#8ca3b8] mb-2">Trending</p>
+                        <div className="flex flex-wrap gap-2">
+                          {traderTrendingSearches.map((term) => (
+                            <button key={term} onClick={() => handleTraderTrendingSelect(term)}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-black transition-colors ${traderHighlightedIndex >= 0 && traderTrendingSearches[traderHighlightedIndex] === term ? 'bg-[#00f3ff]/20 text-[#EAF9FF]' : 'bg-[#00f3ff]/10 text-[#9beeff] hover:bg-[#00f3ff]/20'}`}
+                            >
+                              {term}
                             </button>
                           ))}
                         </div>
-                      )}
-
-                      {!isTraderSearching && traderSearchQuery.trim().length === 0 && (
-                        <div className="px-4 py-3">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-[#8ca3b8] mb-2">Trending</p>
-                          <div className="flex flex-wrap gap-2">
-                            {traderTrendingSearches.map((term) => (
-                              <button
-                                key={term}
-                                onClick={() => handleTraderTrendingSelect(term)}
-                                className={`px-2.5 py-1 rounded-full text-[10px] font-black transition-colors ${traderHighlightedIndex >= 0 && traderTrendingSearches[traderHighlightedIndex] === term ? 'bg-[#00f3ff]/20 text-[#EAF9FF]' : 'bg-[#00f3ff]/10 text-[#9beeff] hover:bg-[#00f3ff]/20'}`}
-                              >
-                                {term}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-4 pl-4 border-l border-white/10">
-                  <div className="profile-wrapper" ref={profileRef}>
-                    <div
-                      onClick={() => setIsProfileOpen(!isProfileOpen)}
-                      className="w-8 h-8 rounded-full bg-[linear-gradient(135deg,#00c6ff_0%,#0072ff_100%)] flex items-center justify-center text-xs font-bold text-white cursor-pointer shadow-[0_0_10px_rgba(0,198,255,0.4)] hover:scale-105 hover:shadow-[0_0_16px_rgba(0,198,255,0.58)] transition-all duration-300"
-                    >
-                      {profile?.profilePicture ? (
-                        <img src={profile.profilePicture} alt="" className="w-full h-full rounded-full object-cover" />
-                      ) : (
-                        userInitial
-                      )}
-                    </div>
-
-                    <ProfileDropdown
-                      isOpen={isProfileOpen}
-                      onClose={() => setIsProfileOpen(false)}
-                      avatarRef={profileRef}
-                      profile={profile}
-                      userInitial={userInitial}
-                      isTraderMode={isTraderMode}
-                      onToggleMode={toggleMode}
-                      onSignOut={() => {
-                        setIsProfileOpen(false);
-                        setShowLogoutModal(true);
-                      }}
-                    />
+                      </div>
+                    )}
                   </div>
+                )}
+              </div>
+
+              {/* Profile Avatar Circle */}
+              <div className="profile-wrapper" ref={profileRef} style={{ position: 'relative' }}>
+                <div
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  style={{
+                    width: '36px', height: '36px', borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #00c6ff 0%, #0072ff 100%)',
+                    overflow: 'hidden',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '13px', fontWeight: 900, color: '#fff',
+                    boxShadow: '0 0 12px rgba(0,198,255,0.45)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    flexShrink: 0,
+                    border: '2px solid rgba(0,198,255,0.3)',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 20px rgba(0,198,255,0.7)'; e.currentTarget.style.borderColor = 'rgba(0,198,255,0.7)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 12px rgba(0,198,255,0.45)'; e.currentTarget.style.borderColor = 'rgba(0,198,255,0.3)'; }}
+                >
+                  {userInitial}
                 </div>
+
+                <ProfileDropdown
+                  isOpen={isProfileOpen}
+                  onClose={() => setIsProfileOpen(false)}
+                  avatarRef={profileRef}
+                  profile={profile}
+                  userInitial={userInitial}
+                  isTraderMode={isTraderMode}
+                  onToggleMode={toggleMode}
+                  onSignOut={() => {
+                    setIsProfileOpen(false);
+                    setShowLogoutModal(true);
+                  }}
+                />
               </div>
             </div>
+
           </header>
-          {}
         </>
       )}
 

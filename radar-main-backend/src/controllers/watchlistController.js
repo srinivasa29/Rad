@@ -1,4 +1,5 @@
 const Watchlist = require('../models/Watchlist');
+const { evaluateRecentChanges } = require('../services/recentChangesEngine');
 
 const profileCache = require('../services/profileCache');
 
@@ -70,7 +71,8 @@ const getWatchlists = async (req, res) => {
         const watchlists = await Watchlist.find(query).sort({ createdAt: 1 });
         res.json(watchlists);
     } catch (error) {
-        res.status(500).json({ error: "Failed to fetch watchlists" });
+        console.error("Watchlist GET Error:", error);
+        res.status(500).json({ error: "Failed to fetch watchlists", details: error.message });
     }
 };
 
@@ -157,22 +159,24 @@ const removeFromWatchlist = async (req, res) => {
 };
 
 const getDefaultWatchlist = async (userId, mode = 'trader') => {
-    if (mode === 'trader') {
+    const cleanMode = String(mode || 'trader').toLowerCase();
+    if (cleanMode === 'trader') {
         await mergeLegacyWatchlists(userId);
     }
-    const targetName = mode === 'investor' ? 'Investor Portfolio' : 'Research Watchlist';
-    let watchlist = await Watchlist.findOne({ userId, mode: mode.toLowerCase(), name: targetName });
+    const targetName = cleanMode === 'investor' ? 'Investor Portfolio' : 'Research Watchlist';
+    let watchlist = await Watchlist.findOne({ userId, mode: cleanMode, name: targetName });
     if (!watchlist) {
-        watchlist = await Watchlist.findOne({ userId, mode: mode.toLowerCase() });
+        watchlist = await Watchlist.findOne({ userId, mode: cleanMode });
     }
-    if (!watchlist) {
+    if (!watchlist && cleanMode === 'trader') {
+        // Only allow fallback to general watchlists if mode is trader (to catch legacy records with null mode)
         watchlist = await Watchlist.findOne({ userId });
     }
     if (!watchlist) {
         watchlist = new Watchlist({
             userId,
             name: targetName,
-            mode: mode.toLowerCase(),
+            mode: cleanMode,
             items: []
         });
         await watchlist.save();
@@ -238,6 +242,17 @@ const reorderWatchlist = async (req, res) => {
     }
 };
 
+const getRecentChanges = async (req, res) => {
+    try {
+        const symbols = Array.isArray(req.body?.symbols) ? req.body.symbols : [];
+        const data = await evaluateRecentChanges(symbols);
+        return res.json({ success: true, data });
+    } catch (error) {
+        console.error("Watchlist recent-changes Error:", error);
+        return res.status(500).json({ success: false, error: "Failed to evaluate recent changes", details: error.message });
+    }
+};
+
 module.exports = { 
     getWatchlists, 
     createWatchlist, 
@@ -245,6 +260,6 @@ module.exports = {
     removeFromWatchlist,
     addToDefaultWatchlist,
     removeFromDefaultWatchlist,
-    reorderWatchlist
+    reorderWatchlist,
+    getRecentChanges
 };
-

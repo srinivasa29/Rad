@@ -151,6 +151,9 @@ const TraderResearchWatchlist = () => {
               <p className="mt-1 max-w-xl text-sm text-slate-500">
                 Technical analysis and intelligence — no order execution.
               </p>
+              <p className="mt-2 inline-flex items-center rounded-full bg-amber-100/15 text-amber-200 border border-amber-300/30 px-3 py-1 text-[11px] font-bold shadow-sm">
+                Note: free sources prioritized; extended coverage available via paid APIs.
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">

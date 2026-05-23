@@ -67,9 +67,11 @@ export default function TradeTerminalPage({ overrideSymbol, onBack }) {
             // Watchlist
             if (wlRes.status === 'fulfilled') {
                 const wlData = wlRes.value?.data?.data ?? wlRes.value?.data;
-                const syms = (Array.isArray(wlData) ? wlData.flatMap(w => (w.items ?? []).map(i => i?.symbol ?? i)) : [])
-                    .filter(s => isValidSymbolSync(s)) // Only include universe symbols
-                    .slice(0, 8);
+                const primaryWatchlist = Array.isArray(wlData) && wlData.length > 0 ? wlData[0] : null;
+                const syms = Array.from(new Set(
+                    (primaryWatchlist ? (primaryWatchlist.items ?? []).map(i => i?.symbol ?? i) : [])
+                        .filter(s => isValidSymbolSync(s))
+                )).slice(0, 8);
                 
                 if (syms.length > 0) {
                     // Use batched fetch for universe validation

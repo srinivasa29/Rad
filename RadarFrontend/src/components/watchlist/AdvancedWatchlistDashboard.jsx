@@ -117,11 +117,14 @@ export default function AdvancedWatchlistDashboard() {
       try {
         if (!hasAuthToken()) return; // Not logged in — keep mock
 
-        const wlRes = await api.get('/watchlist');
+        const wlRes = await api.get('/watchlist', { params: { mode: 'trader' } });
         const wlData = wlRes.data?.data ?? wlRes.data;
-        const symbols = (Array.isArray(wlData)
-          ? wlData.flatMap(w => (w.items ?? []).map(i => i?.symbol ?? i))
-          : []).filter(Boolean).map(s => String(s).replace(/\.(NS|BO)$/i, ''));
+        const primaryWatchlist = Array.isArray(wlData) && wlData.length > 0 ? wlData[0] : null;
+        const symbols = Array.from(new Set(
+          (primaryWatchlist ? (primaryWatchlist.items ?? []).map(i => i?.symbol ?? i) : [])
+            .filter(Boolean)
+            .map(s => String(s).replace(/\.(NS|BO)$/i, ''))
+        ));
 
         if (!symbols.length || !active) return;
 

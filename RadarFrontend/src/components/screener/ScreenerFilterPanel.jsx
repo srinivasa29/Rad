@@ -14,8 +14,6 @@ const ScreenerFilterPanel = ({
   const [expandedSections, setExpandedSections] = useState({
     basic: true,
     technical: true,
-    trader: true,
-    advanced: false,
   });
 
   const toggleSection = (section) => {
@@ -59,7 +57,7 @@ const ScreenerFilterPanel = ({
 
   return (
     <div className="h-full flex flex-col py-4 screener-filter-panel">
-      {}
+      {/* Header */}
       <div className="px-4 pb-4 flex justify-between items-center border-b border-slate-700">
         <div className="flex items-center gap-2">
           <Sliders className="w-5 h-5 text-cyan-400" />
@@ -73,9 +71,9 @@ const ScreenerFilterPanel = ({
         </button>
       </div>
 
-      {}
+      {/* Filter Content */}
       <div className="flex-1 overflow-y-auto">
-        {}
+        {/* Global Search */}
         <div className="px-4 py-4 border-b border-slate-700/50">
           <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Search</label>
           <input
@@ -87,7 +85,7 @@ const ScreenerFilterPanel = ({
           />
         </div>
 
-        {}
+        {/* Basic Filters */}
         <motion.div className="border-b border-slate-700/50">
           <button
             onClick={() => toggleSection('basic')}
@@ -108,7 +106,7 @@ const ScreenerFilterPanel = ({
             style={{ overflow: 'hidden' }}
             className="px-4 pb-4 space-y-4"
           >
-            {}
+            {/* Sector */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">
                 Asset Sectors
@@ -126,7 +124,7 @@ const ScreenerFilterPanel = ({
               </select>
             </div>
 
-            {}
+            {/* Signal Bias Select */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Signal Bias</label>
               <select
@@ -141,7 +139,7 @@ const ScreenerFilterPanel = ({
               </select>
             </div>
 
-            {}
+            {/* Price Change */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">
                 Price Change %
@@ -167,16 +165,49 @@ const ScreenerFilterPanel = ({
                 />
               </div>
             </div>
+
+            {/* Price Range */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Price Range</label>
+              <div className="space-y-2">
+                <input
+                  type="number"
+                  placeholder="Min Price"
+                  value={filters.minPrice}
+                  onChange={(e) => handleInputChange('minPrice', e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:border-cyan-500"
+                />
+                <input
+                  type="number"
+                  placeholder="Max Price"
+                  value={filters.maxPrice}
+                  onChange={(e) => handleInputChange('maxPrice', e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+            </div>
+
+            {/* Min Volume */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Min Volume</label>
+              <input
+                type="number"
+                placeholder="e.g., 1000000"
+                value={filters.minVolume}
+                onChange={(e) => handleInputChange('minVolume', e.target.value)}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:border-cyan-500"
+              />
+            </div>
           </motion.div>
         </motion.div>
 
-        {}
+        {/* Technical Filters */}
         <motion.div className="border-b border-slate-700/50">
           <button
             onClick={() => toggleSection('technical')}
             className="w-full px-4 py-3 flex justify-between items-center hover:bg-slate-800/50 transition-colors"
           >
-            <span className="text-sm font-semibold text-slate-300">Technical</span>
+            <span className="text-sm font-semibold text-slate-300">Technical Indicators</span>
             <ChevronDown
               className={`w-4 h-4 text-slate-400 transition-transform ${
                 expandedSections.technical ? 'rotate-180' : ''
@@ -191,7 +222,7 @@ const ScreenerFilterPanel = ({
             style={{ overflow: 'hidden' }}
             className="px-4 pb-4 space-y-4"
           >
-            {}
+            {/* Momentum Range */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">
                 Momentum Range (RSI): {filters.minRsi} - {filters.maxRsi}
@@ -216,7 +247,7 @@ const ScreenerFilterPanel = ({
               </div>
             </div>
 
-            {}
+            {/* Signal Bias Multi */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Signal Bias (Multi)</label>
               <div className="space-y-2">
@@ -234,7 +265,7 @@ const ScreenerFilterPanel = ({
               </div>
             </div>
 
-            <div className="pt-1">
+            <div className="pt-1 mb-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -245,30 +276,7 @@ const ScreenerFilterPanel = ({
                 <span className="text-sm text-slate-300">Sync with active signal tab</span>
               </label>
             </div>
-          </motion.div>
-        </motion.div>
 
-        {/* Trader Setups */}
-        <motion.div className="border-b border-slate-700/50">
-          <button
-            onClick={() => toggleSection('trader')}
-            className="w-full px-4 py-3 flex justify-between items-center hover:bg-slate-800/50 transition-colors"
-          >
-            <span className="text-sm font-semibold text-slate-300">Trader Setups</span>
-            <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform ${
-                expandedSections.trader ? 'rotate-180' : ''
-              }`}
-            />
-          </button>
-
-          <motion.div
-            initial={false}
-            animate={{ height: expandedSections.trader ? 'auto' : 0 }}
-            transition={{ duration: 0.2 }}
-            style={{ overflow: 'hidden' }}
-            className="px-4 pb-4 space-y-4"
-          >
             {/* Breakouts */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Breakout Type</label>
@@ -370,65 +378,9 @@ const ScreenerFilterPanel = ({
             </div>
           </motion.div>
         </motion.div>
-
-        {/* Advanced Filters */}
-        <motion.div className="border-b border-slate-700/50">
-          <button
-            onClick={() => toggleSection('advanced')}
-            className="w-full px-4 py-3 flex justify-between items-center hover:bg-slate-800/50 transition-colors"
-          >
-            <span className="text-sm font-semibold text-slate-300">Advanced</span>
-            <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform ${
-                expandedSections.advanced ? 'rotate-180' : ''
-              }`}
-            />
-          </button>
-
-          <motion.div
-            initial={false}
-            animate={{ height: expandedSections.advanced ? 'auto' : 0 }}
-            transition={{ duration: 0.2 }}
-            style={{ overflow: 'hidden' }}
-            className="px-4 pb-4 space-y-4"
-          >
-            {}
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Price Range</label>
-              <div className="space-y-2">
-                <input
-                  type="number"
-                  placeholder="Min Price"
-                  value={filters.minPrice}
-                  onChange={(e) => handleInputChange('minPrice', e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:border-cyan-500"
-                />
-                <input
-                  type="number"
-                  placeholder="Max Price"
-                  value={filters.maxPrice}
-                  onChange={(e) => handleInputChange('maxPrice', e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-            </div>
-
-            {}
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Min Volume</label>
-              <input
-                type="number"
-                placeholder="e.g., 1000000"
-                value={filters.minVolume}
-                onChange={(e) => handleInputChange('minVolume', e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:border-cyan-500"
-              />
-            </div>
-          </motion.div>
-        </motion.div>
       </div>
 
-      {}
+      {/* Footer Buttons */}
       <div className="px-4 pt-4 border-t border-slate-700 space-y-2">
         <button
           onClick={() => onActivateScan?.()}

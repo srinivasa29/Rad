@@ -65,7 +65,7 @@ const clearAuthAndRedirect = () => {
 api.interceptors.response.use(
     (response) => {
         if (response && typeof response === 'object' && response.data !== undefined) {
-            response.data = sanitizeStockSuffixes(response.data);
+            //response.data = sanitizeStockSuffixes(response.data);
         }
         return response;
     },
@@ -111,9 +111,17 @@ export const toggleWatchlist = async (symbol, mode) => {
 
         if (isWatched) {
             const removeRes = await api.delete(`/watchlist/${defaultId}/remove/${encodeURIComponent(symbol)}`);
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new Event('watchlist_updated'));
+                window.dispatchEvent(new CustomEvent('watchlist:changed'));
+            }
             return { action: 'removed', watchlist: removeRes.data };
         } else {
             const addRes = await api.post(`/watchlist/${defaultId}/add`, { symbol });
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new Event('watchlist_updated'));
+                window.dispatchEvent(new CustomEvent('watchlist:changed'));
+            }
             return { action: 'added', watchlist: addRes.data };
         }
     } catch (error) {

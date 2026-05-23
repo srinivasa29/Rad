@@ -852,16 +852,6 @@ export default function TraderStockPage({ overrideSymbol, onBack }) {
                     <div className="bg-[#070b13]/50 border border-white/[0.06] rounded-xl p-5 space-y-4 shadow-sm backdrop-blur-sm">
                       <div className="flex items-center justify-between border-b border-white/[0.05] pb-2">
                         <h3 className="text-xs font-black tracking-widest text-[#7c8db5] uppercase">1. Company Profile & Metrics</h3>
-                        {stockDetails.website && (
-                          <a 
-                            href={stockDetails.website} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-[10px] font-bold text-[#00d4ff] hover:underline flex items-center gap-1 font-mono"
-                          >
-                            <Globe size={10} /> VISIT WEBSITE
-                          </a>
-                        )}
                       </div>
                       
                       <div className="grid grid-cols-3 gap-x-4 gap-y-3.5 text-xs font-mono">

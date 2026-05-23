@@ -1,5 +1,3 @@
-
-
 const axios = require('axios');
 const logger = require('../utils/logger');
 
@@ -16,7 +14,6 @@ class FinnhubService {
     return process.env.FINNHUB_API_KEY || 'demo';
   }
 
-  
   canMakeRequest() {
     const now = Date.now();
     this.requestTimestamps = this.requestTimestamps.filter(
@@ -26,13 +23,11 @@ class FinnhubService {
     return this.requestTimestamps.length < this.maxRequestsPerWindow;
   }
 
-  
   recordRequest() {
     this.requestTimestamps.push(Date.now());
     this.requestCount++;
   }
 
-  
   async getQuote(symbol) {
     try {
       if (!this.canMakeRequest()) {
@@ -92,7 +87,6 @@ class FinnhubService {
     }
   }
 
-  
   async getCompanyProfile(symbol) {
     try {
       if (!this.canMakeRequest()) {
@@ -128,7 +122,6 @@ class FinnhubService {
     }
   }
 
-  
   convertToFinnhubSymbol(symbol) {
     let s = String(symbol || '').trim().toUpperCase();
     if (!s) return s;
@@ -164,7 +157,51 @@ class FinnhubService {
     return `NSE:${s}`;
   }
 
-  
+  async getCandles(symbol, resolution, from, to) {
+    try {
+      if (!this.canMakeRequest()) {
+        return { success: false, message: 'Rate limit exceeded' };
+      }
+
+      const finnhubSymbol = this.convertToFinnhubSymbol(symbol);
+      const response = await axios.get(`${this.baseUrl}/stock/candle`, {
+        params: {
+          symbol: finnhubSymbol,
+          resolution,
+          from,
+          to,
+          token: this.apiKey,
+        },
+        timeout: 10000,
+      });
+
+      this.recordRequest();
+
+      if (response.data.s === 'no_data') {
+        return { success: true, data: [] };
+      }
+
+      if (response.data.s !== 'ok') {
+        return { success: false, message: response.data.s };
+      }
+
+      const data = response.data;
+      const formatted = data.t.map((timestamp, index) => ({
+        time: timestamp,
+        open: data.o[index],
+        high: data.h[index],
+        low: data.l[index],
+        close: data.c[index],
+        volume: data.v[index]
+      }));
+
+      return { success: true, data: formatted };
+    } catch (error) {
+      logger.error(`Finnhub candle error for ${symbol}: ${error.message}`);
+      return { success: false, message: error.message };
+    }
+  }
+
   getRateLimitStatus() {
     const now = Date.now();
     this.requestTimestamps = this.requestTimestamps.filter(
@@ -181,7 +218,6 @@ class FinnhubService {
     };
   }
 
-  
   async testConnection() {
     try {
       // Use first active symbol from DB for connectivity test; fall back to AAPL

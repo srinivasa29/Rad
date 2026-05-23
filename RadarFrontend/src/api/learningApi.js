@@ -1,9 +1,10 @@
 import api from './api';
 
-// Returns the localStorage key scoped by mode so trader/investor progress is separate
+// Returns the localStorage key scoped by userId + mode so each user's progress is isolated
 export const getProgressKey = (courseId, mode = '') => {
+    const userId = localStorage.getItem('userId') || 'guest';
     const prefix = mode ? `${mode}_` : '';
-    return `radar_academy_progress_${prefix}${courseId}`;
+    return `radar_academy_progress_${userId}_${prefix}${courseId}`;
 };
 
 export const fetchCourses = async (audience = '') => {

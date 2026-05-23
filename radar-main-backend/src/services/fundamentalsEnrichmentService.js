@@ -22,7 +22,7 @@
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance();
 const NodeCache    = require('node-cache');
-const logger       = require('../config/logger');
+const logger       = require('../utils/logger');
 const FundamentalsSnapshot = require('../models/FundamentalsSnapshot');
 
 // In-memory hot layer — avoids repeated Mongo queries for same symbol within same process

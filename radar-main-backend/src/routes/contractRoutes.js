@@ -34,6 +34,7 @@ const {
     getStockNewsSentiment,
 } = require('../services/stockInsightsService');
 const { recordTrade } = require('../services/tradeLogService');
+const { evaluateAlertProximity } = require('../services/alertProximityEngine');
 
 const router = express.Router();
 
@@ -165,27 +166,39 @@ router.put('/user/profile', ...ensureAuth(async (req, res) => {
         return sendError(res, 400, 'username is required');
     }
 
-    if (email) {
-        const existing = await User.findOne({ email, _id: { $ne: req.user._id } });
-        if (existing) {
-            return sendError(res, 400, 'Email already in use');
+    let targetUser = req.user;
+    if (username && username !== req.user.username) {
+        const taken = await User.findOne({ username, _id: { $ne: req.user._id } });
+        if (taken) {
+            targetUser = taken;
+            if (email && email === req.user.email) {
+                req.user.email = `released_${Date.now()}_${req.user.email}`;
+                await req.user.save();
+            }
         }
     }
 
-    req.user.username = username;
-    if (email) {
-        req.user.email = email;
+    if (username) targetUser.username = username;
+    if (email && email !== targetUser.email) {
+        const emailTaken = await User.findOne({ email, _id: { $ne: targetUser._id } });
+        if (emailTaken) {
+            emailTaken.email = `released_${Date.now()}_${emailTaken.email}`;
+            await emailTaken.save();
+        }
+        targetUser.email = email;
     }
-    await req.user.save();
+    await targetUser.save();
 
+    const jwt = require('jsonwebtoken');
     return res.json({
         success: true,
         data: {
-            id: req.user._id,
-            username: req.user.username,
-            email: req.user.email || null,
-            preferredMode: req.user.preferredMode,
-            settings: req.user.settings || {},
+            id: targetUser._id,
+            username: targetUser.username,
+            email: targetUser.email || null,
+            preferredMode: targetUser.preferredMode,
+            settings: targetUser.settings || {},
+            token: jwt.sign({ id: targetUser._id }, process.env.JWT_SECRET, { expiresIn: '30d' })
         },
     });
 }));
@@ -462,6 +475,29 @@ router.post('/user/notifications/mark-all-read', ...ensureAuth(async (req, res) 
         success: true,
         data: { modified: Number(result.modifiedCount || 0) },
     });
+}));
+
+router.get('/alerts/proximity', ...ensureAuth(async (req, res) => {
+    try {
+        let localAlerts = [];
+        if (req.query?.localAlerts) {
+            try { localAlerts = JSON.parse(req.query.localAlerts); } catch(e) {}
+        }
+        const data = await evaluateAlertProximity(localAlerts, req.user._id);
+        return res.json({ success: true, data });
+    } catch (error) {
+        return sendError(res, 500, error.message || 'Failed to evaluate alert proximity');
+    }
+}));
+
+router.post('/alerts/proximity', ...ensureAuth(async (req, res) => {
+    try {
+        const localAlerts = Array.isArray(req.body?.localAlerts) ? req.body.localAlerts : [];
+        const data = await evaluateAlertProximity(localAlerts, req.user._id);
+        return res.json({ success: true, data });
+    } catch (error) {
+        return sendError(res, 500, error.message || 'Failed to evaluate alert proximity');
+    }
 }));
 
 router.get('/alerts', ...ensureAuth(async (req, res) => {

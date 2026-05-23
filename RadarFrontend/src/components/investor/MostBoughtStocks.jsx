@@ -21,23 +21,33 @@ const MostBoughtStocks = () => {
     const [loadingSymbol, setLoadingSymbol] = useState(null);     // which symbol is mid-request
     const [toast, setToast] = useState(null);                     // { msg, type }
 
-    // Load user's watchlist membership once on mount
+    // Load user's watchlist membership once on mount and sync with changes
     useEffect(() => {
-        api.get('/watchlist')
-            .then(res => {
-                const lists = Array.isArray(res.data) ? res.data : [];
-                if (lists.length > 0) {
-                    const first = lists[0];
-                    setWatchlistId(first._id);
-                    const syms = new Set(
-                        (first.items || []).map(s =>
-                            displaySymbol(s?.symbol || s).toUpperCase()
-                        )
-                    );
-                    setSavedSymbols(syms);
-                }
-            })
-            .catch(() => {}); // not logged in — silent
+        const loadWatchlist = () => {
+            api.get('/watchlist', { params: { mode: 'investor' } })
+                .then(res => {
+                    const lists = Array.isArray(res.data) ? res.data : [];
+                    if (lists.length > 0) {
+                        const first = lists[0];
+                        setWatchlistId(first._id);
+                        const syms = new Set(
+                            (first.items || []).map(s =>
+                                displaySymbol(s?.symbol || s).toUpperCase()
+                            )
+                        );
+                        setSavedSymbols(syms);
+                    }
+                })
+                .catch(() => {}); // not logged in — silent
+        };
+
+        loadWatchlist();
+        window.addEventListener('watchlist_updated', loadWatchlist);
+        window.addEventListener('watchlist:changed', loadWatchlist);
+        return () => {
+            window.removeEventListener('watchlist_updated', loadWatchlist);
+            window.removeEventListener('watchlist:changed', loadWatchlist);
+        };
     }, []);
 
     const showToast = useCallback((msg, type = 'success') => {
@@ -69,6 +79,7 @@ const MostBoughtStocks = () => {
             }
             try {
                 if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new Event('watchlist_updated'));
                     const action = savedSymbols.has(sym) ? 'removed' : 'added';
                     window.dispatchEvent(new CustomEvent('watchlist:changed', { detail: { symbol: sym, action } }));
                 }
@@ -148,9 +159,9 @@ const MostBoughtStocks = () => {
     }, [pulse]);
 
     const openStockPage = (name) => {
-        const symbol = String(name || '').trim();
+        const symbol = String(name || '').trim().toUpperCase().replace(/\.(NS|BO)$/i, '');
         if (!symbol) return;
-        navigate(`/investor-stock/${encodeURIComponent(symbol.toUpperCase())}`);
+        navigate(`/investor/advanced-charts?symbol=${encodeURIComponent(symbol)}`);
     };
 
     return (
