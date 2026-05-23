@@ -1,5 +1,5 @@
 const { fetchStockData } = require('./stockService');
-const { fetchMarketNews } = require('./newsService');
+const { fetchMarketNews, getCompanyNews } = require('./newsService');
 const { getFilingsForSymbol } = require('./secService');
 const axios = require('axios');
 const logger = require('../utils/logger');
@@ -376,30 +376,17 @@ const classifySentiment = (title) => {
 const getStockNewsSentiment = async (symbol) => {
     const stock = await ensureStockFound(symbol);
     const normalized = stripSuffix(stock.symbol);
-    const isCrypto = ['CRYPTO', 'CRYPTOCURRENCY'].includes(String(stock.type || '').toUpperCase()) || 
-                    ['BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK','AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT','ARB','OP','INJ','SUI','SEI','PEPE','WIF','TON','FLOKI','BONK'].includes(normalized);
 
-    const category = isCrypto ? 'crypto' : 'business';
-    const keyword = stock.name ? stock.name.split(' ')[0] : normalized;
-    const rawNews = await fetchMarketNews(category, { symbol: normalized, q: keyword, limit: 30 });
-    
-    // Filter news - keep company specific news or general business news if sparse
-    const companySpecific = (Array.isArray(rawNews) ? rawNews : []).filter((item) => {
-        const text = `${item?.title || ''} ${item?.summary || ''} ${item?.description || ''}`.toUpperCase();
-        return text.includes(normalized) || (stock.name && text.includes(stock.name.split(' ')[0].toUpperCase()));
-    });
+    const articlesToScore = await getCompanyNews(stock.symbol, stock.name);
 
-    const articlesToScore = companySpecific.length >= 3 ? companySpecific : rawNews;
-
-    const scored = articlesToScore.slice(0, 20).map((item, index) => {
-        const cls = classifySentiment(item?.title);
+    const scored = articlesToScore.map((item, index) => {
         return {
             id: `${normalized}-news-${index}`,
             title: item?.title || 'Untitled',
             source: item?.source || 'News',
-            publishedAt: item?.publishedAt || item?.time || new Date().toISOString(),
-            sentiment: cls.sentiment,
-            sentimentScore: cls.score,
+            publishedAt: item?.publishedAt || new Date().toISOString(),
+            sentiment: item?.sentiment || 'neutral',
+            sentimentScore: item?.sentiment === 'positive' ? 0.7 : item?.sentiment === 'negative' ? -0.7 : 0,
             url: item?.url || null,
         };
     });
@@ -492,17 +479,36 @@ const getStockSignals = async (symbol, term = 'medium') => {
     };
 
     const names = getIndicatorNames(term);
-    const sentimentValue = 70 + (variant % 25); // 70-95 for bullish feel
+    const change = parseFloat(stock.change || stock.percent_change || 0);
+    let sentimentValue = 50 + (change * 15);
+    if (sentimentValue > 95) sentimentValue = 95;
+    if (sentimentValue < 5) sentimentValue = 5;
+    if (change === 0) {
+        // Fallback to random if no change is available
+        // Ensure a wide distribution so stocks aren't just defaulted to bullish
+        sentimentValue = (seed * 17) % 100; 
+    }
+    sentimentValue = sentimentValue + (variant % 10) - 5; // Add slight noise
+    
+    const getSentimentLabel = (val) => {
+        if (val > 80) return 'Strongly Bullish';
+        if (val > 60) return 'Bullish';
+        if (val >= 40) return 'Neutral';
+        if (val >= 20) return 'Bearish';
+        return 'Strongly Bearish';
+    };
 
     return {
         symbol: normalized,
         term,
         overallSentiment: {
-            label: sentimentValue > 85 ? 'Strongly Bullish' : 'Bullish',
+            label: getSentimentLabel(sentimentValue),
             score: (sentimentValue / 10).toFixed(1),
-            setup: sentimentValue > 80 ? 'STRONG SETUP' : 'GOOD SETUP',
+            setup: sentimentValue > 60 ? (sentimentValue > 80 ? 'STRONG SETUP' : 'GOOD SETUP') : (sentimentValue < 40 ? 'WEAK SETUP' : 'NEUTRAL SETUP'),
             value: sentimentValue,
-            insight: 'Momentum indicators suggest a bullish continuation with strong trend support at the key moving averages.'
+            insight: sentimentValue > 50 
+                ? 'Momentum indicators suggest a bullish continuation with strong trend support at the key moving averages.'
+                : 'Momentum indicators indicate bearish pressure with significant resistance at key moving averages.'
         },
         trendSignals: {
             items: [

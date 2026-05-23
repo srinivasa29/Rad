@@ -13,6 +13,9 @@ const GRID_STYLES = {
 };
 
 const ChartWorkspace = ({
+  interval,
+  historyRange,
+  //timeframe,
   layout,
   panels,
   activePanelId,
@@ -33,6 +36,9 @@ const ChartWorkspace = ({
         <ChartPane
           key={panel.id}
           panel={panel}
+          interval={panel.interval || interval}
+          historyRange={panel.historyRange || historyRange}
+          //timeframe={timeframe}
           isActive={panel.id === activePanelId}
           onSelect={() => onSelectPanel(panel.id)}
           settings={settings}
@@ -40,8 +46,8 @@ const ChartWorkspace = ({
           onCrosshairMove={onCrosshairMove}
           rangeSync={panel.id !== activePanelId && settings.syncZoom ? rangeSync : null}
           onRangeChange={onRangeChange}
-          customFrom={customFrom}
-          customTo={customTo}
+          customFrom={panel.customFrom || customFrom}
+          customTo={panel.customTo || customTo}
         />
       ))}
     </div>

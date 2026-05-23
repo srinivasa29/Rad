@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import api from '../api/api';
 
 const ChartContext = createContext(null);
 
@@ -54,7 +55,26 @@ const makePanel = (id, symbol, overrides = {}) => ({
 });
 
 export const ChartProvider = ({ children, initialSymbol = 'RELIANCE' }) => {
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [settings, setSettingsState] = useState(DEFAULT_SETTINGS);
+  
+  useEffect(() => {
+    api.get('/auth/me')
+      .then(res => {
+        if (res.data?.success && res.data?.data?.settings) {
+          setSettingsState(prev => ({ ...prev, ...res.data.data.settings }));
+        }
+      })
+      .catch(err => console.error("Failed to load settings", err));
+  }, []);
+
+  const setSettings = useCallback((newSettings) => {
+    setSettingsState(prev => {
+      const updated = typeof newSettings === 'function' ? newSettings(prev) : { ...prev, ...newSettings };
+      api.put('/user/settings', updated).catch(err => console.error("Failed to save settings:", err));
+      return updated;
+    });
+  }, []);
+
   const [layout, setLayout] = useState('single');
   const [panels, setPanels] = useState([makePanel(0, initialSymbol)]);
   const [activePanelId, setActivePanelId] = useState(0);

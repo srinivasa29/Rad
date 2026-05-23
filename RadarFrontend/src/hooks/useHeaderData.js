@@ -60,6 +60,7 @@ export const useHeaderData = () => {
     const [notifications, setNotifications] = useState([]);
     const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
     const [isMarkingNotifications, setIsMarkingNotifications] = useState(false);
+    const [userImage, setUserImage] = useState(() => localStorage.getItem('profileImage'));
 
     const loadProfile = useCallback(async () => {
         const fallbackProfile = buildFallbackProfile();
@@ -163,6 +164,7 @@ export const useHeaderData = () => {
 
         const handleUpdate = () => {
             loadProfile();
+            setUserImage(localStorage.getItem('profileImage'));
         };
         window.addEventListener('profile_updated', handleUpdate);
 
@@ -189,6 +191,7 @@ export const useHeaderData = () => {
     return {
         profile,
         userInitial,
+        userImage,
         notifications,
         unreadCount,
         isLoadingNotifications,

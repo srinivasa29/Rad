@@ -944,8 +944,8 @@ export function ProfilePage() {
                     {/* Header Section (Inline) */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 pb-10 border-b border-slate-50">
                         <div className="flex items-center gap-6">
-                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-blue-100 border-4 border-white">
-                                {initial}
+                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-blue-100 border-4 border-white overflow-hidden">
+                                {localStorage.getItem('profileImage') ? <img src={localStorage.getItem('profileImage')} alt="Profile" className="w-full h-full object-cover" /> : initial}
                             </div>
                             <div className="user-meta">
                                 <h1 className="text-3xl font-black text-slate-800 tracking-tight">{profile?.username}</h1>
@@ -1091,26 +1091,7 @@ export function ProfilePage() {
                         </div>
                     </div>
 
-                    {/* EVENTS SECTION */}
-                    {events.length > 0 && (
-                        <div className="pt-12 border-t border-slate-50">
-                             <div className="flex justify-between items-center mb-8">
-                                <div>
-                                    <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest">Upcoming Events</h2>
-                                    <p className="text-xs text-slate-500 font-bold mt-1">Key market dates for your watchlist</p>
-                                </div>
-                                <Calendar size={16} className="text-slate-400" />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {events.map((event, idx) => (
-                                    <div key={idx} className="flex justify-between items-center p-4 rounded-xl bg-slate-50/50 border border-slate-100">
-                                        <span className="text-sm font-black text-slate-800">{event.symbol} - {event.event}</span>
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase">{event.date}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+
 
                 </div>
             </main>
@@ -1124,7 +1105,7 @@ export function SettingsPage() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
     const [isSessionsModalOpen, setIsSessionsModalOpen] = useState(false);
-    const [selectedImage, setSelectedImage] = useState(null);
+    const [selectedImage, setSelectedImage] = useState(() => localStorage.getItem('profileImage'));
     const fileInputRef = useRef(null);
 
     const [sessions, setSessions] = useState([
@@ -1528,6 +1509,11 @@ export function SettingsPage() {
                                     if (updatedUser.username) localStorage.setItem('username', updatedUser.username);
                                     if (updatedUser.email) localStorage.setItem('email', updatedUser.email);
                                     if (updatedUser.token) localStorage.setItem('token', updatedUser.token);
+                                    
+                                    if (selectedImage && selectedImage.startsWith('data:image')) {
+                                        localStorage.setItem('profileImage', selectedImage);
+                                    }
+
                                     window.dispatchEvent(new Event('profile_updated'));
                                     setStatus('Changes Saved!');
                                     setTimeout(() => setStatus(''), 3000);
@@ -1565,7 +1551,13 @@ export function SettingsPage() {
                                     accept="image/png, image/jpeg"
                                     onChange={(e) => {
                                         const file = e.target.files[0];
-                                        if (file) setSelectedImage(URL.createObjectURL(file));
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                                setSelectedImage(reader.result);
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
                                     }}
                                 />
                                 <button 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Star, Newspaper, Bell, Edit3, BarChart2, X, Loader2, ExternalLink, TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
 import api from '../../../api/api';
+import useStockDetails from '../../../hooks/useStockDetails';
 
 // ── News Drawer ─────────────────────────────────────────────────────────────────
 export const NewsDrawer = ({ symbol, isDark }) => {
@@ -151,6 +152,8 @@ export const AlertsDrawer = ({ symbol, isDark }) => {
   const [value, setValue]   = useState('');
   const [delivery, setDel]  = useState('in-app');
 
+  const stockDetails = useStockDetails(symbol);
+
   const addAlert = () => {
     if (!value.trim()) return;
     const currentAlerts = Array.isArray(alerts) ? alerts : [];
@@ -190,6 +193,13 @@ export const AlertsDrawer = ({ symbol, isDark }) => {
             <option value="percent">% Change Alert</option>
             <option value="indicator">Indicator Crossover</option>
           </select>
+          {stockDetails && type !== 'indicator' && (
+            <div className={`text-[10px] font-medium px-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Current {type === 'price' ? 'Price' : '% Change'}: <strong className={isDark ? 'text-slate-200' : 'text-slate-800'}>
+                {type === 'price' ? `₹${stockDetails.currentPrice || 0}` : `${stockDetails.changePercent > 0 ? '+' : ''}${stockDetails.changePercent || 0}%`}
+              </strong>
+            </div>
+          )}
           <input
             type="text" value={value}
             onChange={e => setValue(e.target.value)}
@@ -210,29 +220,34 @@ export const AlertsDrawer = ({ symbol, isDark }) => {
         </div>
       </div>
 
-      {Array.isArray(alerts) && alerts.length > 0 && (
-        <div className="space-y-2">
-          <p className={`text-[9px] font-black uppercase tracking-widest px-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Active Alerts</p>
-          {alerts.map(a => (
-            <div key={a?.id || Math.random()} className={`flex items-center justify-between p-3 rounded-xl border group/alert transition-all ${isDark ? 'bg-slate-800/60 border-slate-700/60 hover:border-slate-600' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
-              <div>
-                <p className={`text-[11px] font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{a?.symbol || 'STOCK'} · {a?.value || 'Alert'}</p>
-                <p className={`text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{a?.type || 'price'} · {a?.delivery || 'in-app'}</p>
+      {(() => {
+        const companyAlerts = Array.isArray(alerts) ? alerts.filter(a => a?.symbol === symbol) : [];
+        if (companyAlerts.length === 0) return null;
+        
+        return (
+          <div className="space-y-2">
+            <p className={`text-[9px] font-black uppercase tracking-widest px-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Active Alerts for {symbol}</p>
+            {companyAlerts.map(a => (
+              <div key={a?.id || Math.random()} className={`flex items-center justify-between p-3 rounded-xl border group/alert transition-all ${isDark ? 'bg-slate-800/60 border-slate-700/60 hover:border-slate-600' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
+                <div>
+                  <p className={`text-[11px] font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{a?.symbol || 'STOCK'} · {a?.value || 'Alert'}</p>
+                  <p className={`text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{a?.type || 'price'} · {a?.delivery || 'in-app'}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse group-hover/alert:hidden" />
+                  <button
+                    onClick={() => deleteAlert(a?.id)}
+                    className="hidden group-hover/alert:flex items-center justify-center w-6 h-6 rounded-lg bg-rose-50/80 hover:bg-rose-100 text-rose-600 transition-colors cursor-pointer"
+                    title="Delete Alert"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse group-hover/alert:hidden" />
-                <button
-                  onClick={() => deleteAlert(a?.id)}
-                  className="hidden group-hover/alert:flex items-center justify-center w-6 h-6 rounded-lg bg-rose-50/80 hover:bg-rose-100 text-rose-600 transition-colors cursor-pointer"
-                  title="Delete Alert"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 };

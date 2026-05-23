@@ -12,7 +12,7 @@ const {
 const { getHistory } = require('../controllers/historyController');
 const { getOrderBook } = require('../controllers/depthController');
 const { getStatus } = require('../controllers/statusController');
-const { getMarketNews } = require('../controllers/newsController');
+const { getMarketNews, getNewsInsight } = require('../controllers/newsController');
 const { authMiddleware } = require('../middleware/authMiddleware');
 const { getMarketData: getUnifiedData } = require('../services/marketDataService');
 const { validateRequest, validateSymbolParam } = require('../middleware/validationMiddleware');
@@ -32,6 +32,7 @@ router.get('/history', getHistory);
 router.get('/depth', getOrderBook);
 router.get('/status', getStatus);
 router.get('/news', getMarketNews);
+router.post('/news/insight', getNewsInsight);
 
 router.get('/crypto/:symbol', validateSymbolParam, validateRequest, getCryptoBySymbol);
 

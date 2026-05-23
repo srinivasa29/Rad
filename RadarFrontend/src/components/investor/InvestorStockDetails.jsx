@@ -282,8 +282,8 @@ const InvestorStockPage = () => {
 
 
         const [finRes, newsRes, quoteRes] = await Promise.allSettled([
-          api.get(`/stocks/financials?symbol=${activeSymbol}`),
-          api.get(`/stocks/news?symbol=${activeSymbol}`),
+          api.get(`/stocks/${activeSymbol}/fundamentals`),
+          api.get(`/stocks/${activeSymbol}/news-sentiment`),
           api.get(`/market/quotes?symbols=${activeSymbol}`)
         ]);
 

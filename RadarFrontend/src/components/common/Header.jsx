@@ -41,6 +41,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
     const {
         profile,
         userInitial,
+        userImage,
         notifications,
         unreadCount,
         isLoadingNotifications,
@@ -272,15 +273,15 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                         </div>
 
                         <div className="relative">
-                            <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="w-9 h-9 rounded-full bg-[#3E84F6] text-white flex items-center justify-center text-xs font-black cursor-pointer hover:scale-110 transition-all shadow-lg shadow-blue-500/20">
-                                {userInitial}
+                            <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="w-9 h-9 rounded-full bg-[#3E84F6] text-white flex items-center justify-center text-xs font-black cursor-pointer hover:scale-110 transition-all shadow-lg shadow-blue-500/20 overflow-hidden">
+                                {userImage ? <img src={userImage} alt="Profile" className="w-full h-full object-cover" /> : userInitial}
                             </div>
                             {isProfileOpen && (
                                 <div className="absolute right-0 top-12 w-[320px] bg-white border border-slate-100 rounded-[28px] shadow-[0_20px_50px_rgba(0,0,0,0.12)] overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2">
                                     {/* Header Section with Avatar */}
                                     <div className="px-6 py-5 bg-[#F8FAFF] flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-500/20 flex-shrink-0">
-                                            {userInitial}
+                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-500/20 flex-shrink-0 overflow-hidden">
+                                            {userImage ? <img src={userImage} alt="Profile" className="w-full h-full object-cover" /> : userInitial}
                                         </div>
                                         <div className="overflow-hidden">
                                             <p className="text-base font-black text-slate-900 leading-tight">{profile?.username || 'User'}</p>

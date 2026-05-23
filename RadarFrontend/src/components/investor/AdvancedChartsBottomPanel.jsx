@@ -277,8 +277,8 @@ const AdvancedChartsBottomPanel = ({ symbol: propSymbol }) => {
 
 
         const [finRes, newsRes, quoteRes] = await Promise.allSettled([
-          api.get(`/stocks/financials?symbol=${activeSymbol}`),
-          api.get(`/stocks/news?symbol=${activeSymbol}`),
+          api.get(`/stocks/${activeSymbol}/fundamentals`),
+          api.get(`/stocks/${activeSymbol}/news-sentiment`),
           api.get(`/market/quotes?symbols=${activeSymbol}`)
         ]);
 
@@ -787,23 +787,31 @@ const AdvancedChartsBottomPanel = ({ symbol: propSymbol }) => {
                           {[1,2,3].map(i => <div key={i} className="h-12 bg-slate-100 animate-pulse rounded-lg" />)}
                         </div>
                       ) : (
-                        <div className="news-impact-list">
-                          {(newsImpactData?.data?.newsImpact || []).map((n, i) => (
-                            <div key={i} className="news-impact-item">
-                              <div className="ni-top">
-                                <span className={`ni-tag tag-${i === 0 ? 'green' : i === 1 ? 'blue' : 'purple'}`}>{n.category.toUpperCase()}</span>
-                                <p className="ni-head">{financialData?.data?.revenue?.[financialData.data.revenue.length-1]?.year} Forward Outlook</p>
+                        <div className="news-impact-list pr-1 h-full max-h-[220px] overflow-y-auto custom-scrollbar flex flex-col gap-4">
+                          {(newsImpactData?.data?.articles || []).slice(0, 3).map((article, i) => (
+                            <div key={i} 
+                                 className="news-article-item p-3 rounded-xl border border-slate-100 bg-slate-50 transition-all hover:shadow-md cursor-pointer hover:bg-white"
+                                 onClick={() => article.url && window.open(article.url, '_blank')}
+                            >
+                              <div className="flex justify-between items-center gap-2 mb-2">
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${article.sentiment === 'positive' ? 'bg-emerald-100 text-emerald-700' : article.sentiment === 'negative' ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>
+                                  {article.sentiment || 'NEUTRAL'}
+                                </span>
+                                <span className="text-[9px] font-bold text-slate-400 uppercase">
+                                  {article.source} • {new Date(article.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </span>
                               </div>
-                              <div className="news-impact-points mt-1">
-                                {n.points.map((p, pi) => (
-                                  <div key={pi} className="ni-interpretation mb-1">
-                                    <div className="ni-dot"></div>
-                                    <span>{p}</span>
-                                  </div>
-                                ))}
-                              </div>
+                              <p className="text-[12px] font-bold leading-snug line-clamp-2 text-slate-800">
+                                {article.title}
+                              </p>
                             </div>
                           ))}
+                          {(!newsImpactData?.data?.articles || newsImpactData.data.articles.length === 0) && (
+                            <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-3 opacity-60 min-h-[150px]">
+                              <Newspaper size={32} />
+                              <p className="text-[10px] font-bold uppercase tracking-widest">No recent news articles found</p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

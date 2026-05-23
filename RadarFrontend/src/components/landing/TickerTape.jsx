@@ -77,7 +77,9 @@ export default function TickerTape({ variant = "dark" }) {
         if (!isInvestor) return fallbackTickers;
         
         const savedCustom = localStorage.getItem('investorTickerCustom');
-        const customStocks = savedCustom ? JSON.parse(savedCustom) : [];
+        let customStocks = savedCustom ? JSON.parse(savedCustom) : [];
+        // Auto-correct typo if present
+        customStocks = customStocks.map(s => s.replace('RELAINCE', 'RELIANCE'));
         const mandatorySymbols = ["NIFTY 50", "SENSEX", "BANKNIFTY"];
         
         // Return dummy data for custom stocks if backend fails
@@ -106,15 +108,24 @@ export default function TickerTape({ variant = "dark" }) {
                 setError(false);
                 
                 const savedCustom = localStorage.getItem('investorTickerCustom');
-                const customStocks = savedCustom ? JSON.parse(savedCustom) : [];
-                const mandatoryIndexes = ["NIFTY", "SENSEX", "BANKNIFTY"];
+                let customStocks = savedCustom ? JSON.parse(savedCustom) : [];
+                // Auto-correct typo
+                const hadTypo = customStocks.some(s => s.includes('RELAINCE'));
+                customStocks = customStocks.map(s => s.replace('RELAINCE', 'RELIANCE'));
+                if (hadTypo) {
+                    localStorage.setItem('investorTickerCustom', JSON.stringify(customStocks));
+                }
+                const mandatoryIndexes = ["NIFTY 50", "SENSEX", "BANKNIFTY"];
                 const allSymbols = [...mandatoryIndexes, ...customStocks].join(',');
-
-                const params = isInvestor 
-                    ? { symbols: allSymbols }
-                    : { category: "index", limit: 8 };
-                    
-                const res = await fetchMarketData(params);
+                
+                let res;
+                if (isInvestor) {
+                    const { default: api } = await import("../../api/api");
+                    const response = await api.get(`/market/quotes?symbols=${encodeURIComponent(allSymbols)}`);
+                    res = response.data?.data || [];
+                } else {
+                    res = await fetchMarketData({ category: "index", limit: 8 });
+                }
                 
                 let processedRes = res;
                 if (isInvestor && res && res.length > 0) {

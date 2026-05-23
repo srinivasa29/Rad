@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ChevronDown, CheckCircle, AlertTriangle, Eye, ShieldAlert, Plus, Bell, Activity, TrendingUp, TrendingDown, Info, ArrowRight, CornerRightDown, AlignLeft, Filter, BookOpen, Bookmark, SlidersHorizontal, Trash2, PieChart, BarChart3 } from 'lucide-react';
+import { Search, ChevronDown, CheckCircle, AlertTriangle, Eye, ShieldAlert, Plus, Bell, Activity, TrendingUp, TrendingDown, Info, ArrowRight, CornerRightDown, AlignLeft, Filter, BookOpen, Bookmark, SlidersHorizontal, Trash2, PieChart, BarChart3, ExternalLink, X } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Cell, CartesianGrid } from 'recharts';
 import api from '../../api/api';
 import { useSocket } from '../../hooks/useSocket';
+import { AlertsDrawer } from './charts/SidebarDrawers';
 
 const mockSparklinePositive = Array.from({ length: 15 }, (_, i) => ({ value: 60 + Math.sin(i / 2) * 20 }));
 const mockSparklineNegative = Array.from({ length: 15 }, (_, i) => ({ value: 60 - Math.sin(i / 2) * 20 }));
@@ -98,10 +99,45 @@ const AttentionCard = ({ stock }) => {
     );
 };
 
+const SetAlertModal = ({ isOpen, onClose, symbol }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}></div>
+            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div>
+                        <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                            <Bell size={18} className="text-blue-600" />
+                            Manage Alerts
+                        </h3>
+                        <p className="text-xs font-medium text-slate-500 mt-0.5">Configure monitoring for {symbol}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors shadow-sm">
+                        <X size={16} />
+                    </button>
+                </div>
+                <div className="p-5 bg-slate-50/50 max-h-[60vh] overflow-y-auto">
+                    <AlertsDrawer symbol={symbol} isDark={false} />
+                </div>
+                <div className="p-4 bg-white border-t border-slate-100 flex justify-end">
+                    <button onClick={onClose} className="px-6 py-2.5 bg-blue-600 border border-blue-700 rounded-xl text-sm font-bold text-white hover:bg-blue-700 transition-colors shadow-sm">
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const GridCard = ({ stock, onRemove, customAlerts = [] }) => {
+    const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false);
     const [thesis, setThesis] = useState(stock.note || '');
     const [hasNote, setHasNote] = useState(stock.hasNote || false);
+    const [currentAlertIndex, setCurrentAlertIndex] = useState(0);
+    const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
 
     const handleSave = () => {
         if (thesis.trim()) {
@@ -112,39 +148,89 @@ const GridCard = ({ stock, onRemove, customAlerts = [] }) => {
         setIsEditing(false);
     };
 
-    // Find if user has an active alert for this stock symbol
-    const userAlert = customAlerts.find(a => String(a.symbol).toUpperCase() === String(stock.name).toUpperCase());
+    // Find if user has active alerts for this stock symbol
+    const userAlerts = customAlerts.filter(a => String(a.symbol).toUpperCase() === String(stock.name).toUpperCase());
 
     let alertBox = null;
-    if (userAlert && userAlert.value) {
-        const targetVal = Number(userAlert.value);
+    if (userAlerts && userAlerts.length > 0) {
+        // Ensure index is within bounds
+        const safeIndex = currentAlertIndex % userAlerts.length;
+        const userAlert = userAlerts[safeIndex];
+        
+        let targetValStr = String(userAlert.value).trim();
         const currentPriceVal = Number(String(stock.price).replace(/[^0-9.]/g, ''));
 
         let proximityPercent = 0;
         let awayPercent = 0;
-        if (targetVal > 0 && currentPriceVal > 0) {
-            const diff = Math.abs(currentPriceVal - targetVal);
-            awayPercent = Math.round((diff / currentPriceVal) * 100);
-            proximityPercent = Math.max(0, Math.min(100, 100 - awayPercent));
+        let displayValue = targetValStr;
+        let showProgressBar = false;
+
+        if (userAlert.type === 'price') {
+            const parsedTarget = Number(targetValStr.replace(/[^0-9.]/g, ''));
+            if (!isNaN(parsedTarget) && parsedTarget > 0 && currentPriceVal > 0) {
+                const diff = Math.abs(currentPriceVal - parsedTarget);
+                awayPercent = Math.round((diff / currentPriceVal) * 100);
+                proximityPercent = Math.max(0, Math.min(100, 100 - awayPercent));
+                displayValue = `₹${parsedTarget.toLocaleString('en-IN')}`;
+                showProgressBar = true;
+            }
+        } else if (userAlert.type === 'percent') {
+            displayValue = `${targetValStr}%`;
         }
 
+        const handleNextAlert = (e) => {
+            e.stopPropagation();
+            setCurrentAlertIndex((prev) => (prev + 1) % userAlerts.length);
+        };
+        
+        const handlePrevAlert = (e) => {
+            e.stopPropagation();
+            setCurrentAlertIndex((prev) => (prev - 1 + userAlerts.length) % userAlerts.length);
+        };
+
         alertBox = (
-            <div className="bg-slate-50/50 border border-slate-100/60 rounded-xl p-3 mb-5">
+            <div className="bg-slate-50/50 border border-slate-100/60 rounded-xl p-3 mb-5 relative group/alertbox">
                 <div className="flex justify-between items-center mb-1.5">
                     <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                        {userAlert.type === 'price' ? 'Price Target' : userAlert.type === 'percent' ? '% Change Target' : 'Alert Target'}
+                        {userAlert.type === 'price' ? 'Price Target' : userAlert.type === 'percent' ? '% Change Target' : 'Alert Condition'}
+                        {userAlerts.length > 1 && ` (${safeIndex + 1}/${userAlerts.length})`}
                     </div>
-                    <div className="text-[11px] font-bold text-slate-600">₹{targetVal.toLocaleString('en-IN')}</div>
+                    <div className="text-[11px] font-bold text-slate-600 truncate max-w-[100px] text-right" title={displayValue}>{displayValue}</div>
                 </div>
 
-                <div className="w-full bg-slate-200 rounded-full h-1.5 mb-1.5 overflow-hidden">
-                    <div className={`h-1.5 rounded-full ${proximityPercent >= 95 ? 'bg-blue-500' : 'bg-slate-400'}`} style={{ width: `${proximityPercent}%` }}></div>
-                </div>
+                {showProgressBar && (
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 mb-1.5 overflow-hidden">
+                        <div className={`h-1.5 rounded-full ${proximityPercent >= 95 ? 'bg-blue-500' : 'bg-slate-400'}`} style={{ width: `${proximityPercent}%` }}></div>
+                    </div>
+                )}
 
-                <div className="text-[10px] font-medium text-slate-500">
-                    <span className={`font-bold ${proximityPercent >= 95 ? 'text-blue-600' : 'text-slate-600'}`}>
-                        {awayPercent}% away
-                    </span> from target entry
+                <div className="flex justify-between items-center mt-1">
+                    <div className="text-[10px] font-medium text-slate-500">
+                        {showProgressBar ? (
+                            <><span className={`font-bold ${proximityPercent >= 95 ? 'text-blue-600' : 'text-slate-600'}`}>{awayPercent}% away</span> from target entry</>
+                        ) : (
+                            <span className="font-bold text-slate-500">Active Monitoring</span>
+                        )}
+                    </div>
+                    
+                    {userAlerts.length > 1 && (
+                        <div className="flex gap-1">
+                            <button 
+                                onClick={handlePrevAlert}
+                                className="w-5 h-5 bg-white border border-slate-200 rounded-md shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                                title="View Previous Alert"
+                            >
+                                <ArrowRight size={10} className="rotate-180" />
+                            </button>
+                            <button 
+                                onClick={handleNextAlert}
+                                className="w-5 h-5 bg-white border border-slate-200 rounded-md shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                                title="View Next Alert"
+                            >
+                                <ArrowRight size={10} />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -165,13 +251,20 @@ const GridCard = ({ stock, onRemove, customAlerts = [] }) => {
                 </div>
 
                 <div className="flex flex-col items-end gap-1.5">
-                    <div className="h-[20px] mb-1">
+                    <div className="h-[20px] mb-1 flex items-center gap-2">
                         {stock.tagTopRight && (
                             <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 ${stock.tagTopRightColor === 'rose' ? 'bg-rose-50 text-rose-600 border border-rose-100/60' : 'bg-slate-100 text-slate-600'
                                 }`}>
                                 {stock.tagTopRight}
                             </div>
                         )}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/investor/advanced-charts?symbol=${encodeURIComponent(stock.name.toUpperCase().replace(/\.(NS|BO)$/i, ''))}`); }}
+                            className="w-6 h-6 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors shadow-sm border border-slate-100 hover:border-blue-100 cursor-pointer"
+                            title="View Full Stock Dashboard"
+                        >
+                            <ExternalLink size={12} />
+                        </button>
                     </div>
                     <div className="w-[220px] h-32 mt-1 opacity-100">
                         <ResponsiveContainer width="100%" height="100%">
@@ -219,7 +312,7 @@ const GridCard = ({ stock, onRemove, customAlerts = [] }) => {
 
             <div className="flex items-center gap-2 mt-auto">
                 <button
-                    onClick={() => alert(`Alert set for ${stock.name} at current levels.`)}
+                    onClick={() => setIsAlertModalOpen(true)}
                     className="flex-1 bg-white border border-slate-200 hover:border-blue-500 hover:text-blue-700 text-slate-600 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm"
                 >
                     Set Alert
@@ -232,6 +325,12 @@ const GridCard = ({ stock, onRemove, customAlerts = [] }) => {
                     <Trash2 size={15} className="group-hover/trash:scale-110 transition-transform" />
                 </button>
             </div>
+
+            <SetAlertModal 
+                isOpen={isAlertModalOpen} 
+                onClose={() => setIsAlertModalOpen(false)} 
+                symbol={String(stock.name).replace(/\.(NS|BO)$/i, '')} 
+            />
 
             {hasNote && !isEditing && (
                 <div className="mt-4 bg-blue-50/30 border border-blue-100/50 rounded-xl p-3 relative group/note transition-all hover:bg-blue-50/50">
@@ -808,7 +907,9 @@ const Watchlist = () => {
         };
         load(false);
         const timer = setInterval(() => load(true), 20000);
-        return () => { active = false; clearInterval(timer); };
+        const handleWatchlistUpdate = () => { if(active) load(true); };
+        window.addEventListener('watchlist_updated', handleWatchlistUpdate);
+        return () => { active = false; clearInterval(timer); window.removeEventListener('watchlist_updated', handleWatchlistUpdate); };
     }, []);
 
     // Handle real-time WebSocket updates
@@ -994,7 +1095,7 @@ const Watchlist = () => {
                 tagTopColor: a.tagTopColor || 'blue',
                 insight: a.insight || `${a.symbol} proximity score: ${a.progressPercent}% (${a.priority} Priority).`,
                 realAlert: a.realAlert || `Target: ₹${a.targetPrice || 1935}`
-            })).slice(0, 3);
+            }));
         }
 
         return [];
@@ -1061,6 +1162,7 @@ const Watchlist = () => {
             // Optional: revert if absolutely necessary, but usually better to stay optimistic
             // setWatchlist(backup);
         }
+        window.dispatchEvent(new Event('watchlist_updated'));
     };
 
     const handleAddToWatchlist = async (stockSymbol) => {
@@ -1098,6 +1200,7 @@ const Watchlist = () => {
             // Optional: revert placeholder on failure
             // setWatchlist(prev => prev.filter(s => s.id !== placeholder.id));
         }
+        window.dispatchEvent(new Event('watchlist_updated'));
     };
 
     const [isHeatmapOpen, setIsHeatmapOpen] = useState(false);
@@ -1117,17 +1220,6 @@ const Watchlist = () => {
                                 Intelligence Watchlist
                             </h2>
                             <p className="text-sm font-medium text-slate-500 mt-1">Your decision-support command center.</p>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <div className="relative">
-                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Find within watchlist..."
-                                    className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm w-[220px] focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 shadow-sm transition-all text-slate-800 font-medium"
-                                />
-                            </div>
                         </div>
                     </div>
 
@@ -1273,22 +1365,6 @@ const Watchlist = () => {
                                             Watchlist Holdings
                                             <TooltipInfo text="Your primary grid of tracked stocks, displaying real-time technicals, valuations, and customized target proximity bars." />
                                         </h3>
-                                        <div className="flex items-center gap-3">
-                                            <div className="relative group">
-                                                <button className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-slate-600 text-[11px] font-bold hover:bg-slate-50 hover:text-blue-700 hover:border-blue-200 transition-all shadow-sm">
-                                                    <Filter size={13} className="text-slate-400 group-hover:text-blue-500" />
-                                                    Tags
-                                                    <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[9px] ml-1 group-hover:bg-blue-50 group-hover:text-blue-700">All Tracks</span>
-                                                    <ChevronDown size={14} className="ml-1 opacity-60" />
-                                                </button>
-                                            </div>
-                                            <div className="relative group">
-                                                <button className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-slate-600 text-[11px] font-bold hover:bg-slate-100 transition-colors shadow-sm">
-                                                    Sort: <span className="text-blue-700">Valuation Gap</span>
-                                                    <ChevronDown size={14} />
-                                                </button>
-                                            </div>
-                                        </div>
                                     </div>
                                     {watchlist.length > 0 ? (
                                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">

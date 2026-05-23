@@ -14,16 +14,16 @@ import { Loader2, AlertCircle } from 'lucide-react';
 const toHeikinAshi = (data) => {
   if (!data?.length) return [];
   const ha = HeikinAshi.calculate({
-    open:   data.map(d => d.open),
-    high:   data.map(d => d.high),
-    low:    data.map(d => d.low),
-    close:  data.map(d => d.close),
+    open: data.map(d => d.open),
+    high: data.map(d => d.high),
+    low: data.map(d => d.low),
+    close: data.map(d => d.close),
     volume: data.map(d => d.volume || 0),
   });
   return data.map((d, i) => ({
     time: d.time,
-    open:  ha.open[i],  high:  ha.high[i],
-    low:   ha.low[i],   close: ha.close[i],
+    open: ha.open[i], high: ha.high[i],
+    low: ha.low[i], close: ha.close[i],
   }));
 };
 
@@ -41,8 +41,8 @@ const generateMockData = (symbol) => {
     const vol = price * 0.02;
     const open = price;
     const close = Math.max(1, open + (rng() * vol * 2) - vol);
-    const high  = Math.max(open, close) + rng() * vol;
-    const low   = Math.max(1, Math.min(open, close) - rng() * vol);
+    const high = Math.max(open, close) + rng() * vol;
+    const low = Math.max(1, Math.min(open, close) - rng() * vol);
     data.push({ time: now - i * 86400, open, high, low, close, volume: Math.floor(50000 + rng() * 500000) });
     price = close;
   }
@@ -50,14 +50,42 @@ const generateMockData = (symbol) => {
 };
 
 // ── Color helpers ─────────────────────────────────────────────────────────────
-const UP_COLOR   = '#22c55e';
+const UP_COLOR = '#22c55e';
 const DOWN_COLOR = '#ef4444';
 const candleColor = (d) => (d.close >= d.open ? UP_COLOR : DOWN_COLOR);
+const calculateEMA = (data, period = 20) => {
+
+  if (!data?.length) return [];
+
+  const multiplier = 2 / (period + 1);
+
+  let emaPrev = data[0].close;
+
+  return data.map((candle, index) => {
+
+    if (index === 0) {
+      return {
+        time: candle.time,
+        value: candle.close,
+      };
+    }
+
+    const ema =
+      (candle.close - emaPrev) * multiplier + emaPrev;
+
+    emaPrev = ema;
+
+    return {
+      time: candle.time,
+      value: parseFloat(ema.toFixed(2)),
+    };
+  });
+};
 
 // ── Theme configs ─────────────────────────────────────────────────────────────
-const getThemeConfig = (isDark, showGrid) => ({
+const getThemeConfig = (isDark, showGrid, showCrosshair) => ({
   layout: {
-    textColor:  isDark ? '#94a3b8' : '#64748b',
+    textColor: isDark ? '#94a3b8' : '#64748b',
     background: { type: ColorType.Solid, color: isDark ? '#0f172a' : '#ffffff' },
     fontSize: 11,
     fontFamily: 'Inter, system-ui, sans-serif',
@@ -66,16 +94,19 @@ const getThemeConfig = (isDark, showGrid) => ({
     vertLines: { color: showGrid ? (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)') : 'transparent' },
     horzLines: { color: showGrid ? (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)') : 'transparent' },
   },
-  crosshair: { mode: 1 },
+  crosshair: { mode: showCrosshair !== false ? 1 : 2 },
   timeScale: { borderColor: 'transparent', borderVisible: false, timeVisible: true },
   rightPriceScale: { borderColor: 'transparent', borderVisible: false },
   handleScroll: { mouseWheel: false, pressedMouseMove: true },
-  handleScale:  { mouseWheel: false, pinch: true, axisPressedMouseMove: true },
+  handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 const ChartPane = ({
-  panel,              // { id, symbol, timeframe, chartType, indicators, showVolume }
+  panel,
+  interval,
+  historyRange,
+  //timeframe,
   isActive,
   onSelect,
   settings,           // global settings
@@ -87,17 +118,24 @@ const ChartPane = ({
   customTo,
 }) => {
   const containerRef = useRef(null);
-  const chartRef     = useRef(null);
+  const chartRef = useRef(null);
   const mainSeriesRef = useRef(null);
   const indicatorSeriesRef = useRef([]);
-  const volumeSeriesRef    = useRef(null);
+  const ema20SeriesRef = useRef(null);
+  const ema50SeriesRef = useRef(null);
+  const volumeSeriesRef = useRef(null);
   const [hoverData, setHoverData] = useState(null);
   const [selectedCandle, setSelectedCandle] = useState(null);
   const [popupPos, setPopupPos] = useState({ x: 0, y: 0 });
 
   const { data: fetchedData, loading, error } = useChartData(
-    panel.symbol, panel.timeframe, customFrom, customTo
-  );
+    panel.symbol,
+    interval,
+    historyRange,
+    //timeframe,
+    customFrom,
+    customTo
+  )
 
   // Use fetched data or fall back to mock
   const [data, setData] = useState([]);
@@ -116,33 +154,49 @@ const ChartPane = ({
   useChartSocket(panel.symbol, useCallback((tick) => {
     if (!mainSeriesRef.current) return;
     const candle = {
-      time:   tick.time   || Math.floor(Date.now() / 1000),
-      open:   tick.open   || tick.price || 0,
-      high:   tick.high   || tick.price || 0,
-      low:    tick.low    || tick.price || 0,
-      close:  tick.close  || tick.price || 0,
+      time: tick.time || Math.floor(Date.now() / 1000),
+      open: tick.open || tick.price || 0,
+      high: tick.high || tick.price || 0,
+      low: tick.low || tick.price || 0,
+      close: tick.close || tick.price || 0,
       volume: tick.volume || 0,
     };
-    try { mainSeriesRef.current.update(candle); } catch (_) {}
+    try { mainSeriesRef.current.update(candle); } catch (_) { }
   }, []));
 
   // ── Build chart ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current || !data.length) return;
 
-    const isDark   = settings.theme === 'dark';
+    if (chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
+    }
+    const isDark = settings.theme === 'dark';
     const showGrid = settings.showGrid !== false;
+    const showCrosshair = settings.showCrosshair !== false;
 
     // Count panel indicators for layout math
     const panelInds = panel.indicators ? ['rsi', 'macd', 'stoch', 'obv', 'atr']
       .filter(k => panel.indicators[k]) : [];
-    const panelCount    = panelInds.length;
+    const panelCount = panelInds.length;
     const mainHeightFrac = panelCount > 0 ? 0.60 - panelCount * 0.01 : 0.95;
 
-    const chart = createChart(containerRef.current, {
-      ...getThemeConfig(isDark, showGrid),
-      width:  containerRef.current.clientWidth,
+    /*const chart = createChart(containerRef.current, {
+      ...getThemeConfig(isDark, showGrid, showCrosshair),
+      width: containerRef.current.clientWidth,
       height: containerRef.current.clientHeight,
+    });*/
+    const chart = createChart(containerRef.current, {
+      ...getThemeConfig(isDark, showGrid, showCrosshair),
+
+      width: containerRef.current.clientWidth,
+      height: containerRef.current.clientHeight,
+
+      timeScale: {
+        timeVisible: true,
+        secondsVisible: false,
+      },
     });
 
     chart.applyOptions({
@@ -156,7 +210,9 @@ const ChartPane = ({
 
     // ── Main Series ──────────────────────────────────────────────────────────
     let mainSeries;
-    const priceFormat = { type: 'price', precision: 2, minMove: 0.01 };
+    const precision = parseInt(settings.precision || 2, 10);
+    const minMove = 1 / Math.pow(10, precision);
+    const priceFormat = { type: 'price', precision, minMove };
 
     const chartType = panel.chartType || settings.chartType || 'candlestick';
 
@@ -190,7 +246,7 @@ const ChartPane = ({
         break;
 
       case 'line':
-        mainSeries = chart.addSeries(LineSeries, {
+        mainSeries = chart.addSeries(LineSeries, {   //change series to lineSeries
           color: '#3b82f6', lineWidth: 2,
           priceLineVisible: true, lastValueVisible: true, priceFormat,
         });
@@ -228,9 +284,14 @@ const ChartPane = ({
 
     mainSeriesRef.current = mainSeries;
     indicatorSeriesRef.current = [];
+    const chartData =
+      chartType === 'heikinAshi'
+        ? toHeikinAshi(data)
+        : data;
 
+    // EMA 20 and EMA 50 defaults removed as per user request.
     // ── Volume ───────────────────────────────────────────────────────────────
-    if (panel.showVolume && data.some(d => d.volume > 0)) {
+    if (settings.showVolume !== false && panel.showVolume !== false && data.some(d => d.volume > 0)) {
       const volSeries = chart.addSeries(HistogramSeries, {
         priceFormat: { type: 'volume' },
         priceScaleId: 'volume',
@@ -260,12 +321,12 @@ const ChartPane = ({
     }
     if (indicators.bb) {
       const commonBB = { priceLineVisible: false, lineWidth: 1 };
-      const upper  = chart.addSeries(LineSeries, { ...commonBB, color: 'rgba(99,102,241,0.6)', title: 'BB Up'  });
+      const upper = chart.addSeries(LineSeries, { ...commonBB, color: 'rgba(99,102,241,0.6)', title: 'BB Up' });
       const middle = chart.addSeries(LineSeries, { ...commonBB, color: 'rgba(99,102,241,0.4)', title: 'BB Mid' });
-      const lower  = chart.addSeries(LineSeries, { ...commonBB, color: 'rgba(99,102,241,0.6)', title: 'BB Lo'  });
-      if (indicators.bb.upper?.length)  upper.setData(indicators.bb.upper);
+      const lower = chart.addSeries(LineSeries, { ...commonBB, color: 'rgba(99,102,241,0.6)', title: 'BB Lo' });
+      if (indicators.bb.upper?.length) upper.setData(indicators.bb.upper);
       if (indicators.bb.middle?.length) middle.setData(indicators.bb.middle);
-      if (indicators.bb.lower?.length)  lower.setData(indicators.bb.lower);
+      if (indicators.bb.lower?.length) lower.setData(indicators.bb.lower);
       indicatorSeriesRef.current.push(upper, middle, lower);
     }
     if (indicators.vwap?.length) {
@@ -279,8 +340,8 @@ const ChartPane = ({
 
     panelInds.forEach((key, idx) => {
       const scaleId = key;
-      const top     = mainHeightFrac + idx * ((1 - mainHeightFrac) / Math.max(panelCount, 1)) + 0.01;
-      const bottom  = 1 - (top + (1 - mainHeightFrac) / Math.max(panelCount, 1)) + 0.01;
+      const top = mainHeightFrac + idx * ((1 - mainHeightFrac) / Math.max(panelCount, 1)) + 0.01;
+      const bottom = 1 - (top + (1 - mainHeightFrac) / Math.max(panelCount, 1)) + 0.01;
       const margins = { top: Math.max(0, top), bottom: Math.max(0, bottom) };
 
       if (key === 'rsi' && indicators.rsi?.length) {
@@ -295,7 +356,7 @@ const ChartPane = ({
         if (macd?.length) {
           const mLine = chart.addSeries(LineSeries, { color: '#2196F3', lineWidth: 1.5, priceScaleId: 'macd', priceLineVisible: false, title: 'MACD' });
           const sLine = chart.addSeries(LineSeries, { color: '#FF5252', lineWidth: 1.5, priceScaleId: 'macd', priceLineVisible: false, title: 'Signal' });
-          const hBar  = chart.addSeries(HistogramSeries, { priceScaleId: 'macd', priceLineVisible: false, title: 'Hist' });
+          const hBar = chart.addSeries(HistogramSeries, { priceScaleId: 'macd', priceLineVisible: false, title: 'Hist' });
           mLine.setData(macd.filter(d => d.value !== null));
           sLine.setData(signal.filter(d => d.value !== null));
           hBar.setData(hist.filter(d => d.value !== null).map(d => ({
@@ -341,13 +402,20 @@ const ChartPane = ({
     ro.observe(containerRef.current);
 
     // ── Crosshair sync ───────────────────────────────────────────────────────
-    chart.subscribeCrosshairMove(param => {
+    /*chart.subscribeCrosshairMove(param => {
       if (param.time) {
         onCrosshairMove?.(panel.id, param);
         const price = param.seriesData.get(mainSeries);
         if (price) {
           setHoverData({
-            time: param.time,
+            time: new Date(param.time * 1000).toLocaleString('en-IN', {
+              timeZone: 'Asia/Kolkata',
+              day: '2-digit',
+              month: 'short',
+              year: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
             open: price.open || price.value,
             high: price.high || price.value,
             low: price.low || price.value,
@@ -359,14 +427,94 @@ const ChartPane = ({
       } else {
         setHoverData(null);
       }
+    });*/
+    chart.subscribeCrosshairMove(param => {
+
+      if (
+        !param ||
+        !param.point ||
+        !param.time ||
+        param.point.x < 0 ||
+        param.point.y < 0
+      ) {
+        setHoverData(null);
+        return;
+      }
+
+      onCrosshairMove?.(panel.id, param);
+
+      const price = param.seriesData.get(mainSeries);
+
+      if (!price) {
+        setHoverData(null);
+        return;
+      }
+
+      let formattedDate = '';
+
+      // Intraday candles
+      if (typeof param.time === 'number') {
+
+        formattedDate = new Date(param.time * 1000)
+          .toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            day: '2-digit',
+            month: 'short',
+            year: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          });
+
+      }
+
+      // Daily / Weekly / Monthly candles
+      else if (param.time.year) {
+
+        formattedDate =
+          `${param.time.day}/${param.time.month}/${param.time.year}`;
+
+      }
+
+      setHoverData({
+        time: formattedDate,
+
+        open: price.open ?? price.value,
+        high: price.high ?? price.value,
+        low: price.low ?? price.value,
+        close: price.close ?? price.value,
+      });
+
     });
 
     chart.subscribeClick(param => {
       if (param.time && param.point) {
         const price = param.seriesData.get(mainSeries);
         if (price) {
-          setSelectedCandle({
-            time: param.time,
+          selectedCandletSelectedCandle({
+            /*time: new Date(param.time * 1000).toLocaleString('en-IN', {
+              timeZone: 'Asia/Kolkata',
+              day: '2-digit',
+              month: 'short',
+              year: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            }),*/
+            time:
+
+              typeof param.time === 'number'
+
+                ? new Date(param.time * 1000).toLocaleString('en-IN', {
+                  timeZone: 'Asia/Kolkata',
+                  day: '2-digit',
+                  month: 'short',
+                  year: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false,
+                })
+
+                : `${param.time.day}/${param.time.month}/${param.time.year}`,
             open: price.open || price.value,
             high: price.high || price.value,
             low: price.low || price.value,
@@ -392,8 +540,21 @@ const ChartPane = ({
       chartRef.current = null;
       mainSeriesRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, panel.chartType, panel.indicators, panel.showVolume, settings.theme, settings.showGrid, settings.chartType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    data,
+    panel.historyRange,
+    panel.chartType,
+    panel.indicators,
+    panel.showVolume,
+    panel.symbol,
+    settings.theme,
+    settings.showGrid,
+    settings.showVolume,
+    settings.showCrosshair,
+    settings.precision,
+    settings.chartType
+  ]);
 
   // ── External crosshair sync ──────────────────────────────────────────────
   useEffect(() => {
@@ -404,38 +565,36 @@ const ChartPane = ({
         crosshairSync.time,
         mainSeriesRef.current
       );
-    } catch (_) {}
+    } catch (_) { }
   }, [crosshairSync]);
 
   // ── External range sync ──────────────────────────────────────────────────
   useEffect(() => {
     if (!rangeSync || !chartRef.current) return;
-    try { chartRef.current.timeScale().setVisibleRange(rangeSync); } catch (_) {}
+    try { chartRef.current.timeScale().setVisibleRange(rangeSync); } catch (_) { }
   }, [rangeSync]);
 
   // ── Latest price label ────────────────────────────────────────────────────
   const latestCandle = data[data.length - 1];
-  const prevCandle   = data[data.length - 2];
-  const change       = latestCandle && prevCandle
+  const prevCandle = data[data.length - 2];
+  const change = latestCandle && prevCandle
     ? ((latestCandle.close - prevCandle.close) / prevCandle.close * 100)
     : 0;
   const isUp = change >= 0;
 
   return (
     <div
-      className={`relative w-full h-full flex flex-col cursor-pointer select-none rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-        isActive
-          ? 'border-blue-500 shadow-lg shadow-blue-100/30'
-          : 'border-transparent hover:border-slate-200'
-      }`}
+      className={`relative w-full h-full flex flex-col cursor-pointer select-none rounded-xl overflow-hidden border-2 transition-all duration-200 ${isActive
+        ? 'border-blue-500 shadow-lg shadow-blue-100/30'
+        : 'border-transparent hover:border-slate-200'
+        }`}
       style={{ background: settings.theme === 'dark' ? '#0f172a' : '#ffffff' }}
       onClick={onSelect}
     >
       {/* ── Legend bar ─────────────────────────────────────────────────── */}
       <div className="absolute top-3 left-3 z-10 flex items-center gap-2 flex-wrap pointer-events-none">
-        <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${
-          isActive ? 'bg-blue-600 text-white' : (settings.theme === 'dark' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-800')
-        }`}>
+        <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${isActive ? 'bg-blue-600 text-white' : (settings.theme === 'dark' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-800')
+          }`}>
           {panel.symbol}
         </span>
         {(hoverData || latestCandle) && (
@@ -464,12 +623,11 @@ const ChartPane = ({
                 {(hoverData?.close || latestCandle?.close).toFixed(2)}
               </span>
             </div>
-            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-              (hoverData ? (hoverData.close >= hoverData.open) : isUp) 
-                ? 'bg-green-100 text-green-700' 
-                : 'bg-red-100 text-red-700'
-            }`}>
-              {hoverData 
+            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${(hoverData ? (hoverData.close >= hoverData.open) : isUp)
+              ? 'bg-green-100 text-green-700'
+              : 'bg-red-100 text-red-700'
+              }`}>
+              {hoverData
                 ? `${hoverData.close >= hoverData.open ? '+' : ''}${(((hoverData.close - hoverData.open) / hoverData.open) * 100).toFixed(2)}%`
                 : `${isUp ? '+' : ''}${change.toFixed(2)}%`
               }
@@ -477,10 +635,10 @@ const ChartPane = ({
           </div>
         )}
         {/* Active indicator labels */}
-        {panel.indicators.sma   && <span className="text-[8px] font-black text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">SMA·20</span>}
-        {panel.indicators.ema   && <span className="text-[8px] font-black text-purple-500 bg-purple-50 px-1.5 py-0.5 rounded">EMA·9</span>}
-        {panel.indicators.bb    && <span className="text-[8px] font-black text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded">BB</span>}
-        {panel.indicators.vwap  && <span className="text-[8px] font-black text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded">VWAP</span>}
+        {panel.indicators.sma && <span className="text-[8px] font-black text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">SMA·20</span>}
+        {panel.indicators.ema && <span className="text-[8px] font-black text-purple-500 bg-purple-50 px-1.5 py-0.5 rounded">EMA·9</span>}
+        {panel.indicators.bb && <span className="text-[8px] font-black text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded">BB</span>}
+        {panel.indicators.vwap && <span className="text-[8px] font-black text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded">VWAP</span>}
       </div>
 
       {/* ── Loading overlay ──────────────────────────────────────────────── */}
@@ -508,28 +666,51 @@ const ChartPane = ({
 
       {/* ── Click Popup Box ────────────────────────────────────────────────── */}
       {selectedCandle && (
-        <div 
-          className={`absolute z-30 pointer-events-auto p-4 rounded-2xl shadow-2xl border backdrop-blur-xl animate-in fade-in zoom-in duration-200 ${
-            settings.theme === 'dark' 
-              ? 'bg-slate-900/90 border-slate-700 text-white' 
-              : 'bg-white/90 border-slate-200 text-slate-900'
-          }`}
-          style={{ 
-            left: Math.min(popupPos.x + 20, containerRef.current?.clientWidth - 180 || 0), 
-            top: Math.min(popupPos.y + 20, containerRef.current?.clientHeight - 200 || 0),
+        <div
+          className={`absolute z-30 pointer-events-auto p-4 rounded-2xl shadow-2xl border backdrop-blur-xl animate-in fade-in zoom-in duration-200 ${settings.theme === 'dark'
+            ? 'bg-slate-900/90 border-slate-700 text-white'
+            : 'bg-white/90 border-slate-200 text-slate-900'
+            }`}
+          /*style={{
+            left: Math.min(popupPos.x + 20, containerRef.current?.clientWidth - 180 || 0),
+            //top: Math.min(popupPos.y + 20, containerRef.current?.clientHeight - 200 || 0),
+            
             width: '160px'
+          }}*/
+          style={{
+            position: 'absolute',
+
+            left: Math.max(
+              20,
+              Math.min(
+                popupPos.x + 20,
+                (containerRef.current?.clientWidth || 0) - 220
+              )
+            ),
+
+            top: Math.max(
+              20,
+              Math.min(
+                popupPos.y - 20,
+                (containerRef.current?.clientHeight || 0) - 260
+              )
+            ),
+
+            width: '180px',
+
+            zIndex: 9999,
           }}
         >
           <div className="flex justify-between items-center mb-3">
             <span className="text-[10px] font-black text-blue-500 uppercase">Data Point</span>
-            <button 
+            <button
               onClick={(e) => { e.stopPropagation(); setSelectedCandle(null); }}
               className="text-slate-400 hover:text-slate-600 transition-colors"
             >
               <AlertCircle size={14} className="rotate-45" />
             </button>
           </div>
-          
+
           <div className="space-y-2.5">
             {[
               { label: 'Open', val: selectedCandle.open },
@@ -542,13 +723,13 @@ const ChartPane = ({
                 <span className="text-[11px] font-black tracking-tight">₹{item.val.toFixed(2)}</span>
               </div>
             ))}
-            
+
             <div className="pt-2 mt-2 border-t border-slate-500/10">
               <div className="flex justify-between items-center">
                 <span className="text-[9px] font-bold text-slate-400 uppercase">Volume</span>
                 <span className="text-[10px] font-black text-slate-500">
-                  {selectedCandle.volume > 1000000 
-                    ? `${(selectedCandle.volume / 1000000).toFixed(2)}M` 
+                  {selectedCandle.volume > 1000000
+                    ? `${(selectedCandle.volume / 1000000).toFixed(2)}M`
                     : selectedCandle.volume.toLocaleString()}
                 </span>
               </div>

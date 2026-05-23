@@ -51,7 +51,7 @@ import {
 
 import "./InvestorDashboard.css";
 import { fetchDiscoveryShelves, fetchMarketMood, fetchValuation } from "../api/fundamentalApi";
-import { fetchSectorPerformance, fetchMarketData, fetchTrendingSearches, logSearchQuery, fetchMarketNews } from "../api/marketApi";
+import { fetchSectorPerformance, fetchMarketData, fetchTrendingSearches, logSearchQuery, fetchMarketNews, fetchNewsInsight } from "../api/marketApi";
 import { fetchEconomicCalendar } from "../api/calendarApi";
 import { updateUserMode } from "../api/userApi";
 import { useHeaderData } from "../hooks/useHeaderData";
@@ -1348,9 +1348,32 @@ const RegionFilter = ({ active, onChange }) => {
 
 const NewsCard = ({ item, isInitiallyExpanded = false }) => {
     const [isExpanded, setIsExpanded] = useState(isInitiallyExpanded);
-    const impact = item.impact || "Neutral";
+    const [insight, setInsight] = useState(null);
+    const [isLoadingInsight, setIsLoadingInsight] = useState(false);
+
+    useEffect(() => {
+        if (isExpanded && !insight && !item.whatHappened) {
+            let isMounted = true;
+            setIsLoadingInsight(true);
+            fetchNewsInsight(item.title, item.summary || item.description)
+                .then(data => {
+                    if (isMounted) {
+                        setInsight(data);
+                        setIsLoadingInsight(false);
+                    }
+                })
+                .catch(err => {
+                    if (isMounted) {
+                        setIsLoadingInsight(false);
+                    }
+                });
+            return () => { isMounted = false; };
+        }
+    }, [isExpanded, insight, item]);
+
+    const impact = insight?.impact || item.impact || "Neutral";
     const importance = item.importance || "Normal";
-    const sectors = item.sectors || item.affectedSectors || [];
+    const sectors = insight?.sectors || item.sectors || item.affectedSectors || [];
     const tags = item.tags || [];
 
     return (
@@ -1467,7 +1490,12 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                                     <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">WHAT HAPPENED</span>
                                 </div>
                                 <p className="text-[16px] text-slate-800 font-medium leading-relaxed pl-5 tracking-tight">
-                                    {item.whatHappened || "Processing core event details..."}
+                                    {isLoadingInsight ? (
+                                        <span className="flex items-center gap-2 text-slate-400">
+                                            <div className="w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"></div>
+                                            Generating AI insight...
+                                        </span>
+                                    ) : (insight?.whatHappened || item.whatHappened || "Processing core event details...")}
                                 </p>
                             </div>
 
@@ -1477,7 +1505,9 @@ const NewsCard = ({ item, isInitiallyExpanded = false }) => {
                                     <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">WHY IT MATTERS</span>
                                 </div>
                                 <p className="text-[15px] text-slate-700 font-medium leading-relaxed pl-5 tracking-tight">
-                                    {item.whyItMatters || "Strategic implications for current portfolio positions."}
+                                    {isLoadingInsight ? (
+                                        <span className="text-slate-400">...</span>
+                                    ) : (insight?.whyItMatters || item.whyItMatters || "Strategic implications for current portfolio positions.")}
                                 </p>
                             </div>
 
@@ -1563,8 +1593,6 @@ const InvestorNewsFeed = () => {
     const [selectedCategories, setSelectedCategories] = useState([]);
     const [assetClass, setAssetClass] = useState("Stocks");
     const [region, setRegion] = useState("India");
-    const [isWatchlistOnly, setIsWatchlistOnly] = useState(false);
-
     // Toggle multi-select category logic
     const toggleCategory = (cat) => {
         if (cat === "All") {
@@ -1585,11 +1613,19 @@ const InvestorNewsFeed = () => {
 
         // 1. Filter by categories (OR logic as requested)
         if (selectedCategories.length > 0) {
-            filtered = filtered.filter(item =>
-                selectedCategories.some(cat =>
-                    item.category?.toLowerCase() === cat.toLowerCase()
-                )
-            );
+            filtered = filtered.filter(item => {
+                const text = `${item.title} ${item.summary} ${item.category || ''}`.toLowerCase();
+                return selectedCategories.some(cat => {
+                    const c = cat.toLowerCase();
+                    if (item.category && item.category.toLowerCase() === c) return true;
+                    if (c === 'earnings') return text.includes('earning') || text.includes('profit') || text.includes('revenue') || text.includes('q1') || text.includes('q2') || text.includes('q3') || text.includes('q4');
+                    if (c === 'deals') return text.includes('deal') || text.includes('merger') || text.includes('acquisition') || text.includes('buyout') || text.includes('stake');
+                    if (c === 'policy') return text.includes('policy') || text.includes('fed') || text.includes('rate') || text.includes('bank') || text.includes('rbi') || text.includes('central');
+                    if (c === 'macro') return text.includes('macro') || text.includes('inflation') || text.includes('cpi') || text.includes('gdp') || text.includes('economy') || text.includes('jobs');
+                    if (c === 'ipo') return text.includes('ipo') || text.includes('public offering') || text.includes('listing');
+                    return text.includes(c);
+                });
+            });
         }
 
         // 2. Maintain strict chronological sorting (Latest First)
@@ -1614,13 +1650,16 @@ const InvestorNewsFeed = () => {
                 category: "all",
                 region: region.toLowerCase(),
                 assetClass: assetClass.toLowerCase(),
-                watchlist: isWatchlistOnly
             });
 
-            if (data && Array.isArray(data) && data.length > 0) {
-                const processed = data.map(item => ({ ...item, isToday: true }));
-                setRawNews(processed);
-                localStorage.setItem('radar_investor_news', JSON.stringify(processed));
+            if (data && Array.isArray(data)) {
+                if (data.length > 0) {
+                    const processed = data.map(item => ({ ...item, isToday: true }));
+                    setRawNews(processed);
+                    localStorage.setItem('radar_investor_news', JSON.stringify(processed));
+                } else {
+                    setRawNews([]);
+                }
             } else if (!rawNews.length) {
                 // High-fidelity fallback if everything fails and no cache
                 const fallbacks = [
@@ -1654,7 +1693,7 @@ const InvestorNewsFeed = () => {
     useEffect(() => {
         // Automatically fetch fresh news when critical backend filters change
         loadNews();
-    }, [region, assetClass, isWatchlistOnly]);
+    }, [region, assetClass]);
 
     return (
         <div className="flex flex-col w-full">
@@ -1719,22 +1758,12 @@ const InvestorNewsFeed = () => {
                                     <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
                                     <span>{isLoading ? "Refreshing..." : "Refresh Feed"}</span>
                                 </button>
-                                <button
-                                    onClick={() => setIsWatchlistOnly(!isWatchlistOnly)}
-                                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-[11px] font-black border transition-all outline-none ${isWatchlistOnly
-                                            ? "bg-amber-100 border-amber-300 text-amber-700 shadow-md"
-                                            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                                        }`}
-                                >
-                                    <Star size={13} className={isWatchlistOnly ? "text-amber-600 fill-amber-500" : "text-amber-400"} />
-                                    <span>Watchlist</span>
-                                </button>
+
                                 <button
                                     onClick={() => {
                                         setSelectedCategories([]);
                                         setAssetClass("Stocks");
                                         setRegion("India");
-                                        setIsWatchlistOnly(false);
                                     }}
                                     className="flex items-center gap-2 px-3.5 py-1.5 bg-white text-slate-700 rounded-lg text-[11px] font-black border border-slate-200 hover:bg-slate-50 transition-all outline-none"
                                 >

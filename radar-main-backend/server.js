@@ -186,6 +186,7 @@ app.get('/', (req, res) => {
     });
 });
 app.use('/api/auth',          require('./src/routes/authRoutes'));
+app.use('/api/stocks',        require('./src/routes/ohlcRoutes'));
 app.use('/api/user',          require('./src/routes/userRoutes'));
 app.use('/api/market',        require('./src/routes/marketRoutes'));
 app.use('/api/watchlist',     require('./src/routes/watchlistRoutes'));
