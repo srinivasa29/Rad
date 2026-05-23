@@ -16,6 +16,7 @@ import {
     LogOut,
     Menu,
     GraduationCap,
+    AlertTriangle,
 } from "lucide-react";
 import { useHeaderData } from "../../hooks/useHeaderData";
 import { fetchMarketData, fetchTrendingSearches, logSearchQuery } from "../../api/marketApi";
@@ -160,7 +161,13 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                     ].map((item) => (
                         <button
                             key={item.id}
-                            onClick={() => setActiveModule ? setActiveModule(item.id) : navigate('/investor/dashboard')}
+                            onClick={() => {
+                                if (setActiveModule) {
+                                    setActiveModule(item.id);
+                                } else {
+                                    navigate(item.id === 'DASHBOARD' ? '/investor/dashboard' : `/investor/dashboard?module=${item.id}`);
+                                }
+                            }}
                             className="flex items-center gap-2.5 text-[13px] font-black tracking-tight transition-all duration-300 opacity-100 hover:text-blue-700"
                             style={{ color: '#3E84F6' }}
                         >
@@ -193,8 +200,12 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                                     e.preventDefault();
                                     setHighlightedIndex((prev) => (prev - 1 + optionsLength) % optionsLength);
                                 } else if (e.key === 'Enter') {
-                                    if (usingSearchResults && searchResults.length > 0) {
-                                        await handleSearchSelect(searchResults[Math.max(0, highlightedIndex)]);
+                                    if (usingSearchResults) {
+                                        if (searchResults.length > 0 && highlightedIndex >= 0) {
+                                            await handleSearchSelect(searchResults[highlightedIndex]);
+                                        } else {
+                                            await handleTrendingSelect(searchQuery.trim().toUpperCase());
+                                        }
                                     } else if (!usingSearchResults && trendingSearches.length > 0) {
                                         await handleTrendingSelect(trendingSearches[Math.max(0, highlightedIndex)]);
                                     }
@@ -207,17 +218,24 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                                 {isSearching ? (
                                     <div className="px-4 py-3 text-xs font-semibold text-slate-500">Searching...</div>
                                 ) : searchQuery.trim().length > 0 ? (
-                                    searchResults.map((item, idx) => (
-                                        <button key={idx} onClick={() => handleSearchSelect(item)} className={`w-full text-left px-4 py-3 border-b border-blue-50 ${highlightedIndex === idx ? 'bg-blue-50' : 'hover:bg-blue-50'}`}>
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-xs font-black text-slate-800">{displaySymbol(item.symbol)}</p>
-                                                    <p className="text-[10px] text-slate-500">{item.name}</p>
+                                    searchResults.length > 0 ? (
+                                        searchResults.map((item, idx) => (
+                                            <button key={idx} onClick={() => handleSearchSelect(item)} className={`w-full text-left px-4 py-3 border-b border-blue-50 ${highlightedIndex === idx ? 'bg-blue-50' : 'hover:bg-blue-50'}`}>
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-xs font-black text-slate-800">{displaySymbol(item.symbol)}</p>
+                                                        <p className="text-[10px] text-slate-500">{item.name}</p>
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-[#3E84F6]">{item.type}</span>
                                                 </div>
-                                                <span className="text-[10px] font-bold text-[#3E84F6]">{item.type}</span>
-                                            </div>
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <button onClick={() => handleTrendingSelect(searchQuery.trim().toUpperCase())} className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors">
+                                            <p className="text-xs font-black text-slate-800">Search for '{searchQuery.toUpperCase()}'</p>
+                                            <p className="text-[10px] text-slate-500">Press Enter to navigate directly</p>
                                         </button>
-                                    ))
+                                    )
                                 ) : (
                                     <div className="px-4 py-3">
                                         <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Trending</p>

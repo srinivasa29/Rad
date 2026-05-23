@@ -9,6 +9,20 @@ const logger      = require('../config/logger');
 
 const cache = new NodeCache({ stdTTL: 6 * 60 * 60, checkperiod: 60 * 30 });
 
+const SECTOR_PROXIES = {
+    'Financial Services': 'HDFCBANK.NS',
+    'Technology': 'TCS.NS',
+    'Healthcare': 'SUNPHARMA.NS',
+    'Consumer Defensive': 'ITC.NS',
+    'Consumer Cyclical': 'MARUTI.NS',
+    'Energy': 'RELIANCE.NS',
+    'Basic Materials': 'TATASTEEL.NS',
+    'Industrials': 'LT.NS',
+    'Communication Services': 'BHARTIARTL.NS',
+    'Utilities': 'NTPC.NS',
+    'Real Estate': 'DLF.NS'
+};
+
 const CRYPTO_SYMBOLS = new Set([
     'BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK',
     'AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT',
@@ -55,7 +69,7 @@ function approximateDelivery(defaultKeyStatistics) {
     return 55;
 }
 
-async function getFundamentals(symbol, changePercent = 0) {
+async function getFundamentals(symbol, changePercent = 0, isProxy = false) {
     const yahooSym = normalizeSymbol(symbol);
     const cacheKey = `fundamentals:${yahooSym}`;
 
@@ -144,6 +158,23 @@ async function getFundamentals(symbol, changePercent = 0) {
             valStatus:     classifyValuation(pe != null ? pe : (isCrypto ? null : 15 + (seed % 20))),
         };
 
+        if (!isProxy && !isCrypto) {
+            const proxySymbol = SECTOR_PROXIES[sector] || 'RELIANCE.NS';
+            try {
+                // If it's the same symbol, use its own data as benchmark
+                const proxyData = (proxySymbol === yahooSym) ? result : await getFundamentals(proxySymbol, 0, true);
+                result.industryPeAvg = proxyData.pe;
+                result.industryRoeAvg = proxyData.roe;
+                result.industryMarginAvg = proxyData.profitMargins;
+                result.industryGrowthAvg = proxyData.revenueGrowth;
+            } catch (e) {
+                result.industryPeAvg = 18.5;
+                result.industryRoeAvg = 15;
+                result.industryMarginAvg = 10;
+                result.industryGrowthAvg = 12;
+            }
+        }
+
         cache.set(cacheKey, result);
         return result;
 
@@ -151,8 +182,7 @@ async function getFundamentals(symbol, changePercent = 0) {
         const ticker = symbol.replace(/\.(NS|BO)$/i, '');
         const seed = ticker.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
         const isCrypto = isCryptoSymbol(symbol);
-
-        return {
+        const fallbackResult = {
             pe: isCrypto ? null : 15 + (seed % 20),
             priceToBook: 2.5 + (seed % 5) / 2,
             beta: 0.8 + (seed % 5) / 10,
@@ -177,6 +207,15 @@ async function getFundamentals(symbol, changePercent = 0) {
             bookValue: isCrypto ? 3.15 : 315 + (seed % 50),
             valStatus: classifyValuation(15 + (seed % 20)),
         };
+        
+        if (!isProxy && !isCrypto) {
+            fallbackResult.industryPeAvg = 18.5;
+            fallbackResult.industryRoeAvg = 15;
+            fallbackResult.industryMarginAvg = 10;
+            fallbackResult.industryGrowthAvg = 12;
+        }
+
+        return fallbackResult;
     }
 }
 

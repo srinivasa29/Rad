@@ -1696,10 +1696,10 @@ const InvestorStockPage = () => {
                             <span>Metric</span><span>Company</span><span>Industry Avg</span>
                           </div>
                           {[
-                            { n: 'P/E Ratio',     c: na(pe),        i: '—', t: peColor,   d: q.valStatus === 'undervalued' ? 'down' : 'up' },
-                            { n: 'ROE',           c: na(roe),       i: '—', t: roe != null && parseFloat(roe) > 12 ? 'green' : 'neutral', d: 'up' },
-                            { n: 'Profit Margin', c: na(netMargin), i: '—', t: netMargin != null && parseFloat(netMargin) > 10 ? 'green' : 'neutral', d: 'up' },
-                            { n: 'Rev Growth',    c: na(revGrowth), i: '—', t: revGrowth != null && parseFloat(revGrowth) > 5 ? 'green' : 'neutral', d: 'up' },
+                            { n: 'P/E Ratio',     c: na(pe),        i: q.industryPeAvg ? Number(q.industryPeAvg).toFixed(2) : '—', t: peColor,   d: q.valStatus === 'undervalued' ? 'down' : 'up' },
+                            { n: 'ROE',           c: na(roe),       i: q.industryRoeAvg ? parseFloat(q.industryRoeAvg).toFixed(1) + '%' : '—', t: roe != null && parseFloat(roe) > 12 ? 'green' : 'neutral', d: 'up' },
+                            { n: 'Profit Margin', c: na(netMargin), i: q.industryMarginAvg ? parseFloat(q.industryMarginAvg).toFixed(1) + '%' : '—', t: netMargin != null && parseFloat(netMargin) > 10 ? 'green' : 'neutral', d: 'up' },
+                            { n: 'Rev Growth',    c: na(revGrowth), i: q.industryGrowthAvg ? parseFloat(q.industryGrowthAvg).toFixed(1) + '%' : '—', t: revGrowth != null && parseFloat(revGrowth) > 5 ? 'green' : 'neutral', d: 'up' },
                           ].map((m, idx) => (
                             <div key={idx} className="pct-row">
                               <div className="flex items-center gap-2">

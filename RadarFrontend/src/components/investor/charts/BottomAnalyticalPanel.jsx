@@ -258,7 +258,7 @@ const BottomAnalyticalPanel = ({ symbol, isDark, stockDetails }) => {
               isDark={isDark}
               FUNDAMENTALS_TOOLTIPS={FUNDAMENTALS_TOOLTIPS}
               getFundamentalsList={getFundamentalsList}
-              peerComparison={[]}
+              quoteData={quoteData}
             />
           )}
 

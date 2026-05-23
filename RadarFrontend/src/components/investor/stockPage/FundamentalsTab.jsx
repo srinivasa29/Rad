@@ -14,7 +14,7 @@ const FundamentalsSection = ({
   getFundamentalsList,
   formatCurrency,
   formatPercent,
-  peerComparison = [],
+  quoteData = {},
 }) => {
 
   const fundamentals = getFundamentalsList();
@@ -204,7 +204,7 @@ const FundamentalsSection = ({
                 <h3 className={`font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>Peer Comparison</h3>
                 <Info size={14} className="text-slate-300" />
               </div>
-              <span className="text-xs font-bold uppercase text-slate-400">Industry: —</span>
+              <span className="text-xs font-bold uppercase text-slate-400">Industry: {quoteData?.industry || '—'}</span>
             </div>
 
             <div className="overflow-x-auto flex-1">
@@ -220,22 +220,22 @@ const FundamentalsSection = ({
                   <tr className={`border-b ${isDark ? 'border-slate-800/50' : 'border-slate-50'}`}>
                     <td className="py-4 font-semibold text-slate-500">P/E Ratio</td>
                     <td className={`font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>{getMetric('P/E Ratio')}</td>
-                    <td className="text-slate-400">—</td>
+                    <td className="text-slate-400">{quoteData?.industryPeAvg ? Number(quoteData.industryPeAvg).toFixed(2) : '—'}</td>
                   </tr>
                   <tr className={`border-b ${isDark ? 'border-slate-800/50' : 'border-slate-50'}`}>
                     <td className="py-4 font-semibold text-slate-500">ROE</td>
                     <td className={`font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>{getMetric('ROE')}</td>
-                    <td className="text-slate-400">—</td>
+                    <td className="text-slate-400">{quoteData?.industryRoeAvg ? Number(quoteData.industryRoeAvg).toFixed(1) + '%' : '—'}</td>
                   </tr>
                   <tr className={`border-b ${isDark ? 'border-slate-800/50' : 'border-slate-50'}`}>
                     <td className="py-4 font-semibold text-slate-500">Profit Margin</td>
                     <td className={`font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>{getMetric('Profit Margin')}</td>
-                    <td className="text-slate-400">—</td>
+                    <td className="text-slate-400">{quoteData?.industryMarginAvg ? Number(quoteData.industryMarginAvg).toFixed(1) + '%' : '—'}</td>
                   </tr>
                   <tr>
                     <td className="py-4 font-semibold text-slate-500">Rev Growth</td>
                     <td className={`font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>{getMetric('Revenue Growth')}</td>
-                    <td className="text-slate-400">—</td>
+                    <td className="text-slate-400">{quoteData?.industryGrowthAvg ? Number(quoteData.industryGrowthAvg).toFixed(1) + '%' : '—'}</td>
                   </tr>
                 </tbody>
               </table>

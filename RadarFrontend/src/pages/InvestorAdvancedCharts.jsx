@@ -131,7 +131,17 @@ const AdvancedChartsInner = ({ initialSymbol }) => {
 
   // ── Timeframe change ─────────────────────────────────────────────────────────
   const handleRange = (range, from = null, to = null) => {
+    let newInterval = activeInterval;
+
+    // Intelligent auto-adjust interval based on range selection to prevent API data limits
+    if (range === '1D') newInterval = '1m';
+    else if (range === '5D') newInterval = '5m';
+    else if (range === '1M') newInterval = '1h';
+    else if (range === '3M' || range === '6M' || range === '1Y') newInterval = '1d';
+    else if (range === '5Y' || range === 'ALL') newInterval = '1wk';
+
     setActiveRange(range);
+    setActiveInterval(newInterval);
     setCustomFrom(from);
     setCustomTo(to);
 
@@ -139,6 +149,7 @@ const AdvancedChartsInner = ({ initialSymbol }) => {
       const updated = panels.map(p => ({
         ...p,
         historyRange: range,
+        interval: newInterval,
         customFrom: from,
         customTo: to
       }));
@@ -146,6 +157,7 @@ const AdvancedChartsInner = ({ initialSymbol }) => {
       updated.forEach(p =>
         updatePanel(p.id, {
           historyRange: range,
+          interval: newInterval,
           customFrom: from,
           customTo: to
         })
@@ -153,37 +165,44 @@ const AdvancedChartsInner = ({ initialSymbol }) => {
     } else {
       updateActivePanel({
         historyRange: range,
+        interval: newInterval,
         customFrom: from,
         customTo: to
       });
     }
-
   };
   const handleInterval = (interval) => {
+    let newRange = activeRange;
+
+    // Auto-adjust range to valid boundaries for short intervals to avoid empty/clamped data
+    if (interval === '1m' && !['1D', '5D'].includes(activeRange)) newRange = '1D';
+    else if (['5m', '15m'].includes(interval) && !['1D', '5D', '1M'].includes(activeRange)) newRange = '5D';
+    else if (interval === '1h' && !['1D', '5D', '1M', '3M', '6M'].includes(activeRange)) newRange = '1M';
 
     setActiveInterval(interval);
+    if (newRange !== activeRange) {
+        setActiveRange(newRange);
+    }
 
     if (settings.syncTimeframe) {
-
       const updated = panels.map(p => ({
         ...p,
-        interval
+        interval,
+        historyRange: newRange
       }));
 
       updated.forEach(p =>
         updatePanel(p.id, {
-          interval
+          interval,
+          historyRange: newRange
         })
       );
-
     } else {
-
       updateActivePanel({
-        interval
+        interval,
+        historyRange: newRange
       });
-
     }
-
   };
 
   // ── Crosshair / Range sync ────────────────────────────────────────────────────
@@ -392,16 +411,6 @@ const AdvancedChartsInner = ({ initialSymbol }) => {
           onChartTypeChange={(type) => updateActivePanel({ chartType: type })}
           isDark={isDark}
         />
-
-        {/* Compare button */}
-        <button
-          onClick={() => setShowCompare(true)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-        >
-          <ArrowLeftRight size={13} />
-          Compare
-        </button>
 
         {/* Spacer */}
         <div className="flex-1" />

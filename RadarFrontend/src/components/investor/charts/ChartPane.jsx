@@ -95,10 +95,10 @@ const getThemeConfig = (isDark, showGrid, showCrosshair) => ({
     horzLines: { color: showGrid ? (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)') : 'transparent' },
   },
   crosshair: { mode: showCrosshair !== false ? 1 : 2 },
-  timeScale: { borderColor: 'transparent', borderVisible: false, timeVisible: true },
+  timeScale: { borderColor: 'transparent', borderVisible: false, timeVisible: true, fixLeftEdge: false, rightOffset: 5 },
   rightPriceScale: { borderColor: 'transparent', borderVisible: false },
-  handleScroll: { mouseWheel: false, pressedMouseMove: true },
-  handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true },
+  handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true },
+  handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ const ChartPane = ({
     if (fetchedData?.length) {
       setData(fetchedData);
     } else if (!loading) {
-      setData(generateMockData(panel.symbol));
+      setData([]); // Never use mock data
     }
   }, [fetchedData, loading, panel.symbol]);
 
@@ -166,7 +166,16 @@ const ChartPane = ({
 
   // ── Build chart ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!containerRef.current || !data.length) return;
+    if (!containerRef.current) return;
+
+    if (!data.length) {
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+        mainSeriesRef.current = null;
+      }
+      return;
+    }
 
     if (chartRef.current) {
       chartRef.current.remove();
@@ -654,10 +663,19 @@ const ChartPane = ({
       {/* ── Error state ───────────────────────────────────────────────────── */}
       {error && !loading && !data.length && (
         <div className="absolute top-10 left-0 right-0 z-10 flex justify-center pointer-events-none">
-          <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5">
-            <AlertCircle className="w-3 h-3 text-amber-500" />
-            <span className="text-[9px] font-bold text-amber-600">Using simulated data (API unavailable)</span>
+          <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-xl px-3 py-1.5">
+            <AlertCircle className="w-3 h-3 text-red-500" />
+            <span className="text-[9px] font-bold text-red-600">Failed to fetch chart data</span>
           </div>
+        </div>
+      )}
+
+      {/* ── Empty state ───────────────────────────────────────────────────── */}
+      {!loading && !data.length && !error && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none opacity-60">
+          <AlertCircle className="w-8 h-8 text-slate-400 mb-2" />
+          <span className="text-xs font-bold text-slate-500">No trading data available</span>
+          <span className="text-[10px] text-slate-400">Try adjusting the history or interval settings.</span>
         </div>
       )}
 

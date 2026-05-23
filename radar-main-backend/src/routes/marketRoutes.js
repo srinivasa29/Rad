@@ -299,6 +299,10 @@ router.get('/quotes', async (req, res) => {
                     dividendYield: fundamentals.dividendYield,
                     bookValue:     fundamentals.bookValue,
                     valStatus:     fundamentals.valStatus,
+                    industryPeAvg: fundamentals.industryPeAvg,
+                    industryRoeAvg: fundamentals.industryRoeAvg,
+                    industryMarginAvg: fundamentals.industryMarginAvg,
+                    industryGrowthAvg: fundamentals.industryGrowthAvg,
                     // Crypto-native fields
                     category:      fundamentals.sector || 'Equity',
                     layer:         null,

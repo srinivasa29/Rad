@@ -90,14 +90,7 @@ const useChartData = (symbol, interval,
 
       let raw = res.data?.data || [];
 
-      // Fallback: try legacy /history endpoint
-      if (!raw.length) {
-        const histRes = await api.get(`/stocks/${symbol}/history`, {
-          params: { interval: '1day', exchange: 'NSE' },
-          signal: abortRef.current.signal,
-        });
-        raw = histRes.data?.data || [];
-      }
+      // Fallback removed: Returning empty data is better than ignoring user's interval/range and showing 1 year of daily data.
 
       // Normalize to TV format
       const normalized = raw

@@ -826,6 +826,8 @@ export function ProfilePage() {
     const [portfolio, setPortfolio] = useState(null);
     const [insights, setInsights] = useState([]);
     const [events, setEvents] = useState([]);
+    const [learningProgress, setLearningProgress] = useState([]);
+    const [totalProgress, setTotalProgress] = useState(0);
     const [loading, setLoading] = useState(true);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -859,19 +861,75 @@ export function ProfilePage() {
     useEffect(() => {
         const loadDashboardData = async () => {
             try {
-                const [profileRes, portfolioRes, insightsRes, eventsRes] = await Promise.all([
+                const userId = localStorage.getItem('userId') || 'anonymous';
+                const [profileRes, portfolioRes, insightsRes, eventsRes, coursesRes, progressRes] = await Promise.all([
                     api.get('/user/profile').catch(() => ({ data: { username: 'Investor', email: 'guest@radar.com', joinedDate: 'Joined Feb 2024' } })),
                     api.get('/user/portfolio').catch(() => ({ data: null })),
                     api.get('/user/insights').catch(() => ({ data: [] })),
-                    api.get('/user/events').catch(() => ({ data: [] }))
+                    api.get('/user/events').catch(() => ({ data: [] })),
+                    api.get('/learning').catch(() => ({ data: { data: [] } })),
+                    api.get(`/learning/progress/${userId}`).catch(() => ({ data: { data: {} } }))
                 ]);
 
                 setProfile(toPayload(profileRes.data, null));
                 setPortfolio(toPayload(portfolioRes.data, null));
                 setInsights(toPayload(insightsRes.data, []));
                 setEvents(toPayload(eventsRes.data, []));
+
+                const courses = Array.isArray(coursesRes.data?.data) ? coursesRes.data.data : (Array.isArray(coursesRes.data) ? coursesRes.data : []);
+                
+                // Load progress from localStorage to perfectly sync with Academy page 
+                // (Backend progressStore is in-memory and resets on dev server restart)
+                const pStore = {};
+                courses.forEach(c => {
+                    try { pStore[c.id] = JSON.parse(localStorage.getItem(`radar_academy_progress_${c.id}`) || '{}'); }
+                    catch { pStore[c.id] = {}; }
+                });
+
+                let totalScore = 0;
+                let totalPossible = courses.length * 100;
+
+                const mapped = courses.slice(0, 3).map((course) => {
+                    const cProg = course?.id ? (pStore[course.id] || { chapters: {} }) : { chapters: {} };
+                    const chaptersCount = course?.chapters?.length || 1;
+                    const completedChapters = Object.values(cProg.chapters || {}).filter(Boolean).length;
+                    
+                    let progressPct = Math.round((completedChapters / chaptersCount) * 100);
+                    if (progressPct > 100) progressPct = 100;
+                    
+                    totalScore += progressPct;
+
+                    let status = 'Not Started';
+                    if (progressPct === 100) status = 'Completed';
+                    else if (progressPct > 0) status = 'In Progress';
+
+                    let icon = <BookOpen size={14} />;
+                    const titleStr = (course?.title || '').toLowerCase();
+                    if (titleStr.includes('technical')) icon = <TrendingUp size={14} />;
+                    else if (titleStr.includes('risk')) icon = <ShieldCheck size={14} />;
+
+                    return {
+                        title: course?.title || 'Unknown Course',
+                        status,
+                        progress: progressPct,
+                        icon
+                    };
+                });
+
+                if (mapped.length === 0) {
+                    setLearningProgress([
+                        { title: 'Stock Market Basics', status: 'Not Started', progress: 0, icon: <BookOpen size={14} /> },
+                        { title: 'Technical Indicators', status: 'Not Started', progress: 0, icon: <TrendingUp size={14} /> },
+                        { title: 'Risk Management', status: 'Not Started', progress: 0, icon: <ShieldCheck size={14} /> }
+                    ]);
+                    setTotalProgress(0);
+                } else {
+                    setLearningProgress(mapped);
+                    setTotalProgress(totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0);
+                }
             } catch (error) {
                 console.error("Failed to load profile data", error);
+                setLearningProgress([{ title: `Error: ${error?.message || 'Unknown'}`, status: 'Error', progress: 0, icon: <AlertCircle size={14} /> }]);
             } finally {
                 setLoading(false);
             }
@@ -904,11 +962,7 @@ export function ProfilePage() {
         </div>
     );
 
-    const learningProgress = [
-        { title: 'Stock Market Basics', status: 'Completed', progress: 100, icon: <BookOpen size={14} /> },
-        { title: 'Technical Indicators', status: 'In Progress', progress: 70, icon: <TrendingUp size={14} /> },
-        { title: 'Risk Management', status: 'Not Started', progress: 0, icon: <ShieldCheck size={14} /> }
-    ];
+
 
     const dna = profile?.investorDNA || null;
     const hasDNA = dna && dna.dominant;
@@ -1067,7 +1121,7 @@ export function ProfilePage() {
                                 <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest">Learning Journey</h2>
                                 <p className="text-xs text-slate-500 font-bold mt-1">Progress through financial intelligence modules</p>
                             </div>
-                            <div className="px-3 py-1 bg-blue-50 rounded-lg text-[10px] font-black text-blue-600">70% TOTAL PROGRESS</div>
+                            <div className="px-3 py-1 bg-blue-50 rounded-lg text-[10px] font-black text-blue-600">{totalProgress}% TOTAL PROGRESS</div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {learningProgress.map((item, idx) => (
@@ -1748,6 +1802,8 @@ export function InvestorFilingsPage() {
 export function HelpSupportPage() {
     const [openFaq, setOpenFaq] = useState(null);
     const [formStatus, setFormStatus] = useState(null);
+    const [formError, setFormError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [copied, setCopied] = useState(false);
     const contactRef = useRef(null);
 
@@ -1779,15 +1835,56 @@ export function HelpSupportPage() {
     };
 
     const copyEmail = () => {
-        navigator.clipboard.writeText('support@radar.com');
+        navigator.clipboard.writeText('srinivasamannepula7@gmail.com');
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        setFormStatus('success');
-        setTimeout(() => setFormStatus(null), 5000);
+        
+        const form = e.target;
+        const name = form.name.value.trim();
+        const email = form.email.value.trim();
+        const subject = form.subject.value.trim();
+        const message = form.message.value.trim();
+
+        if (!name || !email || !subject || !message) {
+            setFormError('All fields are mandatory. Please fill out the entire form.');
+            return;
+        }
+
+        setFormError('');
+        setIsSubmitting(true);
+
+        try {
+            const response = await fetch("https://formsubmit.co/ajax/srinivasamannepula7@gmail.com", {
+                method: "POST",
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    name,
+                    email,
+                    subject,
+                    message,
+                    _subject: `RADAR Support: ${subject}`
+                })
+            });
+
+            if (response.ok) {
+                setFormStatus('success');
+                setTimeout(() => setFormStatus(null), 5000);
+                form.reset();
+            } else {
+                setFormError('Failed to send message. Please try again later.');
+            }
+        } catch (err) {
+            setFormError('Network error. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -1830,7 +1927,7 @@ export function HelpSupportPage() {
                             </div>
                             <p className="text-slate-500 text-xs font-medium mb-4">Typical response time: Within 24 hours.</p>
                             <div className="mt-auto flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
-                                <span className="text-sm font-black text-slate-700">support@radar.com</span>
+                                <span className="text-sm font-black text-slate-700">srinivasamannepula7@gmail.com</span>
                                 <button 
                                     onClick={copyEmail}
                                     className="p-2 hover:bg-slate-50 rounded-lg transition-all text-blue-600 flex items-center gap-2"
@@ -1875,27 +1972,33 @@ export function HelpSupportPage() {
                                 </div>
                             </div>
                         ) : (
-                            <form onSubmit={handleSubmit} className="space-y-6">
+                            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+                                {formError && (
+                                    <div className="bg-red-50 text-red-600 border border-red-200 px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-2 mb-4 animate-in slide-in-from-top-2">
+                                        <AlertCircle size={14} />
+                                        {formError}
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Name</label>
-                                        <input type="text" required placeholder="John Doe" className="w-full px-5 py-4 rounded-xl bg-white border border-slate-200 text-xs font-bold outline-none focus:border-blue-500 transition-all" />
+                                        <input type="text" name="name" required placeholder="John Doe" className="w-full px-5 py-4 rounded-xl bg-white border border-slate-200 text-xs font-bold outline-none focus:border-blue-500 transition-all" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Email Address</label>
-                                        <input type="email" required placeholder="john@example.com" className="w-full px-5 py-4 rounded-xl bg-white border border-slate-200 text-xs font-bold outline-none focus:border-blue-500 transition-all" />
+                                        <input type="email" name="email" required placeholder="john@example.com" className="w-full px-5 py-4 rounded-xl bg-white border border-slate-200 text-xs font-bold outline-none focus:border-blue-500 transition-all" />
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Subject</label>
-                                    <input type="text" required placeholder="How can we help?" className="w-full px-5 py-4 rounded-xl bg-white border border-slate-200 text-xs font-bold outline-none focus:border-blue-500 transition-all" />
+                                    <input type="text" name="subject" required placeholder="How can we help?" className="w-full px-5 py-4 rounded-xl bg-white border border-slate-200 text-xs font-bold outline-none focus:border-blue-500 transition-all" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Message</label>
-                                    <textarea required rows="5" placeholder="Tell us more about your issue..." className="w-full px-5 py-4 rounded-xl bg-white border border-slate-200 text-xs font-bold outline-none focus:border-blue-500 transition-all resize-none" />
+                                    <textarea name="message" required rows="5" placeholder="Tell us more about your issue..." className="w-full px-5 py-4 rounded-xl bg-white border border-slate-200 text-xs font-bold outline-none focus:border-blue-500 transition-all resize-none" />
                                 </div>
-                                <button type="submit" className="w-full md:w-auto px-10 py-4 bg-blue-600 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-200 flex items-center justify-center gap-2 hover:bg-blue-700 transition-all">
-                                    Send Message <Send size={14} />
+                                <button type="submit" disabled={isSubmitting} className="w-full md:w-auto px-10 py-4 bg-blue-600 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-200 flex items-center justify-center gap-2 hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                                    {isSubmitting ? 'Sending...' : 'Send Message'} <Send size={14} />
                                 </button>
                             </form>
                         )}
