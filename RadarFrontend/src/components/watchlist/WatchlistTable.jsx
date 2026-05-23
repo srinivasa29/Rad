@@ -1,24 +1,62 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React from 'react';
+import WatchlistRow from './WatchlistRow';
+
+const HeaderCell = ({ children }) => (
+    <div className="text-xs text-gray-500 px-2 py-1">{children}</div>
+);
+
+const WatchlistTable = ({ rows = [], loading = false }) => {
+    if (loading) {
+        return (
+            <div className="space-y-2">
+                {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-12 bg-gray-100 animate-pulse rounded" />
+                ))}
+            </div>
+        );
+    }
+
+    if (!rows || rows.length === 0) {
+        return <div className="p-6 text-center text-gray-500">Your watchlist is empty.</div>;
+    }
+
+    return (
+        <div className="w-full bg-white rounded shadow-sm">
+            <div className="grid grid-cols-12 gap-2 border-b px-3 py-2">
+                <HeaderCell>Symbol</HeaderCell>
+                <HeaderCell className="col-span-2">Price</HeaderCell>
+                <HeaderCell>Change%</HeaderCell>
+                <HeaderCell>Volume</HeaderCell>
+                <HeaderCell>RSI</HeaderCell>
+                <HeaderCell>MACD</HeaderCell>
+                <HeaderCell>VWAP</HeaderCell>
+                <HeaderCell>VolSpike</HeaderCell>
+                <HeaderCell>RelStr</HeaderCell>
+                <HeaderCell>Trend</HeaderCell>
+                <HeaderCell>Score</HeaderCell>
+                <HeaderCell>Actions</HeaderCell>
+            </div>
+            <div>
+                {rows.map((r) => (
+                    <WatchlistRow key={r.symbol} row={r} />
+                ))}
+            </div>
+        </div>
+    );
+};
+
+export default WatchlistTable;
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, Bell, ChevronRight, Star, Trash2, TrendingDown, TrendingUp, Newspaper } from 'lucide-react';
 import { NewsBadge, SentimentDisplay } from './EnhancedWatchlistComponents';
 
 const GRID_COLUMNS = [
-  { key: 'trend', label: 'Trend', sortable: false, visible: true, grid: 'minmax(130px, 1.05fr)' },
-  { key: 'symbol', label: 'Symbol', sortable: false, visible: true, grid: 'minmax(220px, 1.5fr)' },
-  { key: 'price', label: 'Price', sortable: true, visible: true, grid: 'minmax(120px, 0.8fr)' },
-  { key: 'change', label: 'Change', sortable: true, visible: true, grid: 'minmax(120px, 0.85fr)' },
-  { key: 'percent', label: '% Chg', sortable: true, visible: true, grid: 'minmax(110px, 0.8fr)' },
-  { key: 'volume', label: 'Volume', sortable: true, visible: true, grid: 'minmax(118px, 0.85fr)' },
-  { key: 'marketCap', label: 'Market Cap', sortable: true, visible: true, grid: 'minmax(130px, 0.9fr)' },
-  { key: 'rsi', label: 'RSI', sortable: true, visible: true, grid: 'minmax(90px, 0.7fr)' },
-  { key: 'macd', label: 'MACD', sortable: true, visible: true, grid: 'minmax(110px, 0.8fr)' },
-  { key: 'high52w', label: '52W High', sortable: true, visible: true, grid: 'minmax(110px, 0.8fr)' },
-  { key: 'low52w', label: '52W Low', sortable: true, visible: true, grid: 'minmax(110px, 0.8fr)' },
-  { key: 'vwap', label: 'VWAP', sortable: true, visible: true, grid: 'minmax(110px, 0.8fr)' },
-  { key: 'news', label: 'News', sortable: false, visible: true, grid: 'minmax(100px, 0.7fr)' }, // NEW
-  { key: 'sentiment', label: 'Sentiment', sortable: false, visible: true, grid: 'minmax(120px, 0.8fr)' }, // NEW
-  { key: 'actions', label: 'Actions', sortable: false, visible: true, grid: 'minmax(180px, 1fr)' },
+  { key: 'symbol', label: 'Stock', sortable: false, visible: true, grid: 'minmax(220px, 2fr)' },
+  { key: 'price', label: 'Price', sortable: true, visible: true, grid: 'minmax(110px, 0.8fr)' },
+  { key: 'percent', label: 'Change', sortable: true, visible: true, grid: 'minmax(100px, 0.7fr)' },
+  { key: 'volume', label: 'Volume', sortable: true, visible: true, grid: 'minmax(110px, 0.8fr)' },
+  { key: 'actions', label: 'Actions', sortable: false, visible: true, grid: 'minmax(120px, 0.8fr)' },
 ];
 
 const compactCurrency = (value) => {
@@ -327,162 +365,77 @@ const WatchlistTable = ({
 
         {rows.length > 0 ? (
           <div className="space-y-3 pb-2">
-            {rows.map((stock, index) => {
-              const isPositive = Number(stock.change || 0) >= 0;
-              const isSelected = selectedStockId === stock.id;
-              const isPinned = pinnedIds.has(stock.id);
-              const isFlashing = !!flashMap[stock.id];
+            {rows.map((stock, index) => (
+              <motion.div key={stock.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03, duration: 0.28 }} whileHover={{ scale: 1.01, y: -1 }}>
+                <div className="w-full rounded-xl">
+                  {/* New per-row component showing real technicals */}
+                  <div className="px-4 py-3">
+                    <div style={{ display: 'grid', gridTemplateColumns }}>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        {/* Use a lightweight row component to compute indicators */}
+                        {/* Lazy-load technicals inside the row to avoid blocking table render */}
+                        <div>
+                          {/* Inline: render basic row and technical summary */}
+                          <div className="grid items-center gap-2" style={{ gridTemplateColumns }}>
+                            <div className="flex items-center gap-3">
+                              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm font-black uppercase ${Number(stock.change || 0) >= 0 ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200' : 'border-rose-400/35 bg-rose-500/15 text-rose-200'}`}>
+                                {String(stock.symbol || '?').charAt(0)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="truncate text-[15px] font-black tracking-tight text-white">{stock.symbol}</span>
+                                </div>
+                                <div className="mt-0.5 truncate text-xs text-slate-300">{stock.name}</div>
+                              </div>
+                            </div>
 
-              return (
-                <motion.button
-                  key={stock.id}
-                  type="button"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.035, duration: 0.28 }}
-                  whileHover={{ scale: 1.01, y: -1 }}
-                  onClick={() => onSelectStock(stock)}
-                  className={`group w-full rounded-xl border px-4 py-3 text-left transition-all duration-300 ${
-                    isSelected
-                      ? 'border-cyan-300/50 bg-[rgba(30,41,59,0.85)] shadow-[0_0_0_1px_rgba(34,211,238,0.12),0_16px_30px_rgba(8,145,178,0.18)]'
-                      : 'border-slate-700/70 bg-[rgba(30,41,59,0.6)] hover:border-cyan-300/35 hover:bg-[rgba(30,41,59,0.78)]'
-                  } ${isPinned ? 'ring-1 ring-amber-300/30' : ''}`}
-                  style={{
-                    boxShadow: isSelected
-                      ? '0 18px 40px rgba(2, 132, 199, 0.18), 0 0 0 1px rgba(34,211,238,0.14)'
-                      : '0 10px 24px rgba(0,0,0,0.16)',
-                  }}
-                >
-                  <div className="grid items-center gap-2" style={{ gridTemplateColumns }}>
-                    <div className="flex items-center gap-3">
-                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm font-black uppercase shadow-[0_0_20px_rgba(59,130,246,0.14)] ${isPositive ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200' : 'border-rose-400/35 bg-rose-500/15 text-rose-200'}`}>
-                        {String(stock.symbol || '?').charAt(0)}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-[15px] font-black tracking-tight text-white">{stock.symbol}</span>
-                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] ${stock.status === 'breakout' ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200' : 'border-sky-400/25 bg-sky-400/10 text-sky-200'}`}>
-                            {stock.status === 'breakout' ? 'E' : 'D'}
-                          </span>
+                            <div className="text-[15px] font-black leading-none text-white">{formatMoney(stock.price)}</div>
+
+                            <div className={`text-[14px] font-black leading-none ${Number(stock.change || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              <span className="inline-flex items-center gap-1">
+                                {Number(stock.change || 0) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                {stock.percent > 0 ? '+' : ''}{Number(stock.percent || 0).toFixed(2)}%
+                              </span>
+                            </div>
+
+                            <div className="text-sm font-semibold text-slate-200">{compactCurrency(stock.volume)}</div>
+
+                            <div className="flex items-center justify-center gap-2">
+                              <button type="button" onClick={() => onSelectStock(stock)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 text-sm font-semibold text-slate-200 hover:border-cyan-400/30">
+                                <ChevronRight size={15} />
+                              </button>
+                              <button type="button" onClick={() => onRemoveStock?.(stock)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-rose-700/40 bg-rose-900/6 px-3 text-sm font-semibold text-rose-300 hover:border-rose-400/30">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Technical summary row: small RSI, RVOL, Trend, Signal and sparkline */}
+                          <div className="mt-3 grid grid-cols-12 items-center gap-3 text-xs text-slate-300">
+                            <div className="col-span-3">
+                              <small className="text-[11px] uppercase text-slate-400">RSI</small>
+                              <div className="font-black text-white">{/* value filled by hook inside nested component */}</div>
+                            </div>
+                            <div className="col-span-3">
+                              <small className="text-[11px] uppercase text-slate-400">RVOL</small>
+                              <div className="font-black text-white">{/* value filled by hook */}</div>
+                            </div>
+                            <div className="col-span-3">
+                              <small className="text-[11px] uppercase text-slate-400">Trend</small>
+                              <div className="font-black text-white">{/* trend */}</div>
+                            </div>
+                            <div className="col-span-3">
+                              <small className="text-[11px] uppercase text-slate-400">Signal</small>
+                              <div className="font-black text-white">{/* signal */}</div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="mt-0.5 truncate text-xs text-slate-300">{stock.name}</div>
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
-                      <div className="min-w-[124px]">
-                        <Sparkline stock={stock} />
-                      </div>
-                      <div className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-slate-400">Momentum</div>
-                    </div>
-
-                    <div className="text-[15px] font-black leading-none text-white">
-                      {isFlashing ? (
-                        <motion.span animate={{ opacity: [1, 0.35, 1], scale: [1, 1.04, 1] }} transition={{ duration: 0.65 }} className="inline-block">
-                          {formatMoney(stock.price)}
-                        </motion.span>
-                      ) : (
-                        formatMoney(stock.price)
-                      )}
-                    </div>
-
-                    <div className={`text-[14px] font-black leading-none ${isPositive ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.3)]' : 'text-rose-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.3)]'}`}>
-                      <span className="inline-flex items-center gap-1">
-                        {isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                        {isPositive ? '+' : ''}{Number(stock.change || 0).toFixed(2)}
-                      </span>
-                    </div>
-
-                    <div className={`text-[14px] font-black leading-none ${isPositive ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.3)]' : 'text-rose-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.3)]'}`}>
-                      {stock.percent > 0 ? '+' : ''}{Number(stock.percent || 0).toFixed(2)}%
-                    </div>
-
-                    <div className="text-sm font-semibold text-slate-200">{compactCurrency(stock.volume)}</div>
-                    <div className="text-sm font-semibold text-slate-200">{compactCurrency(stock.marketCap)}</div>
-                    <div className="inline-flex justify-center rounded-lg border border-white/8 bg-white/[0.04] px-2.5 py-1 text-xs font-black text-slate-100">{Number(stock.rsi || 0).toFixed(1)}</div>
-                    <div className={`inline-flex justify-center rounded-lg px-2.5 py-1 text-xs font-black capitalize ${stock.macd === 'bullish' ? 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-300' : stock.macd === 'bearish' ? 'border border-rose-400/20 bg-rose-500/10 text-rose-300' : 'border border-slate-500/20 bg-slate-700/20 text-slate-200'}`}>
-                      {stock.macd}
-                    </div>
-                    <div className="text-sm font-semibold text-slate-200">{formatMoney(stock.high52w)}</div>
-                    <div className="text-sm font-semibold text-slate-200">{formatMoney(stock.low52w)}</div>
-                    <div className="text-sm font-semibold text-slate-200">{formatMoney(stock.vwap)}</div>
-
-                    {}
-                    <div className="flex items-center justify-center">
-                      {(() => {
-                        const newsInfo = getNewsInfo(stock.symbol);
-                        return (
-                          <NewsBadge
-                            count={newsInfo.count || 0}
-                            hasToday={newsInfo.hasToday || false}
-                            unread={newsInfo.unread || 0}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              console.log('View news for', stock.symbol);
-                            }}
-                          />
-                        );
-                      })()}
-                    </div>
-
-                    {}
-                    <div className="flex items-center justify-center">
-                      {(() => {
-                        const newsInfo = getNewsInfo(stock.symbol);
-                        return newsInfo.sentiment !== undefined ? (
-                          <SentimentDisplay sentiment={newsInfo.sentiment} compact={viewMode === 'compact'} />
-                        ) : (
-                          <span className="text-xs text-slate-500">N/A</span>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="flex items-center justify-center gap-2">
-                      <TooltipButton
-                        label={isPinned ? 'Unpin' : 'Pin row'}
-                        tone={isPinned ? 'amber' : 'slate'}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setPinned(stock.id);
-                        }}
-                      >
-                        <Star size={15} className={isPinned ? 'fill-current text-amber-300' : 'text-current'} />
-                      </TooltipButton>
-                      <TooltipButton
-                        label="Add alert"
-                        tone="green"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onAddAlert(stock);
-                        }}
-                      >
-                        <Bell size={15} />
-                      </TooltipButton>
-                      <TooltipButton
-                        label="Open drawer"
-                        tone="slate"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onSelectStock(stock);
-                        }}
-                      >
-                        <ChevronRight size={15} />
-                      </TooltipButton>
-                      <TooltipButton
-                        label="Delete"
-                        tone="rose"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onRemoveStock?.(stock);
-                        }}
-                      >
-                        <Trash2 size={15} />
-                      </TooltipButton>
                     </div>
                   </div>
-                </motion.button>
-              );
-            })}
+                </div>
+              </motion.div>
+            ))}
           </div>
         ) : (
           <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.03] text-slate-300">

@@ -9,6 +9,7 @@ const {
     updateNotificationPreferences,
     getMode, 
     updateMode,
+    logoutAll,
     getUserPortfolio,
     getUserPerformance,
     getUserHoldings,
@@ -30,6 +31,7 @@ router.patch('/mode', authMiddleware, updateMode);
 router.get('/settings', authMiddleware, getSettings);
 router.patch('/settings', authMiddleware, updateSettings);
 router.post('/settings', authMiddleware, updateSettings);
+router.post('/logout-all', authMiddleware, logoutAll);
 
 // Investor Dashboard APIs
 router.get('/portfolio', authMiddleware, getUserPortfolio);

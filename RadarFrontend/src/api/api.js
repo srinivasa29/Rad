@@ -98,7 +98,7 @@ export const toggleWatchlist = async (symbol, mode) => {
         
         let defaultId = null;
         if (!watchlists || watchlists.length === 0) {
-            const createRes = await api.post('/watchlist', { name: mode === 'investor' ? 'Investor Portfolio' : 'Trader Watchlist', mode });
+            const createRes = await api.post('/watchlist', { name: mode === 'investor' ? 'Investor Portfolio' : 'Research Watchlist', mode });
             defaultId = createRes.data?._id;
             watchlists = [createRes.data];
         } else {

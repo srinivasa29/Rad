@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import api from '../api/api';
-import { useGoogleLogin } from '@react-oauth/google';
+// import { useGoogleLogin } from '@react-oauth/google';
 import AuthLayout from '../components/auth/AuthLayout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, Eye, EyeOff, ChevronDown } from 'lucide-react';
@@ -20,30 +20,32 @@ export default function Login() {
     setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      try {
-        setLoading(true);
-      const res = await api.post('/auth/google', { token: tokenResponse.credential || tokenResponse.access_token, isSignup: false });
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('userEmail', res.data.email || '');
-      localStorage.setItem('user', JSON.stringify({ username: res.data.username, email: res.data.email }));
-      window.location.href = '/dashboard';
-      } catch (error) {
-        setLoading(false);
-        setErrors({ general: error.response?.data?.error || 'Google Login Failed' });
-      }
-    },
-    onError: () => {
-      setErrors({ general: 'Google Login Failed' });
-    }
-  });
+  // const handleGoogleLogin = useGoogleLogin({
+  //   onSuccess: async (tokenResponse) => {
+  //     try {
+  //       setLoading(true);
+  //     const res = await api.post('/auth/google', { token: tokenResponse.credential || tokenResponse.access_token, isSignup: false });
+  //     localStorage.setItem('token', res.data.token);
+  //     localStorage.setItem('userEmail', res.data.email || '');
+  //     localStorage.setItem('user', JSON.stringify({ username: res.data.username, email: res.data.email }));
+  //     window.location.href = '/dashboard';
+  //     } catch (error) {
+  //       setLoading(false);
+  //       setErrors({ general: error.response?.data?.error || 'Google Login Failed' });
+  //     }
+  //   },
+  //   onError: () => {
+  //     setErrors({ general: 'Google Login Failed' });
+  //   }
+  // });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { identifier, password } = formData;
+    const trimmedIdentifier = String(identifier || '').trim();
+    const trimmedPassword = String(password || '');
 
-    if (!identifier || !password) {
+    if (!trimmedIdentifier || !trimmedPassword) {
       setErrors({ general: 'Please fill in all fields' });
       return;
     }
@@ -51,13 +53,15 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/login', {
-        username: identifier,
+      // Send both `username` and `identifier` to the backend and include `email` when input looks like an email.
+      const payload = {
+        username: trimmedIdentifier,
+        identifier: trimmedIdentifier,
+        password: trimmedPassword
+      };
+      if (trimmedIdentifier.includes('@')) payload.email = trimmedIdentifier.toLowerCase();
 
-
-
-        password
-      });
+      const res = await api.post('/auth/login', payload);
 
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('userEmail', res.data.email || identifier);
@@ -140,6 +144,7 @@ export default function Login() {
             </motion.button>
           </form>
 
+          {/*
           <div className="relative flex py-2 items-center">
             <div className="flex-grow border-t border-gray-100"></div>
             <span className="flex-shrink-0 mx-4 text-gray-400 text-xs uppercase tracking-wider font-medium">Or continue with</span>
@@ -163,6 +168,7 @@ export default function Login() {
               Sign in with Google
             </motion.button>
           </div>
+          */}
 
           <div className="text-center pt-2">
             <span className="text-gray-500 text-sm">Don't have an account? </span>

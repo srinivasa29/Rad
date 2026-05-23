@@ -67,6 +67,12 @@ const MostBoughtStocks = () => {
                 setSavedSymbols(prev => new Set([...prev, sym]));
                 showToast(`${sym} added to watchlist ✓`, 'success');
             }
+            try {
+                if (typeof window !== 'undefined') {
+                    const action = savedSymbols.has(sym) ? 'removed' : 'added';
+                    window.dispatchEvent(new CustomEvent('watchlist:changed', { detail: { symbol: sym, action } }));
+                }
+            } catch (e) {}
         } catch (err) {
             const status = err?.response?.status;
             if (status === 401 || status === 403) {

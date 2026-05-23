@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAsset } from "../../context/AssetContext";
-import { fetchMarketHistory } from "../../api/marketApi";
+import { fetchOHLCData } from "../../api/ohlcApi";
 import { Settings, Maximize2 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Tooltip, XAxis, YAxis, Area, Line, CartesianGrid } from "recharts";
 
@@ -16,12 +16,12 @@ const BACKEND_SYMBOL_MAP = {
 };
 
 const BACKEND_INTERVAL_MAP = {
-  "1m": "1D",
-  "5m": "1D",
-  "15m": "1D",
-  "1h": "1D",
-  "4h": "1W",
-  "1D": "1M",
+  "1m": "1m",
+  "5m": "5m",
+  "15m": "15m",
+  "1h": "1h",
+  "4h": "1h",
+  "1D": "1d",
 };
 
 const FALLBACK_BASE_PRICE = {
@@ -51,6 +51,15 @@ const FALLBACK_STEP_MINUTES = {
   "1h": 60,
   "4h": 240,
   "1D": 1440,
+};
+
+const POINT_LIMIT_BY_TIMEFRAME = {
+  "1m": 180,
+  "5m": 220,
+  "15m": 220,
+  "1h": 220,
+  "4h": 220,
+  "1D": 260,
 };
 
 const normalizeChartSymbol = (value) => {
@@ -199,18 +208,26 @@ const MultiChartGrid = ({ className, onOpenChart, timeframe = "15m", activeIndic
       await Promise.all(symbols.map(async (sym) => {
         try {
           const backendSymbol = BACKEND_SYMBOL_MAP[sym] || sym;
-          const backendInterval = BACKEND_INTERVAL_MAP[timeframe] || "1D";
-          const res = await fetchMarketHistory(backendSymbol, "STOCK", backendInterval);
+          const backendInterval = BACKEND_INTERVAL_MAP[timeframe] || "15m";
+          const res = await fetchOHLCData(backendSymbol, {
+            exchange: "NSE",
+            timeframe: backendInterval,
+            limit: POINT_LIMIT_BY_TIMEFRAME[timeframe] || 220,
+          });
           if (res && Array.isArray(res.data) && res.data.length > 0) {
-            newHistories[sym] = res.data.map(d => ({
+            newHistories[sym] = res.data.map((d) => ({
               ...d,
-              time: new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              price: d.close,
-              open: d.open,
-              high: d.high,
-              low: d.low,
-              close: d.close
-            }));
+              time: timeframe === "1D"
+                ? new Date(d.timestamp).toLocaleDateString([], { month: "short", day: "numeric" })
+                : new Date(d.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              price: Number(d.close),
+              open: Number(d.open),
+              high: Number(d.high),
+              low: Number(d.low),
+              close: Number(d.close),
+              volume: Number(d.volume || 0),
+              __source: res.source || "yahoo-finance2",
+            })).filter((d) => Number.isFinite(d.close));
           } else {
             newHistories[sym] = generateFallbackHistory(sym, timeframe);
           }
@@ -283,11 +300,13 @@ const MultiChartGrid = ({ className, onOpenChart, timeframe = "15m", activeIndic
                       <span className="text-white font-bold text-sm tracking-wide">
                         {title}
                       </span>
-                      {isFallback && (
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-amber-300 bg-amber-400/10 border border-amber-300/30 rounded px-1.5 py-0.5">
-                          Reference
-                        </span>
-                      )}
+                      <span className={`text-[9px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 ${
+                        isFallback
+                          ? "text-amber-300 bg-amber-400/10 border border-amber-300/30"
+                          : "text-emerald-300 bg-emerald-400/10 border border-emerald-300/20"
+                      }`}>
+                        {isFallback ? "Fallback" : "Yahoo"}
+                      </span>
                       <span className={`${isPos ? 'text-[#42C0A5]' : 'text-red-400'} text-xs font-mono font-bold`}>
                         {(latest.close || 0).toLocaleString()} ({isPos ? '+' : ''}{pctChange}%)
                       </span>

@@ -1,114 +1,172 @@
-
+const { RSI, MACD, EMA, SMA, BollingerBands, ATR, VWAP } = require('technicalindicators');
 
 const calculateRSI = (history, period = 14) => {
-    if (history.length < period + 1) return [];
-    const prices = history.map(h => h.price);
-    const results = [];
-
-    let gains = 0;
-    let losses = 0;
-
-    for (let i = 1; i <= period; i++) {
-        const diff = prices[i] - prices[i - 1];
-        if (diff > 0) gains += diff;
-        else losses -= diff;
-    }
-
-    let avgGain = gains / period;
-    let avgLoss = losses / period;
-
-    for (let i = period; i < prices.length; i++) {
-        if (i > period) {
-            const diff = prices[i] - prices[i - 1];
-            avgGain = (avgGain * (period - 1) + Math.max(diff, 0)) / period;
-            avgLoss = (avgLoss * (period - 1) + Math.max(-diff, 0)) / period;
+    if (!Array.isArray(history) || history.length < period + 1) return [];
+    const prices = history.map(h => h.price ?? h.close ?? 0);
+    try {
+        const rsiVals = RSI.calculate({ values: prices, period });
+        const result = [];
+        const offset = history.length - rsiVals.length;
+        for (let i = 0; i < rsiVals.length; i++) {
+            result.push({
+                date: history[offset + i]?.date || history[offset + i]?.timestamp,
+                value: parseFloat(rsiVals[i].toFixed(2))
+            });
         }
-        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-        results.push({ date: history[i].date, value: parseFloat((100 - 100 / (1 + rs)).toFixed(2)) });
+        return result;
+    } catch (e) {
+        console.error('RSI calc error:', e.message);
+        return [];
     }
-
-    return results;
 };
 
 const calculateEMA = (prices, period) => {
-    if (prices.length < period) return [];
-    const multiplier = 2 / (period + 1);
-    const emas = [];
-    let ema = prices.slice(0, period).reduce((a, b) => a + b, 0) / period;
-
-    for (let i = period; i < prices.length; i++) {
-        ema = (prices[i] - ema) * multiplier + ema;
-        emas.push(parseFloat(ema.toFixed(4)));
+    if (!Array.isArray(prices) || prices.length < period) return [];
+    try {
+        const emaVals = EMA.calculate({ values: prices, period });
+        const targetLen = prices.length - period;
+        if (emaVals.length > targetLen) {
+            return emaVals.slice(emaVals.length - targetLen).map(v => parseFloat(v.toFixed(4)));
+        }
+        return emaVals.map(v => parseFloat(v.toFixed(4)));
+    } catch (e) {
+        console.error('EMA calc error:', e.message);
+        return [];
     }
-
-    return emas;
 };
 
 const calculateSMA = (history, period = 20) => {
     if (!Array.isArray(history) || history.length < period) return [];
-
-    const values = history.map((item) => Number(item.price));
-    const result = [];
-
-    for (let i = period - 1; i < values.length; i++) {
-        const window = values.slice(i - period + 1, i + 1);
-        const sum = window.reduce((acc, value) => acc + (Number.isFinite(value) ? value : 0), 0);
-        result.push({
-            date: history[i].date,
-            value: parseFloat((sum / period).toFixed(4)),
-        });
+    const prices = history.map(h => h.price ?? h.close ?? 0);
+    try {
+        const smaVals = SMA.calculate({ values: prices, period });
+        const result = [];
+        const offset = history.length - smaVals.length;
+        for (let i = 0; i < smaVals.length; i++) {
+            result.push({
+                date: history[offset + i]?.date || history[offset + i]?.timestamp,
+                value: parseFloat(smaVals[i].toFixed(4))
+            });
+        }
+        return result;
+    } catch (e) {
+        console.error('SMA calc error:', e.message);
+        return [];
     }
-
-    return result;
 };
 
 const calculateBollinger = (history, period = 20, multiplier = 2) => {
     if (!Array.isArray(history) || history.length < period) return [];
-
-    const values = history.map((item) => Number(item.price));
-    const result = [];
-
-    for (let i = period - 1; i < values.length; i++) {
-        const window = values.slice(i - period + 1, i + 1).filter(Number.isFinite);
-        if (window.length < period) continue;
-
-        const mean = window.reduce((acc, value) => acc + value, 0) / period;
-        const variance = window.reduce((acc, value) => acc + ((value - mean) ** 2), 0) / period;
-        const stdDev = Math.sqrt(variance);
-
-        result.push({
-            date: history[i].date,
-            middle: parseFloat(mean.toFixed(4)),
-            upper: parseFloat((mean + multiplier * stdDev).toFixed(4)),
-            lower: parseFloat((mean - multiplier * stdDev).toFixed(4)),
-        });
+    const prices = history.map(h => h.price ?? h.close ?? 0);
+    try {
+        const bbVals = BollingerBands.calculate({ values: prices, period, stdDev: multiplier });
+        const result = [];
+        const offset = history.length - bbVals.length;
+        for (let i = 0; i < bbVals.length; i++) {
+            result.push({
+                date: history[offset + i]?.date || history[offset + i]?.timestamp,
+                middle: parseFloat(bbVals[i].middle.toFixed(4)),
+                upper: parseFloat(bbVals[i].upper.toFixed(4)),
+                lower: parseFloat(bbVals[i].lower.toFixed(4))
+            });
+        }
+        return result;
+    } catch (e) {
+        console.error('Bollinger calc error:', e.message);
+        return [];
     }
-
-    return result;
 };
 
 const calculateMACD = (history, fast = 12, slow = 26, signal = 9) => {
-    const prices = history.map(h => h.price);
-    if (prices.length < slow + signal) return [];
+    if (!Array.isArray(history) || history.length < slow + signal) return [];
+    const prices = history.map(h => h.price ?? h.close ?? 0);
+    try {
+        const macdVals = MACD.calculate({
+            values: prices,
+            fastPeriod: fast,
+            slowPeriod: slow,
+            signalPeriod: signal,
+            SimpleMAOscillator: false,
+            SimpleMASignal: false
+        });
+        const result = [];
+        const offset = history.length - macdVals.length;
+        for (let i = 0; i < macdVals.length; i++) {
+            result.push({
+                date: history[offset + i]?.date || history[offset + i]?.timestamp,
+                value: parseFloat((macdVals[i].MACD || 0).toFixed(4)),
+                signal: parseFloat((macdVals[i].signal || 0).toFixed(4)),
+                histogram: parseFloat((macdVals[i].histogram || 0).toFixed(4))
+            });
+        }
+        return result;
+    } catch (e) {
+        console.error('MACD calc error:', e.message);
+        return [];
+    }
+};
 
-    const fastEMA = calculateEMA(prices, fast);
-    const slowEMA = calculateEMA(prices, slow);
+const calculateATR = (history, period = 14) => {
+    if (!Array.isArray(history) || history.length < period + 1) return [];
+    const highs = history.map(h => h.high ?? h.price ?? h.close ?? 0);
+    const lows = history.map(h => h.low ?? h.price ?? h.close ?? 0);
+    const closes = history.map(h => h.close ?? h.price ?? 0);
+    try {
+        const atrVals = ATR.calculate({ high: highs, low: lows, close: closes, period });
+        const result = [];
+        const offset = history.length - atrVals.length;
+        for (let i = 0; i < atrVals.length; i++) {
+            result.push({
+                date: history[offset + i]?.date || history[offset + i]?.timestamp,
+                value: parseFloat(atrVals[i].toFixed(4))
+            });
+        }
+        return result;
+    } catch (e) {
+        console.error('ATR calc error:', e.message);
+        return [];
+    }
+};
 
-    const offset = slow - fast;
-    const macdLine = slowEMA.map((val, i) => fastEMA[i + offset] - val);
+const calculateVWAP = (history) => {
+    if (!Array.isArray(history) || history.length === 0) return [];
+    const highs = history.map(h => h.high ?? h.price ?? h.close ?? 0);
+    const lows = history.map(h => h.low ?? h.price ?? h.close ?? 0);
+    const closes = history.map(h => h.close ?? h.price ?? 0);
+    const volumes = history.map(h => h.volume ?? 0);
+    try {
+        const vwapVals = VWAP.calculate({ high: highs, low: lows, close: closes, volume: volumes });
+        const result = [];
+        const offset = history.length - vwapVals.length;
+        for (let i = 0; i < vwapVals.length; i++) {
+            result.push({
+                date: history[offset + i]?.date || history[offset + i]?.timestamp,
+                value: parseFloat(vwapVals[i].toFixed(4))
+            });
+        }
+        return result;
+    } catch (e) {
+        console.error('VWAP calc error:', e.message);
+        return [];
+    }
+};
 
-    const signalLine = calculateEMA(macdLine, signal);
-    const signalOffset = macdLine.length - signalLine.length;
-
-    return signalLine.map((sig, i) => ({
-        date: history[slow + signal + i - 1]?.date,
-        value: parseFloat(macdLine[signalOffset + i].toFixed(4)),
-        signal: parseFloat(sig.toFixed(4))
-    }));
+const calculateMomentum = (history, period = 10) => {
+    if (!Array.isArray(history) || history.length < period) return [];
+    const prices = history.map(h => h.price ?? h.close ?? 0);
+    const result = [];
+    for (let i = period; i < prices.length; i++) {
+        const diff = prices[i] - prices[i - period];
+        result.push({
+            date: history[i]?.date || history[i]?.timestamp,
+            value: parseFloat(diff.toFixed(4))
+        });
+    }
+    return result;
 };
 
 const getVolumeStatus = (history, period = 20) => {
-    if (history.length < period) return 'average';
+    if (!Array.isArray(history) || history.length < period) return 'average';
     const volumes = history.map(h => h.volume || 0);
     const recent = volumes[volumes.length - 1];
     const avg = volumes.slice(-period - 1, -1).reduce((a, b) => a + b, 0) / period;
@@ -128,5 +186,8 @@ module.exports = {
     calculateEMA,
     calculateSMA,
     calculateBollinger,
+    calculateATR,
+    calculateVWAP,
+    calculateMomentum,
     getVolumeStatus,
 };

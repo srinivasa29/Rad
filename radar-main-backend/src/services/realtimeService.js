@@ -36,6 +36,7 @@ const NORMAL_CLOSE_LOG_THROTTLE_MS = 300000;
 const WS_ERROR_LOG_THROTTLE_MS = 120000;
 const CLOSE_CODE_LOG_THROTTLE_MS = 120000;
 const FINNHUB_WS_URL = 'wss://ws.finnhub.io';
+const DEFAULT_MARKET_REGION = String(process.env.DEFAULT_MARKET_REGION || 'IN').toUpperCase();
 const FINNHUB_WS_DEFAULT_SYMBOLS = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMZN'];
 const BINANCE_STREAM_MAP = {
     BTCUSDT: 'BTC',
@@ -61,6 +62,32 @@ const parseFinnhubSymbols = () => {
     return symbols.length > 0 ? [...new Set(symbols)] : FINNHUB_WS_DEFAULT_SYMBOLS;
 };
 const FINNHUB_WS_SYMBOLS = parseFinnhubSymbols();
+const stockSubscriptions = new Set(FINNHUB_WS_SYMBOLS);
+
+const normalizeFinnhubSymbol = (value) => {
+    const raw = String(value || '').trim().toUpperCase();
+    if (!raw) return null;
+    if (raw.includes(':')) return raw;
+    if (DEFAULT_MARKET_REGION === 'IN') return `NSE:${raw}`;
+    return raw;
+};
+
+const subscribeToStockSymbol = (symbol) => {
+    if (!symbol) return;
+    if (!process.env.FINNHUB_API_KEY) return;
+    const normalized = normalizeFinnhubSymbol(symbol);
+    if (!normalized) return;
+    if (stockSubscriptions.has(normalized)) return;
+    stockSubscriptions.add(normalized);
+    if (stocksSocket && stocksSocket.readyState === WebSocket.OPEN) {
+        stocksSocket.send(JSON.stringify({ type: 'subscribe', symbol: normalized }));
+    }
+};
+
+const subscribeToStockSymbols = (symbols = []) => {
+    if (!Array.isArray(symbols)) return;
+    symbols.forEach(subscribeToStockSymbol);
+};
 
 const initRealtimeService = (socketIoInstance) => {
     io = socketIoInstance;
@@ -285,7 +312,7 @@ const subscribeFinnhubSymbols = () => {
         return;
     }
 
-    FINNHUB_WS_SYMBOLS.forEach((symbol) => {
+    stockSubscriptions.forEach((symbol) => {
         stocksSocket.send(JSON.stringify({ type: 'subscribe', symbol }));
     });
 };
@@ -433,4 +460,4 @@ const startTickerInterval = () => {
     }, 3000);
 };
 
-module.exports = { initRealtimeService };
+module.exports = { initRealtimeService, subscribeToStockSymbol, subscribeToStockSymbols };

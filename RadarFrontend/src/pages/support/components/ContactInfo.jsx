@@ -2,7 +2,12 @@ import React from 'react';
 import { Mail, Phone, Clock, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const ContactInfo = () => {
+const ContactInfo = ({ contact = {} }) => {
+  const email = contact.email || 'srinivasamannepula7@gmail.com';
+  const phone = contact.phone || '+91 9391 143 994';
+  const hours = contact.hours || 'Monday - Friday, 9 AM - 6 PM IST';
+  const note = contact.note || 'Your feedback helps us improve every day';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -25,10 +30,10 @@ const ContactInfo = () => {
           <div className="info-content">
             <p className="info-label">Email</p>
             <a
-              href="mailto:support@radartrader.com"
+              href={`mailto:${email}`}
               className="info-value email-link"
             >
-              support@radartrader.com
+              {email}
             </a>
           </div>
         </motion.div>
@@ -43,8 +48,8 @@ const ContactInfo = () => {
           </div>
           <div className="info-content">
             <p className="info-label">Phone</p>
-            <a href="tel:+919391143994" className="info-value phone-link">
-              +91 9391 143 994
+            <a href={`tel:${phone.replace(/\s/g, '')}`} className="info-value phone-link">
+              {phone}
             </a>
           </div>
         </motion.div>
@@ -59,7 +64,7 @@ const ContactInfo = () => {
           </div>
           <div className="info-content">
             <p className="info-label">Support Hours</p>
-            <p className="info-value">Monday - Friday, 9 AM - 6 PM IST</p>
+            <p className="info-value">{hours}</p>
           </div>
         </motion.div>
 
@@ -70,7 +75,7 @@ const ContactInfo = () => {
         <div className="info-footer">
           <Heart size={16} className="heart-icon" />
           <p className="footer-text">
-            Your feedback helps us improve every day
+            {note}
           </p>
         </div>
       </div>

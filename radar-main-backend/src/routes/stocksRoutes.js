@@ -5,6 +5,7 @@ const {
     getEarningsCalendar,
     getNewsSentiment,
     getSignals,
+    getUnifiedStockData
 } = require('../controllers/stockInsightsController');
 const { getHistoricalData, getCompareData, getAvailableSymbols, getLatestCandle } = require('../controllers/ohlcController');
 
@@ -33,5 +34,8 @@ router.get('/:symbol/history', validateSymbolParam, validateRequest, getHistoric
 router.get('/:symbol/live', validateSymbolParam, validateRequest, getLatestCandle);
 router.post('/compare', authMiddleware, getCompareData);
 router.get('/search', authMiddleware, getAvailableSymbols);
+
+// Centralized stock aggregator data engine
+router.get('/:symbol', authMiddleware, validateSymbolParam, validateRequest, getUnifiedStockData);
 
 module.exports = router;

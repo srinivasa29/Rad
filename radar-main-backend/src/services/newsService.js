@@ -89,6 +89,74 @@ const classifyCategory = (title = '', summary = '') => {
     return 'General';
 };
 
+// ─── Lightweight sentiment scoring (rule-based) ─────────────────────────────
+const POSITIVE_WORDS = ['up', 'gains', 'gain', 'rise', 'surge', 'beat', 'beats', 'outperform', 'upgrade', 'bull', 'bullish', 'record', 'soar', 'rally', 'jump', 'increase', 'improve', 'strong'];
+const NEGATIVE_WORDS = ['down', 'loss', 'losses', 'fall', 'drop', 'decline', 'miss', 'missed', 'downgrade', 'bear', 'bearish', 'weak', 'slump', 'plunge', 'sell', 'pressure', 'falling'];
+
+const computeSentiment = (text = '') => {
+    const lower = String(text || '').toLowerCase();
+    let pos = 0, neg = 0;
+    for (const w of POSITIVE_WORDS) if (lower.includes(w)) pos++;
+    for (const w of NEGATIVE_WORDS) if (lower.includes(w)) neg++;
+    const total = pos + neg;
+    const score = total === 0 ? 0 : (pos - neg) / total; // -1..1
+    let label = 'Neutral';
+    if (score >= 0.5) label = 'Bullish';
+    else if (score > 0.1) label = 'Slightly Bullish';
+    else if (score <= -0.5) label = 'Bearish';
+    else if (score < -0.1) label = 'Slightly Bearish';
+    return { score, label };
+};
+
+// ─── Related symbols extraction (simple heuristics) ──────────────────────────
+const COMMON_WORDS = new Set(['THE','AND','FOR','WITH','FROM','THIS','THAT','ARE','WILL','CAN','HAS','HAVE','IN','ON','AT','BY','AS','IS','IT']);
+const extractRelatedSymbols = (text = '') => {
+    const candidates = new Set();
+    const words = String(text || '').replace(/[()\[\],.\/\-]/g, ' ').split(/\s+/);
+    for (const w of words) {
+        const clean = w.replace(/^\$+/, '').trim();
+        if (!clean) continue;
+        // Match ticker-like fragments: 1-5 uppercase letters or letters+digits (e.g., RIL, AAPL, TSLA)
+        if (/^[A-Z0-9]{1,5}$/.test(clean) && !COMMON_WORDS.has(clean) && !/^[0-9]+$/.test(clean)) {
+            candidates.add(clean);
+        }
+        // Dot-suffixed tickers like RELIANCE.NS -> take prefix
+        const m = clean.match(/^([A-Z0-9]{1,6})\.(NS|BO|BSE|NSE)$/i);
+        if (m) candidates.add(m[1].toUpperCase());
+    }
+    return Array.from(candidates).slice(0, 6);
+};
+
+// ─── Market session detection (UTC-based heuristics) ─────────────────────────
+const DEFAULT_REGION = String(process.env.DEFAULT_MARKET_REGION || 'IN').toUpperCase();
+const marketSessionForPublished = (publishedIso, region = DEFAULT_REGION) => {
+    try {
+        const d = new Date(publishedIso || Date.now());
+        const minutesUtc = d.getUTCHours() * 60 + d.getUTCMinutes();
+
+        let openStartMin, openEndMin;
+        if (region === 'IN') {
+            // NSE 09:15-15:30 IST => 03:45-10:00 UTC
+            openStartMin = 3 * 60 + 45;
+            openEndMin = 10 * 60;
+        } else if (region === 'US') {
+            // Approx ET open 09:30-16:00 => use 13:30-20:00 UTC (approx DST-aware)
+            openStartMin = 13 * 60 + 30;
+            openEndMin = 20 * 60;
+        } else {
+            // Generic business hours 09:00-17:00 local -> approximate 09:00-17:00 UTC
+            openStartMin = 9 * 60;
+            openEndMin = 17 * 60;
+        }
+
+        if (minutesUtc >= openStartMin && minutesUtc <= openEndMin) return 'Market Open';
+        if (minutesUtc < openStartMin) return 'Pre Market';
+        return 'After Hours';
+    } catch (e) {
+        return 'Unknown';
+    }
+};
+
 const mapArticle = (article) => ({
     id: article?.id || article?.uuid || article?.url,
     source: article?.source?.name || article?.source || 'Unknown',
@@ -98,15 +166,48 @@ const mapArticle = (article) => ({
     time: toDisplayTime(article?.publishedAt || article?.published_at || article?.datetime),
     publishedAt: toIso(article?.publishedAt || article?.published_at || article?.datetime),
     url: article?.url || '#',
-    sentiment: 'Neutral',
+    image: article?.urlToImage || article?.image || article?.thumbnail || null,
     category: article?.category || classifyCategory(
         article?.title || '',
         article?.summary || article?.description || article?.snippet || ''
     ),
+    // compute sentiment and related symbols from available text fields
+    sentiment: (() => {
+        const txt = `${article?.title || ''} ${article?.summary || ''} ${article?.description || ''}`;
+        return computeSentiment(txt).label;
+    })(),
+    sentimentScore: (() => {
+        const txt = `${article?.title || ''} ${article?.summary || ''} ${article?.description || ''}`;
+        return computeSentiment(txt).score;
+    })(),
+    relatedSymbols: (() => {
+        const txt = `${article?.title || ''} ${article?.summary || ''} ${article?.description || ''}`;
+        return extractRelatedSymbols(txt);
+    })(),
+    // percent representation of bullishness (0-100)
+    sentimentPercent: (() => {
+        const txt = `${article?.title || ''} ${article?.summary || ''} ${article?.description || ''}`;
+        const s = computeSentiment(txt).score; // -1..1
+        return Math.round(((s + 1) / 2) * 100);
+    })(),
+    // breaking flag: article published within last N minutes (default 10)
+    breaking: (() => {
+        try {
+            const published = new Date(article?.publishedAt || article?.published_at || article?.datetime || Date.now()).getTime();
+            const diffMin = (Date.now() - published) / 60000;
+            return diffMin <= 10;
+        } catch (e) {
+            return false;
+        }
+    })(),
+    marketSession: (() => {
+        const pub = article?.publishedAt || article?.published_at || article?.datetime;
+        return marketSessionForPublished(pub);
+    })(),
 });
 
 // ─── Source: Finnhub ─────────────────────────────────────────────────────────
-const fetchFinnhubNews = async ({ category, symbol, limit }) => {
+const fetchFinnhubNews = async ({ category, symbol, limit, isIndia }) => {
     if (!process.env.FINNHUB_API_KEY) return [];
     const token = process.env.FINNHUB_API_KEY;
     const normalizedSymbol = normalizeSymbol(symbol);
@@ -149,7 +250,7 @@ const fetchFinnhubNews = async ({ category, symbol, limit }) => {
         }
         const base = filtered.length > 0 ? filtered : rows;
         let final = base;
-        if (IS_INDIA_REGION && !normalizedSymbol) {
+        if (isIndia && !normalizedSymbol) {
             const indiaFiltered = base.filter(item => isIndiaArticle(`${item.headline || ''} ${item.summary || ''}`));
             if (indiaFiltered.length >= Math.min(3, limit)) final = indiaFiltered;
         }
@@ -169,12 +270,12 @@ const fetchFinnhubNews = async ({ category, symbol, limit }) => {
 };
 
 // ─── Source: MarketAux ───────────────────────────────────────────────────────
-const fetchMarketAuxNews = async ({ category, symbol, limit }) => {
+const fetchMarketAuxNews = async ({ category, symbol, limit, isIndia }) => {
     if (!process.env.MARKETAUX_API_KEY) return [];
     const params = { api_token: process.env.MARKETAUX_API_KEY, language: 'en', limit };
     if (symbol) params.symbols = normalizeSymbol(symbol);
     if (category && category !== 'general') params.filter_entities = true;
-    if (IS_INDIA_REGION && !symbol) params.exchanges = 'NSE,BSE';
+    if (isIndia && !symbol) params.exchanges = 'NSE,BSE';
     const response = await axios.get(MARKETAUX_BASE_URL, { params, timeout: 7000 });
     const rows = Array.isArray(response.data?.data) ? response.data.data : [];
     return rows.slice(0, limit).map((item) => mapArticle({
@@ -190,7 +291,7 @@ const fetchMarketAuxNews = async ({ category, symbol, limit }) => {
 
 // ─── Source: Tiingo ──────────────────────────────────────────────────────────
 // Covers Reuters, Bloomberg, Barron's, Seeking Alpha, Business Insider, CNBC, etc.
-const fetchTiingoNews = async ({ symbol, limit, assetClass }) => {
+const fetchTiingoNews = async ({ symbol, limit, assetClass, isIndia }) => {
     if (!process.env.TIINGO_API_KEY) return [];
     const isCrypto = assetClass === 'crypto';
     const params = {
@@ -208,7 +309,7 @@ const fetchTiingoNews = async ({ symbol, limit, assetClass }) => {
     } else {
         url = 'https://api.tiingo.com/tiingo/news';
         // Use broad tags for India or global business news
-        if (IS_INDIA_REGION) {
+        if (isIndia) {
             params.tags = 'India,NSE,BSE,Sensex,Nifty,RBI';
         } else {
             params.tags = 'stocks,markets,economy,earnings,finance';
@@ -304,26 +405,28 @@ const fetchPolygonNews = async ({ symbol, limit, assetClass }) => {
 };
 
 // ─── Source: GNews ────────────────────────────────────────────────────────────
-const fetchGNews = async ({ limit, assetClass }) => {
+const fetchGNews = async ({ limit, assetClass, isIndia }) => {
     if (!process.env.GNEWS_API_KEY) return [];
     const isCrypto = assetClass === 'crypto';
+    const country = isIndia ? 'in' : (NEWS_COUNTRY === 'in' ? 'us' : NEWS_COUNTRY);
     const url = isCrypto ? 'https://gnews.io/api/v4/search' : 'https://gnews.io/api/v4/top-headlines';
     const params = isCrypto
         ? { q: 'cryptocurrency bitcoin ethereum crypto market', lang: 'en', apikey: process.env.GNEWS_API_KEY, max: limit }
-        : { category: 'business', lang: 'en', country: NEWS_COUNTRY, apikey: process.env.GNEWS_API_KEY, max: limit };
+        : { category: 'business', lang: 'en', country, apikey: process.env.GNEWS_API_KEY, max: limit };
     const response = await axios.get(url, { params, timeout: 7000 });
     const rows = Array.isArray(response.data?.articles) ? response.data.articles : [];
     return rows.map(mapArticle);
 };
 
 // ─── Source: NewsAPI ──────────────────────────────────────────────────────────
-const fetchNewsApi = async ({ limit, assetClass }) => {
+const fetchNewsApi = async ({ limit, assetClass, isIndia }) => {
     if (!process.env.NEWS_API_KEY) return [];
     const isCrypto = assetClass === 'crypto';
+    const country = isIndia ? 'in' : (NEWS_COUNTRY === 'in' ? 'us' : NEWS_COUNTRY);
     const url = isCrypto ? 'https://newsapi.org/v2/everything' : 'https://newsapi.org/v2/top-headlines';
     const params = isCrypto
         ? { q: 'cryptocurrency OR bitcoin OR ethereum OR crypto market', language: 'en', sortBy: 'publishedAt', apiKey: process.env.NEWS_API_KEY, pageSize: limit }
-        : { category: 'business', language: 'en', country: NEWS_COUNTRY, apiKey: process.env.NEWS_API_KEY, pageSize: limit };
+        : { category: 'business', language: 'en', country, apiKey: process.env.NEWS_API_KEY, pageSize: limit };
     const response = await axios.get(url, { params, timeout: 7000 });
     const rows = Array.isArray(response.data?.articles) ? response.data.articles : [];
     return rows.map(mapArticle);
@@ -353,6 +456,47 @@ const mergeAndDedup = (arrays, limit) => {
         .slice(0, limit);
 };
 
+const fetchYahooRssNews = async (symbol, limit = 10) => {
+    try {
+        const response = await axios.get(`https://finance.yahoo.com/rss/headline?s=${symbol}`, {
+            timeout: 5000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        const xml = response.data;
+        const items = [];
+        const matches = xml.matchAll(/<item>([\s\S]*?)<\/item>/g);
+        for (const match of matches) {
+            const content = match[1];
+            const titleMatch = content.match(/<title>([\s\S]*?)<\/title>/);
+            const linkMatch = content.match(/<link>([\s\S]*?)<\/link>/);
+            const pubDateMatch = content.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+            const descMatch = content.match(/<description>([\s\S]*?)<\/description>/);
+            
+            if (titleMatch && linkMatch) {
+                const title = titleMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim();
+                const url = linkMatch[1].trim();
+                const pubDate = pubDateMatch ? pubDateMatch[1].trim() : new Date().toISOString();
+                const summary = descMatch ? descMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]*>?/gm, '').trim() : '';
+                
+                items.push({
+                    id: url,
+                    source: 'Yahoo Finance',
+                    title: title,
+                    summary: summary,
+                    description: summary,
+                    publishedAt: new Date(pubDate).toISOString(),
+                    url: url,
+                    image: null
+                });
+            }
+        }
+        return items.slice(0, limit).map(mapArticle);
+    } catch (e) {
+        logger.warn(`Yahoo RSS news failed for ${symbol}`, { error: e.message });
+        return [];
+    }
+};
+
 // ─── Main orchestrator ────────────────────────────────────────────────────────
 const fetchMarketNews = async (category = 'general', options = {}) => {
     const normalizedCategory = normalizeCategory(category);
@@ -379,33 +523,58 @@ const fetchMarketNews = async (category = 'general', options = {}) => {
     }
     logger.info(`[newsService] CACHE MISS — fetching from APIs (region=${requestedRegion ?? 'default(' + DEFAULT_MARKET_REGION + ')'} assetClass=${assetClass || 'stocks'} preferIndiaFirst=${preferIndiaFirst} symbol=${symbol || 'none'})`);
 
-    // Run all available sources in parallel, collect results
-    const fetchArgs = { category: normalizedCategory, symbol, limit, assetClass };
+    const fetchArgs = { category: normalizedCategory, symbol, limit, assetClass, isIndia: effectiveIsIndia };
 
-    const [finnhubRows, marketAuxRows, tiingoRows, fmpRows, polygonRows, gnewsRows, newsApiRows] = await Promise.allSettled([
-        fetchFinnhubNews(fetchArgs).catch(() => []),
-        fetchMarketAuxNews(fetchArgs).catch(() => []),
-        fetchTiingoNews(fetchArgs).catch(() => []),
-        fetchFmpNews(fetchArgs).catch(() => []),
-        fetchPolygonNews(fetchArgs).catch(() => []),
-        fetchGNews(fetchArgs).catch(() => []),
-        fetchNewsApi(fetchArgs).catch(() => []),
-    ]).then(results => results.map(r => (r.status === 'fulfilled' ? r.value : [])));
+    const runSources = async (label, sources) => {
+        const results = await Promise.allSettled(
+            sources.map((source) => source.fn(fetchArgs).catch(() => []))
+        );
+        const rows = results.map(r => (r.status === 'fulfilled' ? r.value : []));
+        const counts = sources.map((source, idx) => `${source.name}:${rows[idx].length}`).join(' ');
+        logger.info(`[newsService] ${label} source counts — ${counts}`);
+        return rows;
+    };
 
-    logger.info(`[newsService] source counts — Finnhub:${finnhubRows.length} MarketAux:${marketAuxRows.length} Tiingo:${tiingoRows.length} FMP:${fmpRows.length} Polygon:${polygonRows.length} GNews:${gnewsRows.length} NewsAPI:${newsApiRows.length}`);
-
-    // India-first: prioritise sources that returned India-relevant content
-    let sourceBuckets;
-    if (preferIndiaFirst) {
-        // For India, GNews/NewsAPI with country=in and Tiingo with India tags are most relevant
-        // Put them first, then the global sources as supplement
-        sourceBuckets = [gnewsRows, newsApiRows, tiingoRows, finnhubRows, fmpRows, polygonRows, marketAuxRows];
-    } else {
-        // Global / crypto / symbol-specific: interleave all equally
-        sourceBuckets = [finnhubRows, tiingoRows, fmpRows, polygonRows, marketAuxRows, gnewsRows, newsApiRows];
+    const freeSources = [
+        { name: 'Finnhub', fn: fetchFinnhubNews },
+        { name: 'GNews', fn: fetchGNews },
+        { name: 'NewsAPI', fn: fetchNewsApi },
+    ];
+    if (symbol) {
+        freeSources.push({
+            name: 'YahooRSS',
+            fn: async (args) => fetchYahooRssNews(options.symbol || args.symbol, args.limit)
+        });
     }
 
-    const merged = mergeAndDedup(sourceBuckets.filter(b => b.length > 0), limit * 2);
+    const paidSources = [
+        { name: 'MarketAux', fn: fetchMarketAuxNews },
+        { name: 'Tiingo', fn: fetchTiingoNews },
+        { name: 'FMP', fn: fetchFmpNews },
+        { name: 'Polygon', fn: fetchPolygonNews },
+    ];
+
+    const [finnhubRows, gnewsRows, newsApiRows] = await runSources('free', freeSources);
+
+    const buildFreeBuckets = () => {
+        if (preferIndiaFirst) {
+            return [gnewsRows, newsApiRows, finnhubRows];
+        }
+        return [finnhubRows, gnewsRows, newsApiRows];
+    };
+
+    let sourceBuckets = buildFreeBuckets();
+    let merged = mergeAndDedup(sourceBuckets.filter(b => b.length > 0), limit * 2);
+
+    if (merged.length < limit) {
+        logger.info(`[newsService] Free sources returned ${merged.length}/${limit}. Falling back to paid sources.`);
+        const [marketAuxRows, tiingoRows, fmpRows, polygonRows] = await runSources('paid', paidSources);
+        const paidBuckets = preferIndiaFirst
+            ? [tiingoRows, marketAuxRows, fmpRows, polygonRows]
+            : [tiingoRows, fmpRows, polygonRows, marketAuxRows];
+        sourceBuckets = [...sourceBuckets, ...paidBuckets];
+        merged = mergeAndDedup(sourceBuckets.filter(b => b.length > 0), limit * 2);
+    }
 
     if (merged.length >= Math.min(3, limit)) {
         const result = merged.slice(0, limit);
@@ -415,47 +584,8 @@ const fetchMarketNews = async (category = 'general', options = {}) => {
         return result;
     }
 
-    // Hard fallback
-    logger.warn('[newsService] All sources returned 0 articles — returning static fallback');
-    return [
-        {
-            id: 'f-1',
-            source: 'Market Pulse',
-            title: 'Global markets stabilize as economic data suggests resilience',
-            summary: 'Investors are closely monitoring central bank signals and corporate earnings for direction.',
-            description: 'Investors are closely monitoring central bank signals and corporate earnings for direction.',
-            time: 'Recently',
-            publishedAt: new Date().toISOString(),
-            sentiment: 'Neutral',
-            category: 'Macro',
-            url: '#',
-        },
-        {
-            id: 'f-2',
-            source: 'Financial Times',
-            title: 'Energy sector shows momentum amid shifting demand patterns',
-            summary: 'Renewable and traditional energy providers are seeing increased institutional interest.',
-            description: 'Renewable and traditional energy providers are seeing increased institutional interest.',
-            time: '1h ago',
-            publishedAt: new Date().toISOString(),
-            sentiment: 'Bullish',
-            category: 'Macro',
-            url: '#',
-        },
-        {
-            id: 'f-3',
-            source: 'Global News',
-            title: 'Inflation targets remain in focus for major economies',
-            summary: 'Recent policy reports highlight the ongoing efforts to balance growth and stability.',
-            description: 'Recent policy reports highlight the ongoing efforts to balance growth and stability.',
-            time: '3h ago',
-            publishedAt: new Date().toISOString(),
-            sentiment: 'Neutral',
-            category: 'Policy',
-            url: '#',
-        },
-    ];
+    logger.warn('[newsService] All sources returned 0 articles; returning empty result (no fallback).');
+    return [];
 };
 
 module.exports = { fetchMarketNews };
-

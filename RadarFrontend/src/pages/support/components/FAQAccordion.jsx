@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const FAQAccordion = () => {
+const FAQAccordion = ({ items }) => {
   const [openIndex, setOpenIndex] = useState(null);
 
-  const faqItems = [
+  const fallbackItems = [
     {
       question: 'Why is chart data delayed?',
       answer:
@@ -32,6 +32,7 @@ const FAQAccordion = () => {
         'Yes, all user data is encrypted and stored securely. We comply with industry-standard security protocols and never share your personal information with third parties without consent.',
     },
   ];
+  const faqItems = Array.isArray(items) && items.length ? items : fallbackItems;
 
   const toggleAccordion = (index) => {
     setOpenIndex(openIndex === index ? null : index);

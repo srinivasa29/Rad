@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckCircle, AlertTriangle, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { submitSupportMessage } from '../../../api/supportApi';
 
-const ContactForm = () => {
+const SUPPORT_EMAIL = 'srinivasamannepula7@gmail.com';
+
+const ContactForm = ({ profile = {}, topics = [] }) => {
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
+    fullName: profile.name || '',
+    email: profile.email || SUPPORT_EMAIL,
     topic: 'Dashboard Issue',
     message: '',
   });
@@ -15,6 +17,15 @@ const ContactForm = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      fullName: prev.fullName || profile.name || '',
+      email: profile.email || prev.email || SUPPORT_EMAIL,
+      topic: topics.includes(prev.topic) ? prev.topic : (topics[0] || 'Dashboard Issue'),
+    }));
+  }, [profile, topics]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -41,9 +52,9 @@ const ContactForm = () => {
       setSubmitted(true);
       setToast({ type: 'success', message: 'Message sent successfully.' });
       setFormData({
-        fullName: '',
-        email: '',
-        topic: 'Dashboard Issue',
+        fullName: profile.name || '',
+        email: profile.email || SUPPORT_EMAIL,
+        topic: topics[0] || 'Dashboard Issue',
         message: '',
       });
 
@@ -111,7 +122,7 @@ const ContactForm = () => {
             name="fullName"
             value={formData.fullName}
             onChange={handleChange}
-            placeholder="John Doe"
+            placeholder="Your name"
             className="form-input"
             required
           />
@@ -127,7 +138,7 @@ const ContactForm = () => {
             name="email"
             value={formData.email}
             onChange={handleChange}
-            placeholder="you@example.com"
+            placeholder={SUPPORT_EMAIL}
             className="form-input"
             required
           />
@@ -144,10 +155,9 @@ const ContactForm = () => {
             onChange={handleChange}
             className="form-select"
           >
-            <option value="Dashboard Issue">Dashboard Issue</option>
-            <option value="Data Issue">Data Issue</option>
-            <option value="Login Issue">Login Issue</option>
-            <option value="Feedback">General Feedback</option>
+            {(topics.length ? topics : ['Dashboard Issue', 'Data Issue', 'Login Issue', 'Feedback']).map((topic) => (
+              <option key={topic} value={topic}>{topic === 'Feedback' ? 'General Feedback' : topic}</option>
+            ))}
           </select>
         </div>
 

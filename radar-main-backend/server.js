@@ -12,7 +12,8 @@ if (!process.env.JWT_SECRET || !process.env.MONGO_URI) {
     process.exit(1);
 }
 
-const { initRealtimeService } = require('./src/services/realtimeService');
+const { initRealtimeService, subscribeToStockSymbols } = require('./src/services/realtimeService');
+// Radar websocket stream removed per request
 const { startAlertEngine, stopAlertEngine, setAlertEventEmitter } = require('./src/services/alertEngine');
 const { notFound, errorHandler } = require('./src/middleware/errorMiddleware');
 const dataUpdateCron = require('./src/services/dataUpdateCron');
@@ -44,7 +45,8 @@ let reconnectTimer = null;
 let currentPort = BASE_PORT;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 const maybeStartAlertEngine = () => {
     if (alertEngineStarted || !getDbStatus()) {
@@ -97,6 +99,11 @@ const normalizeSubscriptionChannels = (payload, fallback = ['ticker']) => {
         if (payload.symbol) {
             raw.push(`symbol:${String(payload.symbol).trim().toUpperCase()}`);
         }
+        if (Array.isArray(payload.symbols)) {
+            payload.symbols.forEach((symbol) => {
+                raw.push(`symbol:${String(symbol).trim().toUpperCase()}`);
+            });
+        }
     }
 
     const mapped = raw
@@ -137,6 +144,11 @@ io.on('connection', (socket) => {
     socket.on('subscribe', (payload) => {
         const channels = normalizeSubscriptionChannels(payload, ['ticker']);
         channels.forEach((channel) => socket.join(channel));
+        if (payload?.symbol || Array.isArray(payload?.symbols)) {
+            const symbols = [payload.symbol, ...(Array.isArray(payload?.symbols) ? payload.symbols : [])]
+                .filter(Boolean);
+            subscribeToStockSymbols(symbols);
+        }
         socket.emit('system_status', buildSystemStatusPayload({
             event: 'subscribed',
             channels,
@@ -189,11 +201,17 @@ app.get('/', (req, res) => {
 app.use('/api/auth',          require('./src/routes/authRoutes'));
 app.use('/api/user',          require('./src/routes/userRoutes'));
 app.use('/api/user/settings', require('./src/routes/userSettingsRoutes'));
+app.use('/api/user/preferences', require('./src/routes/userSettingsRoutes'));
 app.use('/api/market',        require('./src/routes/marketRoutes'));
 app.use('/api/news',          require('./src/routes/newsRoutes'));
+// Radar routes removed
+
+// Research endpoints for trader watchlist research panels
+app.use('/api/research',      require('./src/routes/researchRoutes'));
 
 app.use('/api/market/universe', require('./src/routes/marketUniverseRoutes'));
 app.use('/api/watchlist',     require('./src/routes/watchlistRoutes'));
+app.use('/api/watchlist',     require('./src/routes/watchlistDataRoutes'));
 app.use('/api/portfolio',     require('./src/routes/portfolioRoutes'));
 app.use('/api/alerts',        require('./src/routes/alertRoutes'));
 app.use('/api/analytics',     require('./src/routes/analyticsRoutes'));
@@ -214,6 +232,8 @@ app.use('/api/admin/cache',   require('./src/routes/cacheAdminRoutes'));
 app.use('/api/quotes',        require('./src/routes/quotesRoutes'));
 app.use('/api/screener',      require('./src/routes/screenerRoutes'));
 app.use('/api/stocks',        require('./src/routes/stocksRoutes'));
+app.use('/api/chart',         require('./src/routes/chartRoutes'));
+app.use('/api/charts',        require('./src/routes/chartRoutes'));
 app.use('/api/options',       require('./src/routes/optionsRoutes'));
 app.use('/api/backtest',      require('./src/routes/backtestRoutes'));
 app.use('/api/signals',       require('./src/routes/signalsRoutes'));
@@ -221,6 +241,13 @@ app.use('/api/trader',        require('./src/routes/traderProfileRoutes'));
 app.use('/api/support',       require('./src/routes/supportRoutes'));
 app.use('/api/health',        require('./src/routes/healthRoutes'));
 app.use('/api/notes',         require('./src/routes/noteRoutes'));
+app.get(['/api', '/api/'], (req, res) => {
+    res.json({
+        status: 'ok',
+        db: getDbStatus() ? 'connected' : 'disconnected',
+        alertEngine: alertEngineStarted ? 'running' : 'stopped',
+    });
+});
 app.use('/api',               require('./src/routes/contractRoutes'));
 app.use(notFound);
 app.use(errorHandler);
@@ -245,6 +272,8 @@ server.on('listening', () => {
 });
 
 const startServer = async () => {
+    server.listen(currentPort);
+
     const dbConnected = await connectDB();
 
     if (dbConnected) {
@@ -278,7 +307,6 @@ const startServer = async () => {
         scheduleDbReconnect();
     }
 
-    server.listen(currentPort);
 };
 
 startServer();

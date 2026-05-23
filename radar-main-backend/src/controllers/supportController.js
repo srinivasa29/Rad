@@ -3,6 +3,52 @@ const SupportMessage = require('../models/SupportMessage');
 const sendEmail = require('../services/mailService');
 
 const normalizeString = (value) => String(value || '').trim();
+const SUPPORT_PROFILE_EMAIL = 'srinivasamannepula7@gmail.com';
+
+const supportMeta = {
+    contact: {
+        email: process.env.SUPPORT_PUBLIC_EMAIL || SUPPORT_PROFILE_EMAIL,
+        phone: process.env.SUPPORT_PHONE || '+91 9391 143 994',
+        hours: process.env.SUPPORT_HOURS || 'Monday - Friday, 9 AM - 6 PM IST',
+        note: 'Your feedback helps us improve every day',
+    },
+    topics: ['Dashboard Issue', 'Data Issue', 'Login Issue', 'Feedback'],
+    faqs: [
+        {
+            question: 'Why is chart data delayed?',
+            answer: 'Chart data may be delayed due to market data latency or API processing time. Our system fetches data from multiple sources to ensure accuracy.',
+        },
+        {
+            question: 'Why is data not loading?',
+            answer: 'Data loading issues can occur due to network connectivity, market data provider downtime, or API rate limits. Try refreshing the page or contact support.',
+        },
+        {
+            question: 'How often is data updated?',
+            answer: 'Market data is updated in real time during trading hours and refreshed with a delay after market close.',
+        },
+        {
+            question: 'How do I customize my watchlist?',
+            answer: 'Open Watchlist, search for a symbol, and add it to your preferred list. Your saved watchlist is tied to your account.',
+        },
+        {
+            question: 'Is my data secure and private?',
+            answer: 'Yes. Account data is protected by authenticated APIs and stored in the backend database.',
+        },
+    ],
+};
+
+const getSupportMeta = asyncHandler(async (req, res) => {
+    res.json({
+        success: true,
+        data: {
+            ...supportMeta,
+            profile: {
+                name: req.user?.username || '',
+                email: SUPPORT_PROFILE_EMAIL,
+            },
+        },
+    });
+});
 
 const submitSupportMessage = asyncHandler(async (req, res) => {
     const name = normalizeString(req.body.name || req.body.fullName);
@@ -64,5 +110,6 @@ const submitSupportMessage = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+    getSupportMeta,
     submitSupportMessage,
 };

@@ -13,6 +13,7 @@ import {
   HelpCircle,
   LogOut,
   GraduationCap,
+  Radio,
 } from "lucide-react";
 import { updateUserMode } from "../api/userApi";
 import api from "../api/api";
@@ -650,7 +651,11 @@ export default function Dashboard() {
                       onClick={() => setIsProfileOpen(!isProfileOpen)}
                       className="w-8 h-8 rounded-full bg-[linear-gradient(135deg,#00c6ff_0%,#0072ff_100%)] flex items-center justify-center text-xs font-bold text-white cursor-pointer shadow-[0_0_10px_rgba(0,198,255,0.4)] hover:scale-105 hover:shadow-[0_0_16px_rgba(0,198,255,0.58)] transition-all duration-300"
                     >
-                      {userInitial}
+                      {profile?.profilePicture ? (
+                        <img src={profile.profilePicture} alt="" className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        userInitial
+                      )}
                     </div>
 
                     <ProfileDropdown

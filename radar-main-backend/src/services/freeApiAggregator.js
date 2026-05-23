@@ -6,6 +6,8 @@ const yahooFinanceService = require('./yahooFinanceService');
 const ohlcService = require('./ohlcService');
 const cryptoService = require('./cryptoService');
 const logger = require('../utils/logger');
+const redisClient = require('./redisClient');
+const symbolAdapter = require('../utils/symbolAdapter');
 
 class FreeApiAggregator {
   constructor() {
@@ -29,8 +31,27 @@ class FreeApiAggregator {
 
     this.stats.totalRequests++;
 
+    const redisKey = `quote:${symbol.toUpperCase()}`;
+
     try {
       if (!skipCache) {
+        // Try Redis cache first
+        try {
+          const redisCached = await redisClient.get(redisKey);
+          if (redisCached) {
+            logger.debug(`[Quote Aggregator] Redis cache hit for key: ${redisKey}`);
+            this.stats.cacheHits++;
+            return {
+              success: true,
+              source: 'redis',
+              cached: true,
+              data: redisCached
+            };
+          }
+        } catch (cacheErr) {
+          logger.warn(`[Quote Aggregator Cache Error] Redis error: ${cacheErr.message}`);
+        }
+
         const cached = await this.getCachedQuote(symbol, maxAge);
         if (cached) {
           this.stats.cacheHits++;
@@ -50,6 +71,14 @@ class FreeApiAggregator {
 
       if (result.success) {
         await this.cacheQuote(symbol, result.data);
+        // Save to Redis (cache for min of 15 seconds or maxAge)
+        try {
+          const ttl = Math.max(15000, maxAge);
+          await redisClient.set(redisKey, result.data, ttl);
+          logger.debug(`[Quote Aggregator Cache Save] Saved quote to Redis for ${symbol}`);
+        } catch (cacheErr) {
+          logger.warn(`[Quote Aggregator Cache Save Error] Failed to save quote to Redis: ${cacheErr.message}`);
+        }
       } else {
         this.stats.failures++;
       }
@@ -69,24 +98,14 @@ class FreeApiAggregator {
 
   
   selectBestSource(symbol) {
-    const s = String(symbol || '').toUpperCase().replace(/USDT$/i, '');
+    const s = String(symbol || '').toUpperCase().replace(/USDT$/i, '').replace(/-USD$/i, '');
     const CRYPTO_SYMBOLS = new Set(['BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK','AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT','ARB','OP','INJ','SUI','SEI','PEPE','WIF','TON','FLOKI','BONK']);
     
     if (CRYPTO_SYMBOLS.has(s) || symbol.toUpperCase().endsWith('USDT')) {
       return 'binance';
     }
 
-    if (symbol.includes('.NS') || symbol.includes('.BO')) {
-      if (twelveDataService.canMakeRequest()) {
-        return 'twelvedata';
-      }
-      return 'yahoo'; // Fallback to Yahoo
-    }
-
-    if (finnhubService.canMakeRequest()) {
-      return 'finnhub';
-    }
-
+    // Default to Yahoo Finance as the primary source for all equities (free, unlimited, stable)
     return 'yahoo';
   }
 
@@ -135,6 +154,37 @@ class FreeApiAggregator {
         case 'yahoo':
         default:
           this.stats.yahooHits++;
+          try {
+            const YahooFinance = require('yahoo-finance2').default;
+            const yahooFinance = new YahooFinance();
+            const yahooSymbol = symbolAdapter.toYahoo(symbol);
+            const yfQuote = await yahooFinance.quote(yahooSymbol);
+            if (yfQuote) {
+              return {
+                success: true,
+                source: 'yahoo',
+                data: {
+                  symbol: symbol,
+                  current: yfQuote.regularMarketPrice,
+                  high: yfQuote.regularMarketDayHigh || yfQuote.regularMarketPrice,
+                  low: yfQuote.regularMarketDayLow || yfQuote.regularMarketPrice,
+                  open: yfQuote.regularMarketOpen || yfQuote.regularMarketPrice,
+                  previousClose: yfQuote.regularMarketPreviousClose,
+                  change: yfQuote.regularMarketChange,
+                  changePercent: yfQuote.regularMarketChangePercent,
+                  timestamp: new Date(yfQuote.regularMarketTime || Date.now()),
+                  volume: yfQuote.regularMarketVolume,
+                  marketCap: yfQuote.marketCap,
+                  eps: yfQuote.epsTrailingTwelveMonths || yfQuote.epsForward,
+                  dividendYield: yfQuote.dividendYield,
+                  name: yfQuote.longName || yfQuote.shortName || symbol
+                }
+              };
+            }
+          } catch (yfErr) {
+            logger.warn(`Yahoo Finance quote API failed for ${symbol} (formatted: ${symbolAdapter.toYahoo(symbol)}): ${yfErr.message}`);
+          }
+
           const latest = await ohlcService.getLatest(symbol.replace('.NS', '').replace('.BO', ''), '1d');
           if (latest.success && latest.data) {
             return {

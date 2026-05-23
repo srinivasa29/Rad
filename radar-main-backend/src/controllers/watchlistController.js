@@ -21,8 +21,46 @@ const normalizeSymbolForStorage = (sym) => {
     return `${s}.NS`;
 };
 
+const mergeLegacyWatchlists = async (userId) => {
+    try {
+        const watchlists = await Watchlist.find({ userId });
+        const traderWatchlist = watchlists.find(w => w.mode === 'trader' && w.name === 'Trader Watchlist');
+        const researchWatchlist = watchlists.find(w => w.mode === 'trader' && w.name === 'Research Watchlist');
+        
+        if (traderWatchlist && researchWatchlist) {
+            // Merge symbols from Trader Watchlist to Research Watchlist
+            const existingSymbols = new Set(researchWatchlist.items.map(item => item.symbol.toUpperCase()));
+            let addedAny = false;
+            
+            traderWatchlist.items.forEach(item => {
+                if (item.symbol && !existingSymbols.has(item.symbol.toUpperCase())) {
+                    researchWatchlist.items.push({ symbol: item.symbol });
+                    existingSymbols.add(item.symbol.toUpperCase());
+                    addedAny = true;
+                }
+            });
+            
+            if (addedAny) {
+                await researchWatchlist.save();
+            }
+            
+            // Delete legacy Trader Watchlist
+            await Watchlist.deleteOne({ _id: traderWatchlist._id });
+            try { await profileCache.invalidate(userId); } catch (_) {}
+        } else if (traderWatchlist && !researchWatchlist) {
+            // Rename Trader Watchlist to Research Watchlist
+            traderWatchlist.name = 'Research Watchlist';
+            await traderWatchlist.save();
+            try { await profileCache.invalidate(userId); } catch (_) {}
+        }
+    } catch (err) {
+        console.error('Error during legacy watchlist merge:', err);
+    }
+};
+
 const getWatchlists = async (req, res) => {
     try {
+        await mergeLegacyWatchlists(req.user._id);
         // Optional ?mode=trader|investor query param.
         // If omitted, return ALL watchlists for the user (backward compat).
         const query = { userId: req.user._id };
@@ -84,7 +122,8 @@ const addToWatchlist = async (req, res) => {
         const watchlist = await Watchlist.findOne({ _id: id, userId: req.user._id });
         if (!watchlist) return res.status(404).json({ error: "Watchlist not found" });
 
-        const exists = watchlist.items.some(item => item.symbol === symbol);
+        const bare = (s) => String(s || '').replace(/\.(NS|BO)$/i, '').toUpperCase();
+        const exists = watchlist.items.some((item) => bare(item.symbol) === bare(symbol));
         if (exists) return res.status(400).json({ error: "Stock already in watchlist" });
 
         watchlist.items.push({ symbol });
@@ -117,4 +156,95 @@ const removeFromWatchlist = async (req, res) => {
     }
 };
 
-module.exports = { getWatchlists, createWatchlist, addToWatchlist, removeFromWatchlist };
+const getDefaultWatchlist = async (userId, mode = 'trader') => {
+    if (mode === 'trader') {
+        await mergeLegacyWatchlists(userId);
+    }
+    const targetName = mode === 'investor' ? 'Investor Portfolio' : 'Research Watchlist';
+    let watchlist = await Watchlist.findOne({ userId, mode: mode.toLowerCase(), name: targetName });
+    if (!watchlist) {
+        watchlist = await Watchlist.findOne({ userId, mode: mode.toLowerCase() });
+    }
+    if (!watchlist) {
+        watchlist = await Watchlist.findOne({ userId });
+    }
+    if (!watchlist) {
+        watchlist = new Watchlist({
+            userId,
+            name: targetName,
+            mode: mode.toLowerCase(),
+            items: []
+        });
+        await watchlist.save();
+    }
+    return watchlist;
+};
+
+const addToDefaultWatchlist = async (req, res) => {
+    const { symbol: rawSymbol } = req.body;
+    if (!rawSymbol) return res.status(400).json({ error: "Symbol is required" });
+    const symbol = normalizeSymbolForStorage(rawSymbol);
+    try {
+        const watchlist = await getDefaultWatchlist(req.user._id, req.query.mode || 'trader');
+        const bare = (s) => String(s || '').replace(/\.(NS|BO)$/i, '').toUpperCase();
+        const exists = watchlist.items.some((item) => bare(item.symbol) === bare(symbol));
+        if (exists) return res.status(400).json({ error: "Stock already in watchlist" });
+        watchlist.items.push({ symbol });
+        await watchlist.save();
+        try { await profileCache.invalidate(req.user._id); } catch (_) {}
+        res.json(watchlist);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to add to default watchlist" });
+    }
+};
+
+const removeFromDefaultWatchlist = async (req, res) => {
+    const { symbol: rawSymbol } = req.params;
+    const normalized = normalizeSymbolForStorage(rawSymbol);
+    const plain = String(rawSymbol || '').trim().toUpperCase();
+    try {
+        const watchlist = await getDefaultWatchlist(req.user._id, req.query.mode || 'trader');
+        watchlist.items = watchlist.items.filter(item =>
+            item.symbol !== normalized && item.symbol !== plain
+        );
+        await watchlist.save();
+        try { await profileCache.invalidate(req.user._id); } catch (_) {}
+        res.json(watchlist);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to remove from default watchlist" });
+    }
+};
+
+const reorderWatchlist = async (req, res) => {
+    const { symbols } = req.body;
+    if (!Array.isArray(symbols)) return res.status(400).json({ error: "symbols must be an array" });
+    try {
+        const watchlist = await getDefaultWatchlist(req.user._id, req.query.mode || 'trader');
+        const newItems = [];
+        for (const sym of symbols) {
+            const item = watchlist.items.find(i => i.symbol === sym || i.symbol.replace(/\.(NS|BO)$/i, '').toUpperCase() === sym.toUpperCase());
+            if (item) {
+                newItems.push(item);
+            } else {
+                newItems.push({ symbol: sym });
+            }
+        }
+        watchlist.items = newItems;
+        await watchlist.save();
+        try { await profileCache.invalidate(req.user._id); } catch (_) {}
+        res.json(watchlist);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to reorder watchlist" });
+    }
+};
+
+module.exports = { 
+    getWatchlists, 
+    createWatchlist, 
+    addToWatchlist, 
+    removeFromWatchlist,
+    addToDefaultWatchlist,
+    removeFromDefaultWatchlist,
+    reorderWatchlist
+};
+

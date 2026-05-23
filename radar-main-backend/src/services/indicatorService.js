@@ -1,4 +1,4 @@
-const { calculateRSI, calculateMACD, calculateEMA, getVolumeStatus } = require('../utils/indicators');
+const { calculateRSI, calculateMACD, calculateEMA, calculateSMA, calculateBollinger, calculateATR, calculateVWAP, calculateMomentum, getVolumeStatus } = require('../utils/indicators');
 const { fetchStockHistory } = require('./stockService');
 const { fetchCryptoHistory } = require('./cryptoService');
 const { fetchForexHistory } = require('./forexService');
@@ -23,6 +23,11 @@ const getTechnicalIndicators = async (assetType, symbol, interval = '1D', option
             rsi: null,
             macd: null,
             ema20: null,
+            ema50: null,
+            ema200: null,
+            sma50: null,
+            sma200: null,
+            bollinger: null,
             volumeStatus: 'average',
             lastPrice: history?.length ? history[history.length - 1].price : null,
             previousPrice: history?.length > 1 ? history[history.length - 2].price : null,
@@ -42,8 +47,20 @@ const getTechnicalIndicators = async (assetType, symbol, interval = '1D', option
     } : null;
 
     const prices = history.map(h => h.price);
-    const emaRaw = calculateEMA(prices, 20);
-    const ema20 = emaRaw.length > 0 ? parseFloat(emaRaw[emaRaw.length - 1].toFixed(2)) : null;
+    const ema20Raw = calculateEMA(prices, 20);
+    const ema50Raw = calculateEMA(prices, 50);
+    const ema200Raw = calculateEMA(prices, 200);
+    const ema20 = ema20Raw.length > 0 ? parseFloat(ema20Raw[ema20Raw.length - 1].toFixed(2)) : null;
+    const ema50 = ema50Raw.length > 0 ? parseFloat(ema50Raw[ema50Raw.length - 1].toFixed(2)) : null;
+    const ema200 = ema200Raw.length > 0 ? parseFloat(ema200Raw[ema200Raw.length - 1].toFixed(2)) : null;
+
+    const sma50Raw = calculateSMA(history, 50);
+    const sma200Raw = calculateSMA(history, 200);
+    const sma50 = sma50Raw.length > 0 ? parseFloat(sma50Raw[sma50Raw.length - 1].value.toFixed(2)) : null;
+    const sma200 = sma200Raw.length > 0 ? parseFloat(sma200Raw[sma200Raw.length - 1].value.toFixed(2)) : null;
+
+    const bollingerRaw = calculateBollinger(history, 20, 2);
+    const bollinger = bollingerRaw.length > 0 ? bollingerRaw[bollingerRaw.length - 1] : null;
 
     let support = null;
     let resistance = null;
@@ -64,28 +81,44 @@ const getTechnicalIndicators = async (assetType, symbol, interval = '1D', option
     const lastUpdatedAt = last?.date || null;
 
     let atr = null;
-    if (prices.length >= 14) {
-        let trSum = 0;
-        let count = 0;
-        for (let i = prices.length - 14; i < prices.length; i++) {
-            if (i > 0) {
-                trSum += Math.abs(prices[i] - prices[i - 1]);
-                count++;
-            }
-        }
-        if (count > 0) {
-            atr = parseFloat((trSum / count).toFixed(2));
-        }
+    try {
+        const atrRaw = calculateATR(history, 14);
+        atr = atrRaw.length > 0 ? atrRaw[atrRaw.length - 1].value : null;
+    } catch (e) {
+        console.error('ATR calc failure:', e.message);
+    }
+
+    let vwap = null;
+    try {
+        const vwapRaw = calculateVWAP(history);
+        vwap = vwapRaw.length > 0 ? vwapRaw[vwapRaw.length - 1].value : null;
+    } catch (e) {
+        console.error('VWAP calc failure:', e.message);
+    }
+
+    let momentum = null;
+    try {
+        const momentumRaw = calculateMomentum(history, 10);
+        momentum = momentumRaw.length > 0 ? momentumRaw[momentumRaw.length - 1].value : null;
+    } catch (e) {
+        console.error('Momentum calc failure:', e.message);
     }
 
     return {
         rsi,
         macd,
         ema20,
+        ema50,
+        ema200,
+        sma50,
+        sma200,
+        bollinger,
         support,
         resistance,
         volumeStatus,
         atr,
+        vwap,
+        momentum,
         lastPrice: Number.isFinite(lastPrice) ? lastPrice : null,
         previousPrice: Number.isFinite(previousPrice) ? previousPrice : null,
         lastChangePercent,
@@ -139,6 +172,11 @@ const getTechnicalIndicatorsFromOHLC = async (symbol, exchange = 'NSE', timefram
                 rsi: null,
                 macd: null,
                 ema20: null,
+                ema50: null,
+                ema200: null,
+                sma50: null,
+                sma200: null,
+                bollinger: null,
                 support: null,
                 resistance: null,
                 volumeStatus: 'average',
@@ -174,8 +212,20 @@ const getTechnicalIndicatorsFromOHLC = async (symbol, exchange = 'NSE', timefram
         } : null;
 
         const prices = history.map(h => h.price);
-        const emaRaw = calculateEMA(prices, 20);
-        const ema20 = emaRaw.length > 0 ? parseFloat(emaRaw[emaRaw.length - 1].toFixed(2)) : null;
+        const ema20Raw = calculateEMA(prices, 20);
+        const ema50Raw = calculateEMA(prices, 50);
+        const ema200Raw = calculateEMA(prices, 200);
+        const ema20 = ema20Raw.length > 0 ? parseFloat(ema20Raw[ema20Raw.length - 1].toFixed(2)) : null;
+        const ema50 = ema50Raw.length > 0 ? parseFloat(ema50Raw[ema50Raw.length - 1].toFixed(2)) : null;
+        const ema200 = ema200Raw.length > 0 ? parseFloat(ema200Raw[ema200Raw.length - 1].toFixed(2)) : null;
+
+        const sma50Raw = calculateSMA(history, 50);
+        const sma200Raw = calculateSMA(history, 200);
+        const sma50 = sma50Raw.length > 0 ? parseFloat(sma50Raw[sma50Raw.length - 1].value.toFixed(2)) : null;
+        const sma200 = sma200Raw.length > 0 ? parseFloat(sma200Raw[sma200Raw.length - 1].value.toFixed(2)) : null;
+
+        const bollingerRaw = calculateBollinger(history, 20, 2);
+        const bollinger = bollingerRaw.length > 0 ? bollingerRaw[bollingerRaw.length - 1] : null;
 
         // Support and resistance
         let support = null;
@@ -191,18 +241,29 @@ const getTechnicalIndicatorsFromOHLC = async (symbol, exchange = 'NSE', timefram
 
         // ATR (Average True Range)
         let atr = null;
-        if (prices.length >= 14) {
-            let trSum = 0;
-            let count = 0;
-            for (let i = prices.length - 14; i < prices.length; i++) {
-                if (i > 0) {
-                    trSum += Math.abs(prices[i] - prices[i - 1]);
-                    count++;
-                }
-            }
-            if (count > 0) {
-                atr = parseFloat((trSum / count).toFixed(2));
-            }
+        try {
+            const atrRaw = calculateATR(history, 14);
+            atr = atrRaw.length > 0 ? atrRaw[atrRaw.length - 1].value : null;
+        } catch (e) {
+            console.error('ATR calc failure:', e.message);
+        }
+
+        // VWAP
+        let vwap = null;
+        try {
+            const vwapRaw = calculateVWAP(history);
+            vwap = vwapRaw.length > 0 ? vwapRaw[vwapRaw.length - 1].value : null;
+        } catch (e) {
+            console.error('VWAP calc failure:', e.message);
+        }
+
+        // Momentum
+        let momentum = null;
+        try {
+            const momentumRaw = calculateMomentum(history, 10);
+            momentum = momentumRaw.length > 0 ? momentumRaw[momentumRaw.length - 1].value : null;
+        } catch (e) {
+            console.error('Momentum calc failure:', e.message);
         }
 
         const lastCandle = history[history.length - 1];
@@ -217,10 +278,17 @@ const getTechnicalIndicatorsFromOHLC = async (symbol, exchange = 'NSE', timefram
             rsi,
             macd,
             ema20,
+            ema50,
+            ema200,
+            sma50,
+            sma200,
+            bollinger,
             support,
             resistance,
             volumeStatus,
             atr,
+            vwap,
+            momentum,
             lastPrice: Number.isFinite(lastPrice) ? lastPrice : null,
             previousPrice: Number.isFinite(previousPrice) ? previousPrice : null,
             lastChangePercent,
@@ -235,6 +303,11 @@ const getTechnicalIndicatorsFromOHLC = async (symbol, exchange = 'NSE', timefram
             rsi: null,
             macd: null,
             ema20: null,
+            ema50: null,
+            ema200: null,
+            sma50: null,
+            sma200: null,
+            bollinger: null,
             support: null,
             resistance: null,
             volumeStatus: 'average',

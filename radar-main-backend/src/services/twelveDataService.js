@@ -6,7 +6,7 @@ const logger = require('../utils/logger');
 class TwelveDataService {
   constructor() {
     this.baseUrl = 'https://api.twelvedata.com';
-    this.apiKey = process.env.TWELVE_DATA_API_KEY || 'demo'; // Use demo key if not set
+    this.apiKey = process.env.TWELVE_API_KEY || 'f07be5e2e09a439699db2da9f8b53dfd';
     this.requestCount = 0;
     this.dailyLimit = 800;
     this.requestTimestamps = [];

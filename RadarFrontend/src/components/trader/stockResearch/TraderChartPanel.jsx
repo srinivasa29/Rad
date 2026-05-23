@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getAssetMetadata } from '../../../utils/assetClassifier';
 import { useMarketStatus } from '../../../hooks/useMarketStatus';
 import { formatPrice as formatCurrency } from '../../../utils/currency';
-import { fetchOHLCForChart } from '../../../api/ohlcApi';
+import { fetchOHLCData } from '../../../api/ohlcApi';
 import { fetchMarketHistory } from '../../../api/marketApi';
 import {
   createChart,
@@ -50,6 +50,8 @@ import {
 } from 'lucide-react';
 
 const TF_CONFIG = {
+  '1m': { stepSec: 60, points: 600, drift: 0.05, volatility: 0.5, waveSpan: 4.2, noiseSpan: 2.5, pulseEvery: 10, pulseScale: 0.2 },
+  '5m': { stepSec: 300, points: 600, drift: 0.1, volatility: 0.7, waveSpan: 4.8, noiseSpan: 2.8, pulseEvery: 11, pulseScale: 0.25 },
   '10m': { stepSec: 600, points: 600, drift: 0.15, volatility: 0.85, waveSpan: 5.2, noiseSpan: 3.2, pulseEvery: 12, pulseScale: 0.28 },
   '15m': { stepSec: 900, points: 600, drift: 0.22, volatility: 1.15, waveSpan: 5.8, noiseSpan: 3.5, pulseEvery: 13, pulseScale: 0.31 },
   '30m': { stepSec: 1800, points: 600, drift: 0.28, volatility: 1.4, waveSpan: 6.6, noiseSpan: 3.9, pulseEvery: 14, pulseScale: 0.34 },
@@ -57,9 +59,20 @@ const TF_CONFIG = {
   '4H': { stepSec: 14400, points: 600, drift: 0.46, volatility: 2.1, waveSpan: 8.6, noiseSpan: 4.8, pulseEvery: 16, pulseScale: 0.46 },
   '1D': { stepSec: 86400, points: 600, drift: 0.58, volatility: 2.5, waveSpan: 10.2, noiseSpan: 5.6, pulseEvery: 18, pulseScale: 0.58 },
   '1W': { stepSec: 604800, points: 600, drift: 0.72, volatility: 3.2, waveSpan: 12.4, noiseSpan: 6.8, pulseEvery: 20, pulseScale: 0.65 },
+  '1M': { stepSec: 2592000, points: 600, drift: 0.95, volatility: 4.5, waveSpan: 15.0, noiseSpan: 8.0, pulseEvery: 22, pulseScale: 0.75 },
 };
 
-const TRADER_TIMEFRAMES = ['10m', '15m', '30m', '1H', '4H', '1D'];
+const TRADER_TIMEFRAMES = ['1m', '5m', '15m', '1H', '4H', '1D', '1W', '1M'];
+const BACKEND_TIMEFRAME = {
+  '1m': '1m',
+  '5m': '5m',
+  '15m': '15m',
+  '1H': '1h',
+  '4H': '4h',
+  '1D': '1d',
+  '1W': '1wk',
+  '1M': '1mo',
+};
 const DRAW_TOOLS = ['trendline', 'rectangle', 'horizontal', 'measure'];
 const TOOL_STYLES = {
   trendline: { stroke: '#94a3b8', fill: 'transparent' },
@@ -177,6 +190,19 @@ const extendHistory = (rows, timeframe, chunkSize = 80) => {
   return [...older, ...rows];
 };
 
+const calcVwap = (rows) => {
+  let cumulativeTypicalPriceVolume = 0;
+  let cumulativeVolume = 0;
+  return rows.map((row) => {
+    const typicalPrice = ((row.high || row.close) + (row.low || row.close) + row.close) / 3;
+    const vol = row.volume || 1;
+    cumulativeTypicalPriceVolume += typicalPrice * vol;
+    cumulativeVolume += vol;
+    const vwapValue = cumulativeTypicalPriceVolume / Math.max(1, cumulativeVolume);
+    return { time: row.time, value: +vwapValue.toFixed(2) };
+  });
+};
+
 const calcEma = (rows, period) => {
   const multiplier = 2 / (period + 1);
   let previous = rows[0]?.close ?? 0;
@@ -244,9 +270,49 @@ const calcMacd = (rows, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) => {
   return { macd, signal, histogram };
 };
 
+const calcBollingerBands = (rows, period = 20, multiplier = 2) => {
+  if (rows.length < period) {
+    return {
+      middle: rows.map(r => ({ time: r.time, value: r.close })),
+      upper: rows.map(r => ({ time: r.time, value: r.close })),
+      lower: rows.map(r => ({ time: r.time, value: r.close }))
+    };
+  }
+  const middle = [];
+  const upper = [];
+  const lower = [];
+  
+  for (let i = 0; i < rows.length; i++) {
+    if (i < period - 1) {
+      middle.push({ time: rows[i].time, value: rows[i].close });
+      upper.push({ time: rows[i].time, value: rows[i].close });
+      lower.push({ time: rows[i].time, value: rows[i].close });
+      continue;
+    }
+    
+    let sum = 0;
+    for (let j = 0; j < period; j++) {
+      sum += rows[i - j].close;
+    }
+    const mean = sum / period;
+    
+    let varianceSum = 0;
+    for (let j = 0; j < period; j++) {
+      varianceSum += Math.pow(rows[i - j].close - mean, 2);
+    }
+    const stdDev = Math.sqrt(varianceSum / period);
+    
+    middle.push({ time: rows[i].time, value: +mean.toFixed(2) });
+    upper.push({ time: rows[i].time, value: +(mean + multiplier * stdDev).toFixed(2) });
+    lower.push({ time: rows[i].time, value: +(mean - multiplier * stdDev).toFixed(2) });
+  }
+  return { middle, upper, lower };
+};
+
+
 const chartOptions = (width, height, timeframe, showTime = true) => ({
   layout: {
-    background: { type: ColorType.Solid, color: '#0f172a' },
+    background: { type: ColorType.Solid, color: '#070b13' },
     textColor: '#64748b',
     attributionLogo: false,
   },
@@ -413,9 +479,14 @@ function ResearchChartViewport({
   showMacd = true,
   showEma = true,
   showVolume = true,
+  showVwap = false,
+  showBollinger = false,
   chartType = 'candles',
   settings = {},
   onRequestMoreHistory,
+  compareEnabled = false,
+  compareRows = [],
+  compareSymbol = 'NIFTY',
 }) {
   const rootRef = useRef(null);
   const rsiRef = useRef(null);
@@ -498,6 +569,26 @@ function ResearchChartViewport({
       })));
     }
 
+    // Comparison Overlay Series (plotted on the left scale to prevent scale compression)
+    if (compareEnabled && compareRows && compareRows.length > 0) {
+      chart.priceScale('left').applyOptions({
+        visible: true,
+        borderColor: 'rgba(255, 255, 255, 0.05)',
+      });
+      const compSeries = chart.addSeries(LineSeries, {
+        color: '#f59e0b',
+        lineWidth: 1.5,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        title: compareSymbol || 'Comparison',
+        priceScaleId: 'left',
+      });
+      compSeries.setData(compareRows.map(r => ({
+        time: r.time,
+        value: r.close
+      })));
+    }
+
     // Indicators
     if (showEma) {
       const ema20 = calcEma(rows, 20);
@@ -506,7 +597,20 @@ function ResearchChartViewport({
       chart.addSeries(LineSeries, { color: 'rgba(96, 165, 250, 0.8)', lineWidth: 1.5, lastValueVisible: false, priceLineVisible: false, title: 'EMA 50' }).setData(ema50);
     }
 
+    if (showVwap) {
+      const vwapData = calcVwap(rows);
+      chart.addSeries(LineSeries, { color: 'rgba(168, 85, 247, 0.8)', lineWidth: 1.5, lastValueVisible: false, priceLineVisible: false, title: 'VWAP' }).setData(vwapData);
+    }
+
+    if (showBollinger) {
+      const { middle, upper, lower } = calcBollingerBands(rows, 20, 2);
+      chart.addSeries(LineSeries, { color: 'rgba(168, 85, 247, 0.6)', lineWidth: 1, lineStyle: 2, lastValueVisible: false, priceLineVisible: false, title: 'BB Upper' }).setData(upper);
+      chart.addSeries(LineSeries, { color: 'rgba(168, 85, 247, 0.4)', lineWidth: 1.2, lineStyle: 0, lastValueVisible: false, priceLineVisible: false, title: 'BB Basis' }).setData(middle);
+      chart.addSeries(LineSeries, { color: 'rgba(168, 85, 247, 0.6)', lineWidth: 1, lineStyle: 2, lastValueVisible: false, priceLineVisible: false, title: 'BB Lower' }).setData(lower);
+    }
+
     let rsiChart, macdChart;
+
 
     if (showRsi && rsiRef.current) {
       rsiChart = createChart(rsiRef.current, {
@@ -614,7 +718,7 @@ function ResearchChartViewport({
       charts.forEach(c => c.remove());
       chartRef.current = candleSeriesRef.current = null;
     };
-  }, [rows, height, timeframe, showRsi, showMacd, chartType, selectedTool, onDrawingStart, onDrawingUpdate, onDrawingEnd, panelId, settings]);
+  }, [rows, height, timeframe, showRsi, showMacd, showEma, showVolume, showVwap, showBollinger, chartType, selectedTool, onDrawingStart, onDrawingUpdate, onDrawingEnd, panelId, settings, compareEnabled, compareRows, compareSymbol]);
 
   const overlayItems = drawings
     .filter(d => d.panelId === panelId)
@@ -632,12 +736,12 @@ function ResearchChartViewport({
         style={{ cursor: DRAW_TOOLS.includes(selectedTool) ? 'crosshair' : 'default' }}
       />
       {showRsi && (
-        <div className="h-[140px] relative border-t border-white/5 bg-[#0f172a]">
+        <div className="h-[140px] relative border-t border-white/5 bg-[#070b13]">
           <div ref={rsiRef} className="absolute inset-0" />
         </div>
       )}
       {showMacd && (
-        <div className="h-[140px] relative border-t border-white/5 bg-[#0f172a]">
+        <div className="h-[140px] relative border-t border-white/5 bg-[#070b13]">
           <div ref={macdRef} className="absolute inset-0" />
         </div>
       )}
@@ -671,7 +775,7 @@ function ResearchChartViewport({
   );
 }
 
-export default function TraderChartPanel({ symbol, price, assetType, variant = 'simple' }) {
+export default function TraderChartPanel({ symbol, price, assetType, variant = 'simple', hideHeaderSymbol = false, hideRightPanel = false, height, onCandlesUpdate }) {
   const advanced = variant === 'advanced';
   const assetMeta = getAssetMetadata(symbol);
   
@@ -679,17 +783,20 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
 
   const navigate = useNavigate();
 
-  const [timeframe, setTimeframe] = useState('10m');
+  const [timeframe, setTimeframe] = useState('1D');
   const [workspaceMode, setWorkspaceMode] = useState('analysis');
   const [selectedTool, setSelectedTool] = useState(null);
   const [compareEnabled, setCompareEnabled] = useState(true);
   const [compareSymbol, setCompareSymbol] = useState('NIFTY');
+  const [compareSearch, setCompareSearch] = useState('');
+  const [showCompareMenu, setShowCompareMenu] = useState(false);
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [replayOn, setReplayOn] = useState(false);
   const [replayPlaying, setReplayPlaying] = useState(false);
   const [replayIndex, setReplayIndex] = useState(0);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
-  const [indicators, setIndicators] = useState({ ema: true, rsi: true, macd: true, volume: true });
+  const [indicators, setIndicators] = useState({ ema: false, rsi: false, macd: false, vwap: false, volume: true, bollinger: false });
+  const [refreshCount, setRefreshCount] = useState(0);
   const [chartType, setChartType] = useState('candles');
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [layout, setLayout] = useState('1'); // '1', '2-v', '2-h', '4'
@@ -714,6 +821,7 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
   const mainRef = useRef(null);
   const containerRef = useRef(null);
   const chartRef = useRef(null);
+  const baseHeight = height || (window.innerHeight - 80);
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
@@ -741,6 +849,11 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
   const [compareRowsByTimeframe, setCompareRowsByTimeframe] = useState({});
   const [isChartLoading, setIsChartLoading] = useState(false);
 
+  const onCandlesUpdateRef = useRef(onCandlesUpdate);
+  useEffect(() => {
+    onCandlesUpdateRef.current = onCandlesUpdate;
+  }, [onCandlesUpdate]);
+
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -750,7 +863,7 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
       try {
         // ── Derive correct API symbol based on asset type ──────────────────
         const INDEX_MAP = {
-          NIFTY: '^NSEI', BANKNIFTY: '^NSEBANK', SENSEX: '^BSESN',
+          NIFTY: '^NSEI', NIFTY50: '^NSEI', BANKNIFTY: '^NSEBANK', SENSEX: '^BSESN',
           FINNIFTY: 'NIFTY_FIN_SERVICE.NS', MIDCPNIFTY: '^NSEMDCP50', INDIAVIX: '^INDIAVIX',
         };
         const upperSym = String(symbol || '').toUpperCase();
@@ -765,9 +878,36 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
           apiSymbol = `${upperSym}=X`;
         }
         // ──────────────────────────────────────────────────────────────────
+        const backendTimeframe = BACKEND_TIMEFRAME[timeframe] || '1d';
+        const useYahooOhlc = ['Equity', 'Index'].includes(assetMeta.type);
+
+        const isCompIndex = ['NIFTY', 'NIFTY50', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].includes(compareSymbol.toUpperCase());
+        const compSymbolMapped = isCompIndex 
+          ? (INDEX_MAP[compareSymbol.toUpperCase()] || `^${compareSymbol}`) 
+          : (compareSymbol.includes('.') ? compareSymbol : `${compareSymbol}.NS`);
+
         const [main, comp] = await Promise.all([
-          fetchMarketHistory(apiSymbol, assetMeta.type.toUpperCase(), timeframe),
-          compareEnabled ? fetchMarketHistory(compareSymbol || '^NSEI', 'INDEX', timeframe) : Promise.resolve({ data: [] })
+          (useYahooOhlc
+            ? fetchOHLCData(apiSymbol, {
+                exchange: 'NSE',
+                timeframe: backendTimeframe,
+                limit: TF_CONFIG[timeframe]?.points || 600,
+              })
+            : fetchMarketHistory(apiSymbol, assetMeta.type.toUpperCase(), timeframe)
+          ).catch(e => {
+            console.error('Failed to fetch main chart series:', e);
+            return { data: [] };
+          }),
+          (compareEnabled 
+            ? (isCompIndex
+                ? fetchMarketHistory(compSymbolMapped, 'INDEX', timeframe)
+                : fetchOHLCData(compSymbolMapped, { exchange: 'NSE', timeframe: backendTimeframe, limit: TF_CONFIG[timeframe]?.points || 600 })
+              )
+            : Promise.resolve({ data: [] })
+          ).catch(e => {
+            console.error('Failed to fetch comparison series:', e);
+            return { data: [] };
+          })
         ]);
         mainRes = main;
         compRes = comp;
@@ -780,8 +920,26 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
       const formatRows = (res) => {
         const arr = Array.isArray(res) ? res : res?.data || [];
         return arr.map(d => {
-          let timeVal = new Date(d.timestamp).getTime() / 1000;
-          if (isNaN(timeVal)) timeVal = Number(d.time || d.timestamp);
+          let timeVal = NaN;
+          if (d.timestamp) {
+            if (typeof d.timestamp === 'string') {
+              timeVal = new Date(d.timestamp).getTime() / 1000;
+            } else if (typeof d.timestamp === 'number') {
+              timeVal = d.timestamp > 1e11 ? d.timestamp / 1000 : d.timestamp;
+            } else if (d.timestamp instanceof Date) {
+              timeVal = d.timestamp.getTime() / 1000;
+            }
+          }
+          if (isNaN(timeVal)) {
+            const rawTime = d.time || d.timestamp;
+            if (rawTime) {
+              if (typeof rawTime === 'string') {
+                timeVal = new Date(rawTime).getTime() / 1000;
+              } else {
+                timeVal = Number(rawTime) > 1e11 ? Number(rawTime) / 1000 : Number(rawTime);
+              }
+            }
+          }
           return {
             time: timeVal,
             open: Number(d.open),
@@ -798,9 +956,15 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
       const newRows = formatRows(mainRes);
       if (newRows.length > 0) {
         setRowsByTimeframe(prev => ({ ...prev, [timeframe]: newRows }));
+        if (onCandlesUpdateRef.current) {
+          onCandlesUpdateRef.current(newRows);
+        }
       } else {
-        // Fallback for empty data so UI doesn't completely break
-        setRowsByTimeframe(prev => ({ ...prev, [timeframe]: buildOhlcv(symbol, price, timeframe) }));
+        const fall = buildOhlcv(symbol, price, timeframe);
+        setRowsByTimeframe(prev => ({ ...prev, [timeframe]: fall }));
+        if (onCandlesUpdateRef.current) {
+          onCandlesUpdateRef.current(fall);
+        }
       }
 
       if (compareEnabled) {
@@ -817,7 +981,7 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
     
     load();
     return () => { active = false; };
-  }, [symbol, timeframe, assetType, compareEnabled, compareSymbol, price]);
+  }, [symbol, timeframe, assetType, compareEnabled, compareSymbol, price, refreshCount]);
 
   const baseReplayRows = rowsByTimeframe[timeframe] ?? [];
 
@@ -1088,7 +1252,7 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
 
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full bg-[#0f172a] text-slate-300 font-sans selection:bg-cyan-500/30 relative">
+    <div ref={containerRef} className="flex flex-col h-full bg-[#070b13] text-slate-300 font-sans selection:bg-cyan-500/30 relative">
       {/* ── Fullscreen Exit Message ── */}
       {isFullscreen && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 bg-black/60 backdrop-blur-xl border border-white/10 rounded-full text-[10px] font-black text-white/80 uppercase tracking-widest animate-in fade-in slide-in-from-top-4 duration-700">
@@ -1099,7 +1263,7 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-6 h-12 border-b border-white/5 bg-[#111827]/80 backdrop-blur-md z-40">
         <div className="flex items-center">
-          {advanced && (
+          {!hideHeaderSymbol && advanced && (
             <button
               onClick={() => navigate(`/stocks/${symbol}`)}
               className="flex items-center gap-2 pr-4 border-r border-white/5 text-slate-400 hover:text-white transition-colors mr-6"
@@ -1109,34 +1273,38 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
             </button>
           )}
 
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20">
-              <span className="text-lg">{assetMeta.icon}</span>
+          {!hideHeaderSymbol && (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20">
+                <span className="text-lg">{assetMeta.icon}</span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-base font-black text-white tracking-tight">{symbol}</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  {assetMeta.exchange} · {assetMeta.currency}
+                </span>
+              </div>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-base font-black text-white tracking-tight">{symbol}</span>
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                {assetMeta.exchange} · {assetMeta.currency}
-              </span>
-            </div>
-          </div>
+          )}
 
-          <div className="flex items-center gap-4 ml-6">
-            <div className="h-4 w-px bg-white/10" />
-            <div className="flex items-center gap-3 ml-2">
-              <div className="text-lg font-black text-white leading-none">
-                {formatCurrency(price, assetType, symbol)}
-              </div>
-              <div className={`text-xs font-bold px-2 py-0.5 rounded ${priceChange >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-                {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
+          {!hideHeaderSymbol && (
+            <div className="flex items-center gap-4 ml-6">
+              <div className="h-4 w-px bg-white/10" />
+              <div className="flex items-center gap-3 ml-2">
+                <div className="text-lg font-black text-white leading-none">
+                  {formatCurrency(price, assetType, symbol)}
+                </div>
+                <div className={`text-xs font-bold px-2 py-0.5 rounded ${priceChange >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                  {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {!advanced && (
-            <div className="flex items-center ml-6">
-              <div className="h-4 w-px bg-white/10" />
-              <div className="flex items-center gap-2 ml-4">
+            <div className="flex items-center">
+              {!hideHeaderSymbol && <div className="h-4 w-px bg-white/10 mr-4 ml-6" />}
+              <div className="flex items-center gap-2">
                 {['10m', '15m', '30m', '1H', '1D', '1W'].map((tf) => (
                   <button
                     key={tf}
@@ -1168,8 +1336,8 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
                 {showTfMenu && (
                   <div className="absolute top-10 left-6 w-40 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden py-2 animate-in fade-in slide-in-from-top-2">
                     <div className="px-3 py-1 text-[9px] font-black text-slate-500 uppercase tracking-widest">Minutes</div>
-                    {['10m', '15m', '30m'].map(tf => (
-                      <button key={tf} onClick={() => { setTimeframe(tf); setShowTfMenu(false); }} className={`w-full text-left px-4 py-2 text-xs font-bold hover:bg-cyan-500/10 transition-colors ${timeframe === tf ? 'text-cyan-400 bg-cyan-500/5' : 'text-slate-300'}`}>{tf === '10m' ? '10 minutes' : tf === '15m' ? '15 minutes' : '30 minutes'}</button>
+                    {['1m', '5m', '15m'].map(tf => (
+                      <button key={tf} onClick={() => { setTimeframe(tf); setShowTfMenu(false); }} className={`w-full text-left px-4 py-2 text-xs font-bold hover:bg-cyan-500/10 transition-colors ${timeframe === tf ? 'text-cyan-400 bg-cyan-500/5' : 'text-slate-300'}`}>{tf === '1m' ? '1 minute' : tf === '5m' ? '5 minutes' : '15 minutes'}</button>
                     ))}
                     <div className="h-px bg-white/5 my-1 mx-2" />
                     <div className="px-3 py-1 text-[9px] font-black text-slate-500 uppercase tracking-widest">Hours</div>
@@ -1177,9 +1345,9 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
                       <button key={tf} onClick={() => { setTimeframe(tf); setShowTfMenu(false); }} className={`w-full text-left px-4 py-2 text-xs font-bold hover:bg-cyan-500/10 transition-colors ${timeframe === tf ? 'text-cyan-400 bg-cyan-500/5' : 'text-slate-300'}`}>{tf === '1H' ? '1 hour' : '4 hours'}</button>
                     ))}
                     <div className="h-px bg-white/5 my-1 mx-2" />
-                    <div className="px-3 py-1 text-[9px] font-black text-slate-500 uppercase tracking-widest">Days</div>
-                    {['1D', '1W'].map(tf => (
-                      <button key={tf} onClick={() => { setTimeframe(tf); setShowTfMenu(false); }} className={`w-full text-left px-4 py-2 text-xs font-bold hover:bg-cyan-500/10 transition-colors ${timeframe === tf ? 'text-cyan-400 bg-cyan-500/5' : 'text-slate-300'}`}>{tf === '1D' ? '1 day' : '1 week'}</button>
+                    <div className="px-3 py-1 text-[9px] font-black text-slate-500 uppercase tracking-widest">Higher</div>
+                    {['1D', '1W', '1M'].map(tf => (
+                      <button key={tf} onClick={() => { setTimeframe(tf); setShowTfMenu(false); }} className={`w-full text-left px-4 py-2 text-xs font-bold hover:bg-cyan-500/10 transition-colors ${timeframe === tf ? 'text-cyan-400 bg-cyan-500/5' : 'text-slate-300'}`}>{tf === '1D' ? '1 day' : tf === '1W' ? '1 week' : '1 month'}</button>
                     ))}
                   </div>
                 )}
@@ -1229,7 +1397,7 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
                     <div className="px-2 pb-2">
                       <input type="text" placeholder="Search indicators..." className="w-full bg-[#0f172a] border border-white/5 rounded-lg px-3 py-1.5 text-[10px] text-slate-400 outline-none focus:border-cyan-500/30" />
                     </div>
-                    {['EMA', 'RSI', 'MACD', 'Volume'].map((ind) => (
+                    {['EMA', 'RSI', 'MACD', 'VWAP', 'Volume', 'Bollinger'].map((ind) => (
                       <button
                         key={ind}
                         onClick={() => setIndicators(prev => ({ ...prev, [ind.toLowerCase()]: !prev[ind.toLowerCase()] }))}
@@ -1239,6 +1407,115 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
                         {indicators[ind.toLowerCase()] && <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]" />}
                       </button>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Quick Toolbar Toggles ── */}
+              <div className="flex items-center gap-1.5 border-l border-white/5 pl-4 ml-4">
+                <button
+                  onClick={() => setIndicators(prev => ({ ...prev, ema: !prev.ema }))}
+                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                    indicators.ema 
+                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_8px_rgba(245,158,11,0.1)]' 
+                      : 'text-slate-400 border-transparent hover:text-white hover:bg-white/5'
+                  }`}
+                  title="Toggle Exponential Moving Average"
+                >
+                  EMA
+                </button>
+                <button
+                  onClick={() => setIndicators(prev => ({ ...prev, vwap: !prev.vwap }))}
+                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                    indicators.vwap 
+                      ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_8px_rgba(168,85,247,0.1)]' 
+                      : 'text-slate-400 border-transparent hover:text-white hover:bg-white/5'
+                  }`}
+                  title="Toggle VWAP"
+                >
+                  VWAP
+                </button>
+                <button
+                  onClick={() => setIndicators(prev => ({ ...prev, bollinger: !prev.bollinger }))}
+                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                    indicators.bollinger 
+                      ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-[0_0_8px_rgba(6,182,212,0.1)]' 
+                      : 'text-slate-400 border-transparent hover:text-white hover:bg-white/5'
+                  }`}
+                  title="Toggle Bollinger Bands"
+                >
+                  BB
+                </button>
+                <button
+                  onClick={() => setRefreshCount(c => c + 1)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+                  title="Refresh Chart Data"
+                >
+                  <RotateCcw size={14} className="hover:rotate-45 transition-transform" />
+                </button>
+              </div>
+
+              {/* ── Compare Asset Selector ── */}
+              <div className="relative border-l border-white/5 pl-4 ml-4 flex items-center gap-2 font-sans">
+                <button
+                  onClick={() => {
+                    setCompareEnabled(!compareEnabled);
+                    if (!compareEnabled) setShowCompareMenu(true);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black rounded-lg border transition-all cursor-pointer ${compareEnabled ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_8px_rgba(245,158,11,0.2)]' : 'text-slate-400 border-transparent hover:text-white hover:bg-white/5'}`}
+                  title="Compare Asset"
+                >
+                  <TrendingUp size={14} />
+                  <span>Compare Asset ▼</span>
+                </button>
+                {compareEnabled && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowCompareMenu(!showCompareMenu)}
+                      className="bg-[#1e293b] border border-white/10 rounded-lg px-3 py-1 text-[10px] font-bold text-slate-200 hover:border-cyan-500 transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <span>{compareSymbol.toUpperCase()}</span>
+                      <ChevronDown size={10} className="text-slate-400" />
+                    </button>
+                    {showCompareMenu && (
+                      <div className="absolute top-8 left-0 w-52 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl z-50 p-2 animate-in fade-in slide-in-from-top-2">
+                        <div className="px-1 py-1 border-b border-white/5 mb-1.5">
+                          <input
+                            type="text"
+                            placeholder="Enter symbol (e.g. RELIANCE)..."
+                            value={compareSearch}
+                            onChange={(e) => setCompareSearch(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && compareSearch.trim()) {
+                                setCompareSymbol(compareSearch.trim().toUpperCase());
+                                setShowCompareMenu(false);
+                              }
+                            }}
+                            className="w-full bg-[#0f172a] border border-white/5 rounded-lg px-2.5 py-1.5 text-[10px] text-slate-200 placeholder-slate-500 outline-none focus:border-cyan-500/40"
+                          />
+                        </div>
+                        <div className="max-h-36 overflow-y-auto space-y-0.5 custom-scrollbar">
+                          {['NIFTY50', 'BANKNIFTY', 'RELIANCE', 'TCS', 'INFY', 'HDFCBANK']
+                            .filter(sym => sym.toLowerCase().includes(compareSearch.toLowerCase()))
+                            .map((sym) => (
+                              <button
+                                key={sym}
+                                onClick={() => {
+                                  setCompareSymbol(sym);
+                                  setShowCompareMenu(false);
+                                  setCompareSearch('');
+                                }}
+                                className={`w-full text-left px-2.5 py-1.5 text-[10px] font-bold rounded-lg hover:bg-white/5 transition-colors flex items-center justify-between ${compareSymbol === sym ? 'text-amber-400 bg-amber-500/5' : 'text-slate-300'}`}
+                              >
+                                <span>{sym}</span>
+                                <span className="text-[8px] font-semibold text-slate-500 uppercase">
+                                  {['NIFTY50', 'BANKNIFTY'].includes(sym) ? 'Index' : 'Equity'}
+                                </span>
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1307,19 +1584,21 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
                 >
                   <Maximize2 size={18} />
                 </button>
-                <button
-                  onClick={() => setRightPanelOpen(!rightPanelOpen)}
-                  className={`p-2 transition-all ${rightPanelOpen ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-500 hover:text-white transition-colors'}`}
-                >
-                  <Menu size={18} />
-                </button>
+                {!hideRightPanel && (
+                  <button
+                    onClick={() => setRightPanelOpen(!rightPanelOpen)}
+                    className={`p-2 transition-all ${rightPanelOpen ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-500 hover:text-white transition-colors'}`}
+                  >
+                    <Menu size={18} />
+                  </button>
+                )}
               </>
             )}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 flex min-h-0 relative bg-[#0f172a]">
+      <div className="flex-1 flex min-h-0 relative bg-[#070b13]">
         {/* ── Fixed Left Sidebar Toolbar (Advanced Only) ── */}
         {advanced && (
           <div className="w-14 border-r border-white/5 bg-[#111827]/40 flex flex-col items-center py-4 gap-4 z-40">
@@ -1370,14 +1649,18 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
                   onDrawingStart={handleDrawingStart}
                   onDrawingUpdate={handleDrawingUpdate}
                   onDrawingEnd={handleDrawingEnd}
-                  height={layout === '1' ? window.innerHeight - 80 : layout === '2-h' ? (window.innerHeight - 80) / 2 : layout === '4' ? (window.innerHeight - 80) / 2 : window.innerHeight - 80}
+                  height={layout === '1' ? baseHeight : layout === '2-h' ? baseHeight / 2 : layout === '4' ? baseHeight / 2 : baseHeight}
                   showRsi={indicators.rsi}
                   showMacd={indicators.macd}
                   showEma={indicators.ema}
                   showVolume={indicators.volume}
+                  showVwap={indicators.vwap}
                   chartType={chartType}
                   settings={chartSettings}
                   onRequestMoreHistory={requestMoreHistory}
+                  compareEnabled={compareEnabled}
+                  compareRows={compareRowsByTimeframe[timeframe] ?? []}
+                  compareSymbol={compareSymbol}
                 />
               ))}
             </div>
@@ -1454,7 +1737,7 @@ export default function TraderChartPanel({ symbol, price, assetType, variant = '
 
 
         {/* ── Right Panel: Insights & Signals (Advanced Only) ── */}
-        {advanced && (
+        {advanced && !hideRightPanel && rightPanelOpen && (
           <div className="w-[300px] border-l border-white/5 bg-[#0f172a] flex flex-col z-30 animate-in slide-in-from-right duration-500">
             <div className="p-4 border-b border-white/5 flex items-center justify-between">
               <span className="text-xs font-black uppercase tracking-widest text-white">Insights</span>

@@ -20,9 +20,31 @@ export const fetchUserWatchlist = async (mode) => {
     }
 };
 
+export const fetchWatchlists = async (mode) => {
+    try {
+        const params = mode ? { mode } : {};
+        const res = await api.get('/watchlist', { params });
+        return Array.isArray(res.data) ? res.data : [];
+    } catch (err) {
+        console.warn('fetchWatchlists failed:', err.message);
+        return [];
+    }
+};
+
+export const ensureWatchlist = async (mode = 'trader', name = 'Research Watchlist') => {
+    const modeLists = await fetchWatchlists(mode);
+    const named = modeLists.find((list) => String(list?.name || '').toLowerCase() === name.toLowerCase());
+    if (named) return named;
+    if (modeLists.length > 0) return modeLists[0];
+
+    const created = await createWatchlist(name, mode);
+    return created?.data ?? created;
+};
+
 export const addSymbolToWatchlist = async (watchlistId, symbol) => {
     try {
-        const res = await api.post(`/watchlist/${watchlistId}/add`, { symbol });
+        const url = watchlistId ? `/watchlist/${watchlistId}/add` : '/watchlist/add';
+        const res = await api.post(url, { symbol });
         return res.data;
     } catch (err) {
         console.error('addSymbolToWatchlist failed:', err.message);
@@ -32,13 +54,15 @@ export const addSymbolToWatchlist = async (watchlistId, symbol) => {
 
 export const removeSymbolFromWatchlist = async (watchlistId, symbol) => {
     try {
-        const res = await api.delete(`/watchlist/${watchlistId}/remove/${encodeURIComponent(symbol)}`);
+        const url = watchlistId ? `/watchlist/${watchlistId}/remove/${encodeURIComponent(symbol)}` : `/watchlist/remove/${encodeURIComponent(symbol)}`;
+        const res = await api.delete(url);
         return res.data;
     } catch (err) {
         console.error('removeSymbolFromWatchlist failed:', err.message);
         throw err;
     }
 };
+
 
 export const createWatchlist = async (name, mode) => {
     try {
@@ -64,4 +88,3 @@ export const fetchWatchlistLiveData = async (mode) => {
         return [];
     }
 };
-

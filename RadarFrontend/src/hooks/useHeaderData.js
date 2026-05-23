@@ -166,11 +166,23 @@ export const useHeaderData = () => {
         loadProfile();
         loadNotifications();
 
+        const handleProfileUpdated = (event) => {
+            setProfile((currentProfile) => ({
+                ...currentProfile,
+                ...(event.detail || {})
+            }));
+        };
+
+        window.addEventListener('radar:profile-updated', handleProfileUpdated);
+
         const pollInterval = setInterval(() => {
             loadNotifications();
         }, 45000);
 
-        return () => clearInterval(pollInterval);
+        return () => {
+            window.removeEventListener('radar:profile-updated', handleProfileUpdated);
+            clearInterval(pollInterval);
+        };
     }, [loadProfile, loadNotifications]);
 
     const userInitial = useMemo(() => {

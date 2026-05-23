@@ -1738,6 +1738,9 @@ const InvestorNewsFeed = () => {
                             <h1 className="text-[32px] font-black text-slate-900 tracking-tight leading-none">Latest Headlines</h1>
                         </div>
                         <p className="text-slate-500 font-semibold text-[15px] pl-1">Intelligent discovery of signals across global market assets.</p>
+                        <p className="mt-2 inline-flex items-center rounded-full bg-amber-100 text-amber-800 border border-amber-200 px-3 py-1 text-[12px] font-bold shadow-sm">
+                            Note: free sources prioritized; extended coverage available via paid APIs.
+                        </p>
                     </div>
 
                     {/* 2. FILTER BAR / ACTION BUTTONS */}

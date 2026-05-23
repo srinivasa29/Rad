@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, BookMarked, PlayCircle, Award, ChevronRight, ChevronLeft, CheckCircle, Circle, Zap, Clock, BarChart2, ArrowLeft, X, User } from 'lucide-react';
-import { fetchCourses, saveProgress, submitQuiz } from '../api/learningApi';
+import { fetchCourses, saveProgress, submitQuiz, fetchProgress, getProgressKey } from '../api/learningApi';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const ICON_MAP = { BookMarked, PlayCircle, Award, BookOpen };
 const COLOR_MAP = {
-  blue:    { bg: 'bg-blue-500/10',   text: 'text-blue-400',   border: 'border-blue-500/30',   badge: 'bg-blue-500/20 text-blue-300'   },
-  purple:  { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', badge: 'bg-purple-500/20 text-purple-300' },
-  emerald: { bg: 'bg-emerald-500/10',text: 'text-emerald-400',border: 'border-emerald-500/30',badge: 'bg-emerald-500/20 text-emerald-300'},
+  blue:    { bg: 'bg-blue-500/10',   text: 'text-blue-400',   border: 'border-blue-500/30',   badge: 'bg-blue-500/20 text-blue-300',   fill: 'bg-blue-400'   },
+  purple:  { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', badge: 'bg-purple-500/20 text-purple-300', fill: 'bg-purple-400' },
+  emerald: { bg: 'bg-emerald-500/10',text: 'text-emerald-400',border: 'border-emerald-500/30',badge: 'bg-emerald-500/20 text-emerald-300', fill: 'bg-emerald-400' },
 };
 const LIGHT_COLOR_MAP = {
-  blue:    { bg: 'bg-blue-50',    text: 'text-blue-600',   border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-700'    },
-  purple:  { bg: 'bg-purple-50',  text: 'text-purple-600', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700' },
-  emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600',border: 'border-emerald-200',badge: 'bg-emerald-100 text-emerald-700'},
+  blue:    { bg: 'bg-blue-50',    text: 'text-blue-600',   border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-700',    fill: 'bg-blue-600'    },
+  purple:  { bg: 'bg-purple-50',  text: 'text-purple-600', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700', fill: 'bg-purple-600'  },
+  emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600',border: 'border-emerald-200',badge: 'bg-emerald-100 text-emerald-700', fill: 'bg-emerald-600' },
 };
 
 const parseBold = (text) => {
@@ -62,18 +62,13 @@ const renderContent = (text = '') => {
   return elements;
 };
 
-const LOCAL_KEY = (id, mode = '') => {
-  const prefix = mode ? `${mode}_` : '';
-  return `radar_academy_progress_${prefix}${id}`;
-};
-
 const loadLocalProgress = (courseId, mode = '') => {
-  try { return JSON.parse(localStorage.getItem(LOCAL_KEY(courseId, mode)) || '{}'); }
+  try { return JSON.parse(localStorage.getItem(getProgressKey(courseId, mode)) || '{}'); }
   catch { return {}; }
 };
 
 const saveLocalProgress = (courseId, data, mode = '') => {
-  localStorage.setItem(LOCAL_KEY(courseId, mode), JSON.stringify(data));
+  localStorage.setItem(getProgressKey(courseId, mode), JSON.stringify(data));
 };
 
 // ── Course Card ──────────────────────────────────────────────────────────────
@@ -114,7 +109,7 @@ function CourseCard({ course, isTrader, onClick, progress }) {
       <div className="space-y-1">
         <div className={`h-1.5 w-full rounded-full ${isTrader ? 'bg-white/10' : 'bg-slate-100'}`}>
           <div
-            className={`h-1.5 rounded-full transition-all ${cm.text.replace('text-', 'bg-')}`}
+            className={`h-1.5 rounded-full transition-all ${cm.fill}`}
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -404,16 +399,51 @@ export default function LearningAcademy() {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchCourses(audience).then(data => {
-      if (!alive) return;
-      setCourses(data);
-      const pm = {};
-      data.forEach(c => { pm[c.id] = loadLocalProgress(c.id, mode); });
-      setProgressMap(pm);
-      setLoading(false);
-    });
+
+    const loadAndSync = async () => {
+      try {
+        const userId = localStorage.getItem('userId');
+        if (userId) {
+          const backendProgress = await fetchProgress(userId);
+          Object.entries(backendProgress).forEach(([courseId, data]) => {
+            const key = getProgressKey(courseId, mode);
+            const localData = JSON.parse(localStorage.getItem(key) || '{}');
+            const merged = {
+              ...localData,
+              ...data,
+              chapters: {
+                ...(localData.chapters || {}),
+                ...(data.chapters || {})
+              },
+              quizScores: {
+                ...(localData.quizScores || {}),
+                ...(data.quizScores || {})
+              }
+            };
+            localStorage.setItem(key, JSON.stringify(merged));
+          });
+        }
+      } catch (e) {
+        console.error('Failed to sync progress from backend:', e);
+      }
+
+      try {
+        const data = await fetchCourses(audience);
+        if (!alive) return;
+        setCourses(data);
+        const pm = {};
+        data.forEach(c => { pm[c.id] = loadLocalProgress(c.id, mode); });
+        setProgressMap(pm);
+      } catch (err) {
+        console.error('Failed to load courses:', err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+
+    loadAndSync();
     return () => { alive = false; };
-  }, []);
+  }, [audience, mode]);
 
   // Re-sync progress from localStorage whenever user returns to the course list
   useEffect(() => {

@@ -6,11 +6,14 @@ const logger = require('../utils/logger');
 class FinnhubService {
   constructor() {
     this.baseUrl = 'https://finnhub.io/api/v1';
-    this.apiKey = process.env.FINNHUB_API_KEY || 'demo'; // Use demo key if not set
     this.requestCount = 0;
     this.requestWindow = 60000; // 1 minute
     this.maxRequestsPerWindow = 60;
     this.requestTimestamps = [];
+  }
+
+  get apiKey() {
+    return process.env.FINNHUB_API_KEY || 'demo';
   }
 
   
@@ -127,7 +130,38 @@ class FinnhubService {
 
   
   convertToFinnhubSymbol(symbol) {
-    return symbol;
+    let s = String(symbol || '').trim().toUpperCase();
+    if (!s) return s;
+    
+    // If already has prefix
+    if (s.includes(':')) return s;
+
+    const CRYPTO_SYMBOLS = new Set(['BTC','ETH','SOL','XRP','BNB','ADA','DOT','DOGE','MATIC','LINK','AVAX','ATOM','LTC','UNI','SHIB','TRX','ETC','FIL','NEAR','APT','ARB','OP','INJ','SUI','SEI','PEPE','WIF','TON','FLOKI','BONK']);
+    const bareSymbol = s.replace(/\.(NS|BO)$/i, '');
+
+    if (CRYPTO_SYMBOLS.has(bareSymbol) || bareSymbol.endsWith('USDT') || bareSymbol.endsWith('-USD')) {
+      const crypto = bareSymbol.replace(/USDT$/i, '').replace(/-USD$/i, '');
+      return `BINANCE:${crypto}USDT`;
+    }
+
+    if (s.endsWith('.BO')) {
+      return `BSE:${s.replace('.BO', '')}`;
+    }
+
+    if (s.endsWith('.NS')) {
+      return `NSE:${s.replace('.NS', '')}`;
+    }
+
+    // Indices
+    if (s.startsWith('^')) {
+      if (s === '^NSEI') return 'NSE:NIFTY';
+      if (s === '^NSEBANK') return 'NSE:BANKNIFTY';
+      if (s === '^BSESN') return 'BSE:SENSEX';
+      return s;
+    }
+
+    // Default to NSE for Indian stocks
+    return `NSE:${s}`;
   }
 
   

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -9,42 +9,148 @@ import {
   Download,
   BarChart3,
   Activity,
+  Flame,
+  Bookmark,
+  Save,
+  Trash,
 } from 'lucide-react';
 import ScreenerFilterPanel from '../components/screener/ScreenerFilterPanel';
 import ScreenerStockCard from '../components/screener/ScreenerStockCard';
 import ScreenerResultsTable from '../components/screener/ScreenerResultsTable';
+import HeatmapView from '../components/screener/HeatmapView';
+import { toggleWatchlist } from '../api/api';
 import './ScreenerPage.css';
 import { runScreenerScan } from '../api/screenerApi';
+import { useSocket } from '../hooks/useSocket';
+
+const DEFAULT_FILTERS = {
+  search: '',
+  sector: 'All',
+  signals: [],
+  minPriceChange: 0,
+  maxPriceChange: null,
+  minRsi: 0,
+  maxRsi: 100,
+  minPrice: '',
+  maxPrice: '',
+  minVolume: '',
+  showOnlySignals: true,
+  trendType: 'all',
+};
+
+const MIN_LIVE_RESULTS = 10;
+const MAX_SCREENER_RESULTS = 200;
+const CLIENT_CACHE_TTL_MS = 30000;
+const CLIENT_CACHE_KEY = 'radar_screener_cache_v4';
 
 const ScreenerPage = () => {
   const navigate = useNavigate();
-  const SETTINGS_STORAGE_KEY = 'radar_screener_settings';
   const [filterOpen, setFilterOpen] = useState(true);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
-  const [filters, setFilters] = useState({
-    search: '',
-    sector: 'All',
-    signals: [],
-    minPriceChange: 0,
-    maxPriceChange: null,
-    minRsi: 0,
-    maxRsi: 100,
-    minPrice: '',
-    maxPrice: '',
-    minVolume: '',
-    showOnlySignals: true,
-    trendType: 'all', // 'bullish', 'bearish', 'neutral', 'all'
-  });
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   const [stocks, setStocks] = useState([]);
-  const [filteredStocks, setFilteredStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [activeSignalTab, setActiveSignalTab] = useState('all');
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [actionNotice, setActionNotice] = useState('');
+  const [coverageNote, setCoverageNote] = useState('');
+  const [dataSource, setDataSource] = useState('live');
+  const [activePreset, setActivePreset] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(true);
+  const inFlightRef = useRef(false);
+  const deferredSearch = useDeferredValue(filters.search);
+  const { isConnected: isRealtimeConnected, on, off, emit } = useSocket(['ticker']);
   const contentRef = useRef(null);
   const noticeTimerRef = useRef(null);
+
+  const [customScanners, setCustomScanners] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('radar_custom_scanners') || '[]');
+    } catch (_) {
+      return [];
+    }
+  });
+  const [addingWatchlist, setAddingWatchlist] = useState(false);
+  const [timeframe, setTimeframe] = useState('1D');
+
+  const handleSaveScanner = () => {
+    const name = prompt('Enter a name for your custom scanner:');
+    if (!name) return;
+    const cleanName = name.trim();
+    if (!cleanName) return;
+    const duplicate = customScanners.find(s => s.name.toLowerCase() === cleanName.toLowerCase());
+    if (duplicate) {
+      alert('A scanner with this name already exists.');
+      return;
+    }
+    const next = [...customScanners, { id: Date.now(), name: cleanName, filters }];
+    setCustomScanners(next);
+    localStorage.setItem('radar_custom_scanners', JSON.stringify(next));
+    pushNotice(`Scanner "${cleanName}" saved successfully.`);
+  };
+
+  const handleLoadCustomScanner = (scanner) => {
+    setFilters(scanner.filters);
+    pushNotice(`Applied Custom Scanner: ${scanner.name}`);
+  };
+
+  const handleDeleteScanner = (id, e) => {
+    e.stopPropagation();
+    const next = customScanners.filter(s => s.id !== id);
+    setCustomScanners(next);
+    localStorage.setItem('radar_custom_scanners', JSON.stringify(next));
+    pushNotice('Custom scanner deleted.');
+  };
+
+  const handleAddSelectedToWatchlist = async () => {
+    if (selectedStocks.length === 0) return;
+    setAddingWatchlist(true);
+    let count = 0;
+    try {
+      const symbolsToToggle = stocks
+        .filter(s => selectedStocks.includes(s.id))
+        .map(s => s.symbol);
+      for (const symbol of symbolsToToggle) {
+        await toggleWatchlist(symbol, 'trader');
+        count++;
+      }
+      pushNotice(`Successfully toggled ${count} stocks in Research Watchlist.`);
+      setSelectedStocks([]);
+    } catch (err) {
+      pushNotice(`Failed to update watchlist: ${err.message}`);
+    } finally {
+      setAddingWatchlist(false);
+    }
+  };
+
+  const QUICK_PRESETS = [
+    {
+      id: 'momentum-surge',
+      label: 'Momentum Surge',
+      filters: { minRsi: 55, minPriceChange: 0.8, signals: ['BULLISH'], trendType: 'bullish' },
+      tab: 'bullish',
+    },
+    {
+      id: 'breakout-rvol',
+      label: 'Breakout + Volume',
+      filters: { minPriceChange: 1.2, minVolume: 2500000, signals: ['BULLISH'], trendType: 'bullish' },
+      tab: 'bullish',
+    },
+    {
+      id: 'pullback-rebound',
+      label: 'Pullback Rebound',
+      filters: { maxRsi: 55, minPriceChange: -5, maxPriceChange: 0, signals: ['BEARISH'], trendType: 'bearish' },
+      tab: 'bearish',
+    },
+    {
+      id: 'oversold-watch',
+      label: 'Oversold Watch',
+      filters: { maxRsi: 35, signals: ['BEARISH'], trendType: 'bearish' },
+      tab: 'bearish',
+    },
+  ];
 
   const MOCK_STOCKS = [
     {
@@ -243,12 +349,49 @@ const ScreenerPage = () => {
 
   // Live load on mount — replaces MOCK_STOCKS
   const fetchAndSet = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setLoading(true);
     try {
-      const res = await runScreenerScan({ limit: 50 });
+      setCoverageNote('');
+      
+      // Map active frontend filters state to backend schema
+      const backendFilters = {};
+      if (filters.minPrice !== '') backendFilters.minPrice = parseFloat(filters.minPrice);
+      if (filters.maxPrice !== '') backendFilters.maxPrice = parseFloat(filters.maxPrice);
+      if (filters.minPriceChange !== null && filters.minPriceChange !== '') backendFilters.minChange = parseFloat(filters.minPriceChange);
+      if (filters.maxPriceChange !== null && filters.maxPriceChange !== '') backendFilters.maxChange = parseFloat(filters.maxPriceChange);
+      if (filters.minRsi !== undefined) backendFilters.minRsi = Number(filters.minRsi);
+      if (filters.maxRsi !== undefined) backendFilters.maxRsi = Number(filters.maxRsi);
+      
+      if (filters.sector && filters.sector !== 'All') {
+        backendFilters.sectors = [filters.sector];
+      }
+
+      if (filters.emaCrossover && filters.emaCrossover !== 'all') backendFilters.emaCrossover = filters.emaCrossover;
+      if (filters.smaCrossover && filters.smaCrossover !== 'all') backendFilters.smaCrossover = filters.smaCrossover;
+      if (filters.bollingerSqueeze !== undefined && filters.bollingerSqueeze !== null && filters.bollingerSqueeze !== '') {
+        backendFilters.bollingerSqueeze = String(filters.bollingerSqueeze);
+      }
+      if (filters.breakoutType && filters.breakoutType !== 'all') backendFilters.breakoutType = filters.breakoutType;
+      if (filters.candlestickPattern && filters.candlestickPattern !== 'all') backendFilters.candlestickPattern = filters.candlestickPattern;
+      if (filters.trendStrength && filters.trendStrength !== 'all') backendFilters.trendStrength = filters.trendStrength;
+      if (filters.minRiskReward !== undefined && filters.minRiskReward !== null && filters.minRiskReward !== '') {
+        backendFilters.minRiskReward = parseFloat(filters.minRiskReward);
+      }
+
+      const res = await runScreenerScan({
+        limit: MAX_SCREENER_RESULTS,
+        strictLive: false,
+        includeIndicators: showAdvanced,
+        filters: backendFilters,
+        timeframe: timeframe,
+      });
       // Backend wraps: { success, data: { results: [...] } }
       const inner = res?.data ?? res;
-      const raw = inner?.results ?? inner?.stocks ?? (Array.isArray(inner) ? inner : []);
+      const payload = inner?.data ?? inner;
+      const raw = payload?.results ?? payload?.stocks ?? (Array.isArray(payload) ? payload : []);
+      const returnedCount = Number(payload?.returned ?? raw.length ?? 0);
       
       const normalized = raw.map((s, i) => ({
         id: s._id || s.id || s.displaySymbol || s.symbol || i,
@@ -256,59 +399,78 @@ const ScreenerPage = () => {
         name: s.name || s.displaySymbol || s.symbol || '',
         price: Number(s.price ?? 0),
         change: Number(s.changePercent ?? s.change ?? 0),
-        changePercent: Number(s.changePercent ?? s.change ?? 0),
         volume: Number(s.volume ?? 0),
         sector: s.sector || 'Equity',
-        signal: s.signal || (Number(s.changePercent ?? s.change ?? 0) > 1.5
-          ? 'BREAKOUT'
-          : s.bias === 'bearish' ? 'PULLBACK' : 'MOMENTUM'),
-        signalStrength: s.signalStrength || (Number(s.confidence ?? s.score ?? 70) > 80 ? 'Strong' : 'Medium'),
-        signalType: s.signalType || s.why || '',
-        rsi: Number(s.rsi ?? 50),
-        pe: Number(s.pe ?? 0),
-        trend: s.trend || s.bias || (Number(s.changePercent ?? s.change ?? 0) >= 0 ? 'bullish' : 'bearish'),
-        sentiment: Number(s.sentiment ?? (Number(s.changePercent ?? s.change ?? 0) * 10)),
-        strength: s.strength || `Confidence ${Number(s.confidence ?? s.score ?? 72)}%`,
-        entry: Number(s.entry ?? s.price ?? 0),
-        target: Number(s.target ?? (s.price ?? 0) * 1.04),
-        stopLoss: Number(s.stopLoss ?? s.sl ?? (s.price ?? 0) * 0.985),
-        rvol: Number(s.volumeRatio ?? s.rvol ?? 1.2),
-        timeframe: s.timeframe || '1D',
-        chart: s.chart || s.history || [],
+        signal: String(s.signal || s.bias || 'NEUTRAL').toUpperCase(),
+        bias: String(s.bias || 'neutral').toLowerCase(),
+        rsi: Number.isFinite(Number(s.rsi)) ? Number(s.rsi) : null,
+        ema20: Number.isFinite(Number(s.ema20)) ? Number(s.ema20) : null,
+        ema50: Number.isFinite(Number(s.ema50)) ? Number(s.ema50) : null,
+        ema200: Number.isFinite(Number(s.ema200)) ? Number(s.ema200) : null,
+        sma50: Number.isFinite(Number(s.sma50)) ? Number(s.sma50) : null,
+        sma200: Number.isFinite(Number(s.sma200)) ? Number(s.sma200) : null,
+        atr: Number.isFinite(Number(s.atr)) ? Number(s.atr) : null,
+        support: Number.isFinite(Number(s.support)) ? Number(s.support) : null,
+        resistance: Number.isFinite(Number(s.resistance)) ? Number(s.resistance) : null,
+        bollinger: s.bollinger || null,
+        pe: Number.isFinite(Number(s.pe)) ? Number(s.pe) : null,
+        score: Number.isFinite(Number(s.score)) ? Number(s.score) : null,
+        confidence: Number.isFinite(Number(s.confidence)) ? Number(s.confidence) : null,
+        volumeStatus: s.volumeStatus || null,
+        why: s.why || '',
+        marketCap: s.marketCap || null,
+        emaCrossover: s.emaCrossover || 'neutral',
+        smaCrossover: s.smaCrossover || 'neutral',
+        bollingerSqueeze: s.bollingerSqueeze ?? false,
+        breakoutType: s.breakoutType || 'none',
+        riskRewardRatio: Number.isFinite(Number(s.riskRewardRatio)) ? Number(s.riskRewardRatio) : 1.5,
+        trendStrength: s.trendStrength || 'moderate',
+        candlestickPattern: s.candlestickPattern || 'none',
       }));
 
-      // If API returned stocks, use them — otherwise fall back to demo data
+      // Use backend results only; no mock fallback for trader screener
       if (normalized.length > 0) {
         setStocks(normalized);
-        setFilteredStocks(normalized);
+        setDataSource('live');
+        if (normalized.length < MIN_LIVE_RESULTS || returnedCount < MAX_SCREENER_RESULTS) {
+          setCoverageNote(`Limited API coverage: ${returnedCount} of ${MAX_SCREENER_RESULTS} stocks returned.`);
+        }
+        try {
+          localStorage.setItem(CLIENT_CACHE_KEY, JSON.stringify({
+            ts: Date.now(),
+            results: normalized,
+            returned: returnedCount,
+          }));
+        } catch (_err) {}
       } else {
-        setStocks(MOCK_STOCKS);
-        setFilteredStocks(MOCK_STOCKS);
+        setStocks([]);
+        setDataSource('unavailable');
+        setCoverageNote('Live APIs returned no stocks.');
       }
     } catch (err) {
       console.warn('ScreenerPage load failed, using demo data:', err.message);
-      setStocks(MOCK_STOCKS);
-      setFilteredStocks(MOCK_STOCKS);
+      setStocks([]);
+      setDataSource('unavailable');
+      setCoverageNote('Live APIs unavailable. Please retry.');
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
-  }, []);
+  }, [showAdvanced, filters, timeframe]);
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') {
-          if (parsed.filters && typeof parsed.filters === 'object') setFilters((prev) => ({ ...prev, ...parsed.filters }));
-          if (typeof parsed.activeSignalTab === 'string') setActiveSignalTab(parsed.activeSignalTab);
-          if (typeof parsed.viewMode === 'string') setViewMode(parsed.viewMode);
-          if (typeof parsed.filterOpen === 'boolean') setFilterOpen(parsed.filterOpen);
+      const cached = JSON.parse(localStorage.getItem(CLIENT_CACHE_KEY) || 'null');
+      if (cached?.ts && Array.isArray(cached.results)) {
+        const age = Date.now() - cached.ts;
+        if (age <= CLIENT_CACHE_TTL_MS) {
+          setStocks(cached.results);
+          setDataSource('cached');
+          setCoverageNote(`Cached data (${Math.round(age / 1000)}s ago). Refreshing...`);
         }
       }
-    } catch (error) {
-      console.error('Failed to restore screener settings:', error);
-    }
+    } catch (_err) {}
+
     fetchAndSet();
   }, [fetchAndSet]);
 
@@ -320,14 +482,15 @@ const ScreenerPage = () => {
     };
   }, []);
 
-  useEffect(() => {
+  const filteredStocks = useMemo(() => {
     let result = stocks;
+    const search = deferredSearch.trim().toLowerCase();
 
-    if (filters.search) {
+    if (search) {
       result = result.filter(
         (stock) =>
-          stock.symbol.toLowerCase().includes(filters.search.toLowerCase()) ||
-          stock.name.toLowerCase().includes(filters.search.toLowerCase())
+          stock.symbol.toLowerCase().includes(search) ||
+          stock.name.toLowerCase().includes(search)
       );
     }
 
@@ -336,7 +499,9 @@ const ScreenerPage = () => {
     }
 
     if (filters.signals.length > 0) {
-      result = result.filter((stock) => filters.signals.includes(stock.signal));
+      result = result.filter((stock) =>
+        filters.signals.includes(String(stock.signal || stock.bias || '').toUpperCase())
+      );
     }
 
     if (filters.minPriceChange !== null) {
@@ -346,7 +511,13 @@ const ScreenerPage = () => {
       result = result.filter((stock) => stock.change <= filters.maxPriceChange);
     }
 
-    result = result.filter((stock) => stock.rsi >= filters.minRsi && stock.rsi <= filters.maxRsi);
+    result = result.filter((stock) => {
+      const rsi = Number(stock.rsi);
+      if (!Number.isFinite(rsi)) {
+        return filters.minRsi <= 0 && filters.maxRsi >= 100;
+      }
+      return rsi >= filters.minRsi && rsi <= filters.maxRsi;
+    });
 
     if (filters.minPrice) {
       result = result.filter((stock) => stock.price >= parseFloat(filters.minPrice));
@@ -360,18 +531,104 @@ const ScreenerPage = () => {
     }
 
     if (filters.trendType !== 'all') {
-      result = result.filter((stock) => stock.trend === filters.trendType);
+      result = result.filter((stock) => String(stock.bias || 'neutral') === filters.trendType);
     }
 
     if (filters.showOnlySignals && activeSignalTab !== 'all') {
-      result = result.filter((stock) => stock.signal.toLowerCase() === activeSignalTab.toLowerCase());
+      result = result.filter((stock) => String(stock.bias || 'neutral') === activeSignalTab.toLowerCase());
     }
 
-    setFilteredStocks(result);
-  }, [filters, stocks, activeSignalTab]);
+    // Advanced Trader Filters
+    if (filters.breakoutType && filters.breakoutType !== 'all') {
+      result = result.filter((stock) => stock.breakoutType === filters.breakoutType);
+    }
+
+    if (filters.emaCrossover && filters.emaCrossover !== 'all') {
+      result = result.filter((stock) => stock.emaCrossover === filters.emaCrossover);
+    }
+
+    if (filters.smaCrossover && filters.smaCrossover !== 'all') {
+      result = result.filter((stock) => stock.smaCrossover === filters.smaCrossover);
+    }
+
+    if (filters.bollingerSqueeze !== undefined && filters.bollingerSqueeze !== null && filters.bollingerSqueeze !== '') {
+      const expected = String(filters.bollingerSqueeze) === 'true';
+      result = result.filter((stock) => stock.bollingerSqueeze === expected);
+    }
+
+    if (filters.candlestickPattern && filters.candlestickPattern !== 'all') {
+      result = result.filter((stock) => stock.candlestickPattern === filters.candlestickPattern);
+    }
+
+    if (filters.trendStrength && filters.trendStrength !== 'all') {
+      result = result.filter((stock) => stock.trendStrength === filters.trendStrength);
+    }
+
+    if (filters.minRiskReward !== undefined && filters.minRiskReward !== null && filters.minRiskReward !== '') {
+      result = result.filter((stock) => stock.riskRewardRatio >= parseFloat(filters.minRiskReward));
+    }
+
+    return result;
+  }, [stocks, filters, activeSignalTab, deferredSearch]);
+  const normalizeSocketSymbol = (value) => String(value || '')
+    .toUpperCase()
+    .replace(/^NSE:/, '')
+    .replace(/\.(NS|BO)$/i, '')
+    .trim();
+
+  useEffect(() => {
+    if (!emit || stocks.length === 0) return;
+    const symbols = stocks.map((stock) => stock.symbol).filter(Boolean).slice(0, 50);
+    emit('subscribe', { channels: ['ticker'], symbols });
+    return () => emit('unsubscribe', { channels: ['ticker'], symbols });
+  }, [emit, stocks]);
+
+  useEffect(() => {
+    if (!on) return;
+    const handler = (event) => {
+      if (!event || event.type === 'indices') return;
+      const symbol = normalizeSocketSymbol(event.symbol);
+      if (!symbol) return;
+
+      setStocks((prev) => prev.map((stock) => {
+        if (stock.symbol !== symbol) return stock;
+        const nextPrice = Number(event.price);
+        if (!Number.isFinite(nextPrice)) return stock;
+        const prevPrice = Number(stock.price);
+        const change = Number.isFinite(event.change)
+          ? Number(event.change)
+          : (Number.isFinite(prevPrice) && prevPrice > 0 ? ((nextPrice - prevPrice) / prevPrice) * 100 : stock.change);
+        return {
+          ...stock,
+          price: nextPrice,
+          change: Number.isFinite(change) ? Number(change.toFixed(2)) : stock.change,
+        };
+      }));
+      setLastUpdated(new Date());
+    };
+
+    on('price_update', handler);
+    return () => off?.('price_update', handler);
+  }, [on, off]);
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
+  };
+
+  const resetFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    setActiveSignalTab('all');
+    setActivePreset('');
+    pushNotice('Filters reset to default.');
+  };
+
+  const applyPreset = (preset) => {
+    const next = { ...filters, ...preset.filters };
+    if (preset.filters.signals) next.signals = preset.filters.signals;
+    setFilters(next);
+    setActiveSignalTab(preset.tab || 'all');
+    setActivePreset(preset.id);
+    pushNotice(`Preset applied: ${preset.label}.`);
   };
 
   const pushNotice = (text) => {
@@ -436,35 +693,18 @@ const ScreenerPage = () => {
     pushNotice('Excel export completed.');
   };
 
-  const handlePublishSettings = () => {
-    try {
-      const payload = {
-        filters,
-        activeSignalTab,
-        viewMode,
-        filterOpen,
-        updatedAt: new Date().toISOString(),
-      };
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(payload));
-      pushNotice('Settings published and saved.');
-    } catch (error) {
-      console.error('Failed to publish settings:', error);
-      pushNotice('Unable to publish settings.');
-    }
-  };
-
-  const SIGNAL_TABS = [
-    { id: 'all', label: 'Market Opportunities', count: filteredStocks.length },
-    { id: 'breakout', label: 'Breakout', count: filteredStocks.filter((s) => s.signal === 'BREAKOUT').length },
-    { id: 'momentum', label: 'Momentum', count: filteredStocks.filter((s) => s.signal === 'MOMENTUM').length },
-    { id: 'pullback', label: 'Pullback', count: filteredStocks.filter((s) => s.signal === 'PULLBACK').length },
-  ];
+  const SIGNAL_TABS = useMemo(() => ([
+    { id: 'all', label: 'All Signals', count: filteredStocks.length },
+    { id: 'bullish', label: 'Bullish', count: filteredStocks.filter((s) => s.bias === 'bullish').length },
+    { id: 'neutral', label: 'Neutral', count: filteredStocks.filter((s) => s.bias === 'neutral').length },
+    { id: 'bearish', label: 'Bearish', count: filteredStocks.filter((s) => s.bias === 'bearish').length },
+  ]), [filteredStocks]);
   const scansActive = Math.max(12, filteredStocks.length * 8 + 2);
 
-  const SECTOR_OPTIONS = ['All', ...new Set(stocks.map((s) => s.sector))];
+  const SECTOR_OPTIONS = useMemo(() => ['All', ...new Set(stocks.map((s) => s.sector).filter(Boolean))], [stocks]);
 
   return (
-    <div className="screener-page h-screen flex overflow-hidden">
+    <div className="screener-page screener-shell h-screen flex overflow-hidden">
       {}
       <AnimatePresence>
         {filterOpen && (
@@ -473,7 +713,7 @@ const ScreenerPage = () => {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -320, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="w-80 bg-slate-900/95 border-r border-slate-700 overflow-y-auto"
+            className="w-80 screener-sidepanel border-r border-slate-700 overflow-y-auto"
           >
             <ScreenerFilterPanel
               sectors={SECTOR_OPTIONS}
@@ -481,6 +721,8 @@ const ScreenerPage = () => {
               onFilterChange={handleFilterChange}
               onActivateScan={handleRefresh}
               onClose={() => setFilterOpen(false)}
+              defaultFilters={DEFAULT_FILTERS}
+              onReset={resetFilters}
             />
           </motion.div>
         )}
@@ -489,7 +731,7 @@ const ScreenerPage = () => {
       {}
       <div className="flex-1 flex flex-col overflow-hidden">
         {}
-        <div className="h-20 border-b border-slate-700/50 px-6 flex items-center justify-between">
+        <div className="screener-header border-b border-slate-700/50 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {!filterOpen && (
               <button
@@ -507,10 +749,54 @@ const ScreenerPage = () => {
               <p className="text-xs text-slate-400 mt-0.5">
                 Discover actionable market opportunities with research-first scans.
               </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className={`screener-pill ${dataSource === 'unavailable' ? 'screener-pill--warn' : 'screener-pill--ok'}`}>
+                  {dataSource === 'unavailable' ? 'Live Feed Unavailable' : dataSource === 'cached' ? 'Cached Feed' : 'Live Feed'}
+                </span>
+                <span className={`screener-pill ${isRealtimeConnected ? 'screener-pill--ok' : 'screener-pill--neutral'}`}>
+                  {isRealtimeConnected ? 'Realtime On' : 'Realtime Off'}
+                </span>
+                <span className="screener-pill screener-pill--neutral">Universe {stocks.length}</span>
+                <span className="screener-pill screener-pill--neutral">Signals {filteredStocks.length}</span>
+                {coverageNote && (
+                  <span className="screener-pill screener-pill--warn">{coverageNote}</span>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+            <div className="screener-actionbar flex flex-wrap items-center gap-2">
+            {selectedStocks.length > 0 && (
+              <button
+                onClick={handleAddSelectedToWatchlist}
+                disabled={addingWatchlist}
+                className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg border border-amber-500/40 transition-colors flex items-center gap-2 text-sm font-semibold"
+              >
+                <Bookmark className="w-4.5 h-4.5" />
+                Add to Watchlist ({selectedStocks.length})
+              </button>
+            )}
+
+
+
+            {/* Timeframe Selector */}
+            <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
+              <span className="text-[10px] uppercase font-bold text-slate-400 px-2">TF</span>
+              {['15M', '1H', '4H', '1D'].map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => { setTimeframe(tf); pushNotice(`Switched timeframe context to ${tf}`); }}
+                  className={`px-2 py-1 rounded text-xs font-bold transition-all ${
+                    timeframe === tf
+                      ? 'bg-cyan-500 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
+
             <button
               onClick={handleRefresh}
               disabled={loading}
@@ -528,13 +814,6 @@ const ScreenerPage = () => {
               Excel
             </button>
 
-            <button
-              onClick={handlePublishSettings}
-              className="px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-200 rounded-lg transition-colors"
-            >
-              Publish Settings
-            </button>
-
             <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('grid')}
@@ -543,6 +822,7 @@ const ScreenerPage = () => {
                     ? 'bg-cyan-500/30 text-cyan-300'
                     : 'text-slate-400 hover:text-slate-300'
                 }`}
+                title="Grid View"
               >
                 <BarChart3 className="w-4 h-4" />
               </button>
@@ -553,10 +833,32 @@ const ScreenerPage = () => {
                     ? 'bg-cyan-500/30 text-cyan-300'
                     : 'text-slate-400 hover:text-slate-300'
                 }`}
+                title="Table View"
               >
                 <Activity className="w-4 h-4" />
               </button>
+              <button
+                onClick={() => setViewMode('heatmap')}
+                className={`px-3 py-2 rounded transition-colors ${
+                  viewMode === 'heatmap'
+                    ? 'bg-cyan-500/30 text-cyan-300'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+                title="Heatmap View"
+              >
+                <Flame className="w-4 h-4" />
+              </button>
             </div>
+              <button
+                onClick={() => setShowAdvanced((prev) => !prev)}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  showAdvanced
+                    ? 'bg-amber-500/20 text-amber-200 border border-amber-400/40'
+                    : 'bg-white/5 border border-white/10 text-slate-300 hover:border-white/20'
+                }`}
+              >
+                Advanced
+              </button>
           </div>
         </div>
 
@@ -588,6 +890,50 @@ const ScreenerPage = () => {
             <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
             <span className="font-semibold">{scansActive} Scans Active</span>
           </div>
+        </div>
+
+        <div className="screener-quickbar px-6 py-3 border-b border-slate-700/40 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <span className="screener-quick-label">Quick Scans</span>
+            {QUICK_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => applyPreset(preset)}
+                className={`screener-quick-chip ${activePreset === preset.id ? 'active' : ''}`}
+              >
+                {preset.label}
+              </button>
+            ))}
+
+            {customScanners.length > 0 && (
+              <div className="flex items-center gap-2 pl-4 border-l border-slate-700">
+                <span className="screener-quick-label">Custom Scanners</span>
+                {customScanners.map((scanner) => (
+                  <div key={scanner.id} className="relative group/scanner inline-flex items-center">
+                    <button
+                      onClick={() => handleLoadCustomScanner(scanner)}
+                      className="screener-quick-chip active:scale-95"
+                    >
+                      {scanner.name}
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteScanner(scanner.id, e)}
+                      className="absolute -top-1 -right-1 hidden group-hover/scanner:flex w-4.5 h-4.5 rounded-full bg-rose-600 hover:bg-rose-500 items-center justify-center text-[10px] text-white font-bold"
+                      title="Delete scanner"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={resetFilters}
+            className="screener-quick-reset"
+          >
+            Reset Filters
+          </button>
         </div>
 
         {}
@@ -637,9 +983,22 @@ const ScreenerPage = () => {
                     isSelected={selectedStocks.includes(stock.id)}
                     onSelect={() => toggleStockSelection(stock.id)}
                     onOpenResearch={openResearch}
+                    showAdvanced={showAdvanced}
                     index={index}
                   />
                 ))}
+              </motion.div>
+            ) : viewMode === 'heatmap' ? (
+              <motion.div
+                key="heatmap"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <HeatmapView
+                  stocks={filteredStocks}
+                  onOpenResearch={openResearch}
+                />
               </motion.div>
             ) : (
               <motion.div
@@ -648,7 +1007,11 @@ const ScreenerPage = () => {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <ScreenerResultsTable stocks={filteredStocks} onOpenResearch={openResearch} />
+                <ScreenerResultsTable
+                  stocks={filteredStocks}
+                  onOpenResearch={openResearch}
+                  showAdvanced={showAdvanced}
+                />
               </motion.div>
             )}
           </AnimatePresence>

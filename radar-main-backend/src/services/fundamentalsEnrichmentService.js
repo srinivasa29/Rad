@@ -20,7 +20,7 @@
  */
 
 const YahooFinance = require('yahoo-finance2').default;
-const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
+const yahooFinance = new YahooFinance();
 const NodeCache    = require('node-cache');
 const logger       = require('../config/logger');
 const FundamentalsSnapshot = require('../models/FundamentalsSnapshot');

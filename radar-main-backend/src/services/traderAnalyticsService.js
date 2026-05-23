@@ -183,10 +183,11 @@ const buildActivityTimeline = ({ trades, watchlist, alertRules, alerts }) => {
     const entries = [];
 
     trades.slice(-6).forEach((trade) => {
+        const price = Number(trade.price);
         entries.push({
             symbol: trade.symbol,
             pattern: trade.side === 'BUY' ? 'Executed Buy' : 'Executed Sell',
-            description: `${trade.side} ${trade.quantity} @ ${trade.price.toFixed(2)}`,
+            description: `${trade.side} ${trade.quantity} @ ${Number.isFinite(price) ? price.toFixed(2) : 'N/A'}`,
             time: formatTimelineTime(trade.executedAt),
             timestamp: new Date(trade.executedAt).getTime(),
         });

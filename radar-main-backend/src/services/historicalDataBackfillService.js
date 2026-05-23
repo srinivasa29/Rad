@@ -111,18 +111,21 @@ const ALL_NSE_SYMBOLS = [
 
 class HistoricalDataBackfillService {
     
-    async backfillSymbol(symbol, exchange = 'NSE', timeframe = '1d', range = '1y') {
+    async backfillSymbol(symbol, exchange = 'NSE', timeframe = '1d', range = '1y', options = {}) {
         try {
             logger.info(`ðŸ”„ Starting backfill for ${symbol} (${timeframe}, ${range})`);
 
-            const hasExisting = await this.checkExistingData(symbol, exchange, timeframe);
-            if (hasExisting) {
-                logger.info(`â­ï¸ Skipping ${symbol} - data already exists`);
-                return {
-                    success: true,
-                    skipped: true,
-                    message: 'Data already exists',
-                };
+            const { force = false, minCount = 0 } = options;
+            if (!force) {
+                const hasExisting = await this.checkExistingData(symbol, exchange, timeframe, minCount);
+                if (hasExisting) {
+                    logger.info(`â­ï¸ Skipping ${symbol} - data already exists`);
+                    return {
+                        success: true,
+                        skipped: true,
+                        message: 'Data already exists',
+                    };
+                }
             }
 
             const result = await yahooFinanceService.fetchHistoricalData(
@@ -173,9 +176,21 @@ class HistoricalDataBackfillService {
     }
 
     
-    async checkExistingData(symbol, exchange, timeframe) {
+    async checkExistingData(symbol, exchange, timeframe, minCount = 0) {
         try {
             const cleanSymbol = symbol.replace('.NS', '').replace('.BO', '');
+
+            if (minCount && Number(minCount) > 0) {
+                const minLimit = Number(minCount);
+                const result = await ohlcService.getOHLCData({
+                    symbol: cleanSymbol,
+                    exchange,
+                    timeframe,
+                    limit: minLimit,
+                });
+                return Boolean(result.success && result.data && result.data.length >= minLimit);
+            }
+
             const endDate = new Date();
             const startDate = new Date();
             startDate.setMonth(startDate.getMonth() - 1); // Check last month

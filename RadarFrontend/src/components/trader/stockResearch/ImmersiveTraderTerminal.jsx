@@ -61,9 +61,19 @@ const buildOhlcv = async (symbol, timeframe) => {
   try {
     const config = TF_CONFIG[timeframe] || TF_CONFIG['10m'];
     const limit = config.points || 600;
+    const backendTimeframe = {
+      '10m': '15m',
+      '15m': '15m',
+      '30m': '30m',
+      '1H': '1h',
+      '4H': '1h',
+      '1D': '1d',
+      '1W': '1wk',
+    }[timeframe] || '1d';
     
     const response = await fetchOHLCData(symbol, {
-      timeframe: timeframe.includes('m') ? timeframe : timeframe === '1D' ? '1d' : timeframe === '1W' ? '1wk' : '1mo',
+      exchange: 'NSE',
+      timeframe: backendTimeframe,
       limit
     });
 
@@ -72,13 +82,17 @@ const buildOhlcv = async (symbol, timeframe) => {
     }
 
     return response.data.map(d => ({
-      time: d.timestamp / 1000,
-      open: d.open,
-      high: d.high,
-      low: d.low,
-      close: d.close,
-      value: d.close
-    })).sort((a, b) => a.time - b.time);
+      time: Math.floor(new Date(d.timestamp).getTime() / 1000),
+      open: Number(d.open),
+      high: Number(d.high),
+      low: Number(d.low),
+      close: Number(d.close),
+      value: Number(d.close),
+      volume: Number(d.volume || 0),
+    }))
+      .filter(d => Number.isFinite(d.time) && d.time > 0 && Number.isFinite(d.close))
+      .sort((a, b) => a.time - b.time)
+      .filter((d, index, rows) => index === 0 || d.time !== rows[index - 1].time);
   } catch (error) {
     console.error('Error building OHLCV:', error);
     return [];
@@ -228,10 +242,6 @@ const ChartPane = ({ symbol, timeframe, chartType, indicators, basePrice, active
     const handleResize = () => {
       if (containerRef.current) {
         chart.applyOptions({ width: containerRef.current.clientWidth, height: containerRef.current.clientHeight });
-        chart.timeScale().setVisibleLogicalRange({
-          from: 0,
-          to: Math.max(chartData.length - 1, 1),
-        });
         chart.timeScale().fitContent();
       }
     };

@@ -36,6 +36,17 @@ export const saveProgress = async (courseId, chapterId, completed = true) => {
     }
 };
 
+export const fetchProgress = async (userId) => {
+    try {
+        const uid = userId || localStorage.getItem('userId') || 'anonymous';
+        const res = await api.get(`/learning/progress/${uid}`);
+        return res.data?.data ?? res.data ?? {};
+    } catch (err) {
+        console.error('Failed to fetch progress:', err);
+        return {};
+    }
+};
+
 export const submitQuiz = async (courseId, answers) => {
     try {
         const userId = localStorage.getItem('userId') || 'anonymous';
@@ -46,3 +57,4 @@ export const submitQuiz = async (courseId, answers) => {
         return null;
     }
 };
+

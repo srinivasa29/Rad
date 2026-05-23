@@ -6,15 +6,21 @@ const crypto = require('crypto');
 const asyncHandler = require('express-async-handler');
 const sendEmail = require('../services/mailService');
 const logger = require('../config/logger');
+const { getDbStatus } = require('../config/db');
 
 
-const generateToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+const generateToken = (id, tokenVersion = 0) => {
+    return jwt.sign({ id, tokenVersion }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 
 const normalizeIdentifier = (value) => String(value || '').trim().toLowerCase();
+const MAX_PROFILE_PICTURE_LENGTH = 4 * 1024 * 1024;
 
 const registerUser = asyncHandler(async (req, res) => {
+    if (!getDbStatus()) {
+        return res.status(503).json({ error: 'Database not connected. Please try again shortly.' });
+    }
+
     const { username, password, email, identifier } = req.body;
 
     const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;
@@ -47,7 +53,7 @@ const registerUser = asyncHandler(async (req, res) => {
                 username: user.username,
                 email: user.email || null,
                 preferredMode: user.preferredMode,
-                token: generateToken(user._id)
+                token: generateToken(user._id, user.tokenVersion)
             });
         }
     } catch (error) {
@@ -60,6 +66,10 @@ const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID); 
 
 const googleAuth = asyncHandler(async (req, res) => {
+    if (!getDbStatus()) {
+        return res.status(503).json({ error: 'Database not connected. Please try again shortly.' });
+    }
+
     const { token, isSignup } = req.body;
 
     try {
@@ -99,7 +109,7 @@ const googleAuth = asyncHandler(async (req, res) => {
                 username: user.username,
                 email: user.email,
                 preferredMode: user.preferredMode,
-                token: generateToken(user._id),
+                token: generateToken(user._id, user.tokenVersion),
                 picture: picture,
                 isNewUser: false
             });
@@ -121,7 +131,7 @@ const googleAuth = asyncHandler(async (req, res) => {
                 username: user.username,
                 email: user.email,
                 preferredMode: user.preferredMode,
-                token: generateToken(user._id),
+                token: generateToken(user._id, user.tokenVersion),
                 picture: picture,
                 isNewUser: true
             });
@@ -134,7 +144,18 @@ const googleAuth = asyncHandler(async (req, res) => {
 
 
 const loginUser = asyncHandler(async (req, res) => {
+    if (!getDbStatus()) {
+        return res.status(503).json({ error: 'Database not connected. Please try again shortly.' });
+    }
+
     const { username, identifier, password } = req.body;
+    // Safe debug logging for login attempts (do NOT log raw passwords in non-dev environments)
+    try {
+        const masked = password ? `${'*'.repeat(Math.min(3, String(password).length))} (len=${String(password).length})` : 'no-password';
+        logger.debug(`[loginUser] attempt: username='${username||''}', identifier='${identifier||''}', password=${masked}, ip=${req.ip}`);
+    } catch (logErr) {
+        // swallow logging errors
+    }
     const loginId = String(username || identifier || '').trim();
     const normalized = normalizeIdentifier(loginId);
 
@@ -143,9 +164,13 @@ const loginUser = asyncHandler(async (req, res) => {
             return res.status(400).json({ error: 'Username/email and password are required' });
         }
 
+        // Lookup username case-insensitively to avoid login failures from casing differences
+        const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const usernameRegex = new RegExp(`^${escapeRegex(loginId)}$`, 'i');
+
         const user = await User.findOne({
             $or: [
-                { username: loginId },
+                { username: usernameRegex },
                 { email: normalized },
             ],
         });
@@ -156,7 +181,7 @@ const loginUser = asyncHandler(async (req, res) => {
                 username: user.username,
                 email: user.email || null,
                 preferredMode: user.preferredMode,
-                token: generateToken(user._id)
+                token: generateToken(user._id, user.tokenVersion)
             });
         } else {
             res.status(401).json({ error: 'Invalid username or password' });
@@ -173,6 +198,8 @@ const getUserProfile = asyncHandler(async (req, res) => {
         _id:          u._id,
         username:     u.username,
         email:        u.email || null,
+        address:      u.address || '',
+        profilePicture: u.profilePicture || '',
         preferredMode: u.preferredMode,
         createdAt:    u.createdAt,
         joinedDate:   u.createdAt
@@ -191,7 +218,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
 });
 
 const updateUserProfile = asyncHandler(async (req, res) => {
-    const { username, email } = req.body;
+    const { username, email, address, profilePicture } = req.body;
     logger.info(`[updateUserProfile] Received: username=${username}, email=${email}, userId=${req.user?._id}`);
 
     const user = await User.findById(req.user._id);
@@ -211,6 +238,16 @@ const updateUserProfile = asyncHandler(async (req, res) => {
         if (taken) return res.status(400).json({ error: 'Email already taken' });
         user.email = normalizedEmail;
     }
+    if (address !== undefined) {
+        user.address = String(address || '').trim();
+    }
+    if (profilePicture !== undefined) {
+        const nextPicture = String(profilePicture || '').trim();
+        if (nextPicture.length > MAX_PROFILE_PICTURE_LENGTH) {
+            return res.status(400).json({ error: 'Profile picture is too large. Please choose a smaller image.' });
+        }
+        user.profilePicture = nextPicture;
+    }
 
     try {
         await user.save();
@@ -222,7 +259,16 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 
     res.json({
         success: true,
-        data: { username: user.username, email: user.email }
+        data: {
+            _id: user._id,
+            username: user.username,
+            email: user.email,
+            address: user.address || '',
+            profilePicture: user.profilePicture || '',
+            preferredMode: user.preferredMode,
+            createdAt: user.createdAt,
+            authProvider: user.authProvider || 'email',
+        }
     });
 });
 
@@ -500,8 +546,81 @@ const resetPassword = asyncHandler(async (req, res) => {
     res.status(200).json({
         success: true,
         data: 'Password reset successful',
-        token: generateToken(user._id)
+        token: generateToken(user._id, user.tokenVersion)
     });
+});
+
+const logoutAll = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
+
+    res.json({ success: true, message: 'Logged out from all devices' });
+});
+
+// Dev-only: Inspect a user by username/email and optionally test a password.
+const devInspectUser = asyncHandler(async (req, res) => {
+    // Only allow in non-production and from localhost for safety
+    const allowedLocal = req.ip === '::1' || req.ip === '127.0.0.1' || (String(req.ip).startsWith('::ffff:127.0.0.1'));
+    if (process.env.NODE_ENV === 'production' || !allowedLocal) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { login, testPassword } = req.query;
+    if (!login) return res.status(400).json({ error: 'Provide ?login=USERNAME_OR_EMAIL' });
+
+    const lookup = String(login || '').trim();
+    const normalized = normalizeIdentifier(lookup);
+    const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const usernameRegex = new RegExp(`^${escapeRegex(lookup)}$`, 'i');
+
+    const user = await User.findOne({ $or: [{ username: usernameRegex }, { email: normalized }] });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const response = {
+        _id: user._id,
+        username: user.username,
+        email: user.email || null,
+        authProvider: user.authProvider || 'email',
+        createdAt: user.createdAt,
+        hasPassword: Boolean(user.password)
+    };
+
+    if (testPassword) {
+        try {
+            const match = await user.matchPassword(testPassword);
+            response.testPassword = { provided: true, match };
+        } catch (err) {
+            response.testPassword = { provided: true, error: err.message };
+        }
+    }
+
+    res.json(response);
+});
+
+// Dev-only: list users (optional `q` to search username/email, `limit` to cap results)
+const devListUsers = asyncHandler(async (req, res) => {
+    const allowedLocal = req.ip === '::1' || req.ip === '127.0.0.1' || (String(req.ip).startsWith('::ffff:127.0.0.1'));
+    if (process.env.NODE_ENV === 'production' || !allowedLocal) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { q, limit = 20 } = req.query;
+    const query = {};
+    if (q && String(q).trim()) {
+        const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escapeRegex(q.trim()), 'i');
+        query.$or = [{ username: regex }, { email: regex }];
+    }
+
+    const users = await User.find(query)
+        .limit(Number(limit) || 20)
+        .select('_id username email authProvider createdAt')
+        .lean();
+
+    res.json({ count: users.length, users });
 });
 
 module.exports = { 
@@ -510,6 +629,8 @@ module.exports = {
     googleAuth,
     forgotPassword,
     resetPassword,
+    devInspectUser,
+    devListUsers,
     getUserProfile,
     updateUserProfile,
     updatePassword,
@@ -525,4 +646,5 @@ module.exports = {
     getUserInsights,
     getUserNews,
     getUserEvents
+    ,logoutAll
 };

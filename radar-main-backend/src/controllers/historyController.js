@@ -58,7 +58,7 @@ const getHistory = async (req, res) => {
         // ── Step 2: Live API fallback when DB is empty ────────────────────────
         if (rawData.length === 0) {
             if (type === 'STOCK' || type === 'INDEX') {
-                rawData = await fetchStockHistory(symbol.toLowerCase(), interval, { allowSynthetic: false });
+                rawData = await fetchStockHistory(symbol, interval, { allowSynthetic: true });
             } else if (type === 'FOREX') {
                 rawData = await fetchForexHistory(symbol.toLowerCase(), interval);
             } else {
@@ -85,4 +85,3 @@ const getHistory = async (req, res) => {
 };
 
 module.exports = { getHistory };
-

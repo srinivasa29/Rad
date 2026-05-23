@@ -35,6 +35,18 @@ const TIMEFRAMES = [
   { id: 'M', label: '1M', seconds: 2592000 },
 ];
 
+const BACKEND_TIMEFRAME = {
+  '1': '1m',
+  '5': '5m',
+  '15': '15m',
+  '30': '30m',
+  '60': '1h',
+  '240': '1h',
+  D: '1d',
+  W: '1wk',
+  M: '1mo',
+};
+
 const CHART_TYPES = [
   { id: 'candlestick', label: 'Candlestick', icon: 'C' },
   { id: 'line', label: 'Line', icon: 'L' },
@@ -154,8 +166,6 @@ const AdvancedTradingChart = ({
 
     candleSeriesRef.current = candleSeries;
 
-    loadChartData();
-
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
         chart.applyOptions({ width: chartContainerRef.current.clientWidth });
@@ -174,17 +184,21 @@ const AdvancedTradingChart = ({
     setIsLoading(true);
     try {
       const response = await fetchOHLCData(symbol, {
-        timeframe: timeframe.includes('m') ? timeframe : timeframe === 'D' ? '1d' : timeframe === 'W' ? '1wk' : '1mo',
+        exchange: 'NSE',
+        timeframe: BACKEND_TIMEFRAME[timeframe] || '15m',
         limit: 200
       });
       
       const data = response.data.map(d => ({
-        time: d.timestamp / 1000,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
-      })).sort((a, b) => a.time - b.time);
+        time: Math.floor(new Date(d.timestamp).getTime() / 1000),
+        open: Number(d.open),
+        high: Number(d.high),
+        low: Number(d.low),
+        close: Number(d.close),
+      }))
+        .filter(d => Number.isFinite(d.time) && d.time > 0 && Number.isFinite(d.close))
+        .sort((a, b) => a.time - b.time)
+        .filter((d, index, rows) => index === 0 || d.time !== rows[index - 1].time);
       
       if (candleSeriesRef.current && data.length > 0) {
         candleSeriesRef.current.setData(data);
@@ -208,7 +222,13 @@ const AdvancedTradingChart = ({
     } finally {
       setIsLoading(false);
     }
-  }, [onChartReady]);
+  }, [symbol, timeframe, onChartReady]);
+
+  useEffect(() => {
+    if (candleSeriesRef.current) {
+      loadChartData();
+    }
+  }, [loadChartData]);
 
 
 

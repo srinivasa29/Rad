@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// Default proxy target points to the backend. Use VITE_PROXY_TARGET to override.
+// Most dev runs use port 5000; set VITE_PROXY_TARGET if your backend runs on 5001.
 const proxyTarget = process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:5000'
 
 export default defineConfig({

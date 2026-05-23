@@ -28,7 +28,7 @@ const CHECKLIST = [
   { label: 'No major resistance near', pass: false },
 ];
 
-export default function TradeDecisionZone({ stock, keyLevels, techData }) {
+export default function TradeDecisionZone({ stock, keyLevels, techData, isSidebar = false }) {
   const price = stock?.price ?? 0;
   
   // ── 1. Signal & Trend ──
@@ -43,7 +43,7 @@ export default function TradeDecisionZone({ stock, keyLevels, techData }) {
   else if (score >= 55) { signalText = 'Buy'; signalColor = 'text-emerald-400'; }
   else if (score <= 30) { signalText = 'Strong Sell'; signalColor = 'text-rose-400'; }
   else if (score <= 45) { signalText = 'Sell'; signalColor = 'text-rose-400'; }
-
+ 
   // ── 2. Trade Setup ──
   const support = keyLevels?.support?.s1 ?? (price * 0.98);
   const resistance = keyLevels?.resistance?.r1 ?? (price * 1.04);
@@ -51,7 +51,7 @@ export default function TradeDecisionZone({ stock, keyLevels, techData }) {
   let entry = price;
   let sl = 0;
   let target = 0;
-
+ 
   if (bias === 'bullish') {
     entry = +(price * 0.998).toFixed(2);
     sl = +(support * 0.995).toFixed(2);
@@ -65,22 +65,22 @@ export default function TradeDecisionZone({ stock, keyLevels, techData }) {
     sl = +(price * 0.98).toFixed(2);
     target = +(price * 1.03).toFixed(2);
   }
-
+ 
   // Fallback to avoid NaN or division by zero
   if (sl >= entry && bias !== 'bearish') sl = entry * 0.98;
   if (target <= entry && bias !== 'bearish') target = entry * 1.03;
   if (sl <= entry && bias === 'bearish') sl = entry * 1.02;
   if (target >= entry && bias === 'bearish') target = entry * 0.97;
-
+ 
   const riskAmt = Math.abs(entry - sl);
   const rewardAmt = Math.abs(target - entry);
   const rr = riskAmt > 0 ? (rewardAmt / riskAmt).toFixed(1) : '0.0';
-
+ 
   // ── 3. Risk Analysis ──
   const ema20 = techData?.indicators?.ema20 ?? price;
   const volStatus = techData?.indicators?.volumeStatus ?? 'average';
   const dailyTrend = techData?.trendMatrix?.['1d'] ?? 'neutral';
-
+ 
   const checklist = [
     { label: 'Price above EMA 20', pass: price > ema20 },
     { label: 'Volume above average', pass: ['high_volume', 'above_average'].includes(volStatus) },
@@ -89,11 +89,11 @@ export default function TradeDecisionZone({ stock, keyLevels, techData }) {
     { label: 'Sector outperforming', pass: score > 60 },
     { label: 'No major resistance near', pass: bias === 'bullish' ? price < resistance * 0.98 : price > support * 1.02 },
   ];
-
+ 
   const passed = checklist.filter(c => c.pass).length;
   const riskLabel = passed >= 5 ? 'Low' : passed >= 3 ? 'Medium' : 'High';
   const riskColor = passed >= 5 ? 'text-emerald-400' : passed >= 3 ? 'text-amber-400' : 'text-rose-400';
-
+ 
   // ── 4. Invalidation ──
   const invConditions = bias === 'bullish' ? [
     `Close below ${formatPrice(sl, stock?.type, stock?.symbol)} (S1 support)`,
@@ -111,9 +111,9 @@ export default function TradeDecisionZone({ stock, keyLevels, techData }) {
     `RSI enters overbought/oversold`,
     `Trend establishes direction`,
   ];
-
+ 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className={isSidebar ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"}>
 
       {/* 1 — Signal & Trend */}
       <Panel>

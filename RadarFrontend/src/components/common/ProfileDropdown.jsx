@@ -120,7 +120,11 @@ const ProfileDropdown = ({
       {/* Profile Header */}
       <div className="dropdown-profile-header">
         <div className="dropdown-profile-avatar">
-          {userInitial}
+          {profile?.profilePicture ? (
+            <img src={profile.profilePicture} alt="" />
+          ) : (
+            userInitial
+          )}
         </div>
         <div className="dropdown-profile-copy">
           <p className="dropdown-profile-name">{profile?.username || "User"}</p>

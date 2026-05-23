@@ -35,9 +35,15 @@ exports.updateSettings = async (req, res) => {
         if (!settings) {
             settings = new UserSettings({ user: req.user._id, ...req.body });
         } else {
-            // Update fields
-            Object.keys(req.body).forEach(key => {
-                settings[key] = req.body[key];
+            Object.keys(req.body || {}).forEach(key => {
+                if (req.body[key] && typeof req.body[key] === 'object' && !Array.isArray(req.body[key])) {
+                    settings[key] = {
+                        ...(settings[key]?.toObject ? settings[key].toObject() : settings[key] || {}),
+                        ...req.body[key],
+                    };
+                } else {
+                    settings[key] = req.body[key];
+                }
             });
             settings.updatedAt = Date.now();
         }

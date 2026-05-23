@@ -35,6 +35,7 @@ export const fetchOHLCData = async (symbol, options = {}) => {
             exchange,
             timeframe,
             count: response.data.count,
+            source: response.data.source,
             data: response.data.data || [],
         };
     } catch (error) {

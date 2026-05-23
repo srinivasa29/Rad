@@ -1,361 +1,496 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { ArrowLeft, Monitor, Bell, Shield, LayoutGrid, CheckCircle2, Info } from 'lucide-react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
+import { ArrowLeft, CheckCircle2, AlertTriangle, Save, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SettingsContext } from '../../context/SettingsContext';
+import api from '../../api/api';
 import './SettingsPage.css';
 
 const SettingsPage = ({ embedded = false } = {}) => {
   const navigate = useNavigate();
   const { settings: ctxSettings, saveSettings: saveToServer } = useContext(SettingsContext);
+  const toastTimerRef = useRef(null);
 
-  const [settings, setSettings] = useState({
-    // Chart & Display
-    defaultTimeframe: '15m',
-    defaultLayout: '4-grid',
-    showGridLines: true,
-    showIndicators: false,
-
-    // Dashboard Preferences
-    defaultModule: 'DASHBOARD',
-    autoRefreshWatchlist: true,
-
-    // Risk Defaults
-    defaultStopLoss: 2.0,
-    defaultTakeProfit: 5.0,
-
-    // Alerts
-    priceAlerts: true,
+  // Left Card State: Terminal & Market
+  const [terminal, setTerminal] = useState({
+    defaultLandingPage: 'Dashboard',
+    defaultChartTimeframe: '5m',
+    defaultChartType: 'Candlestick',
   });
 
-  const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState(null);
-  const [isDirty, setIsDirty] = useState(false);
+  const [marketDisplay, setMarketDisplay] = useState({
+    defaultMarket: 'NSE',
+    currencyFormat: 'INR',
+    theme: 'Dark',
+    showMarketStatusBadge: true,
+  });
 
-  // Load saved settings from context on mount
-  useEffect(() => {
-    if (!ctxSettings) return;
-    try {
-      setSettings(prev => ({
-        ...prev,
-        defaultTimeframe:     ctxSettings.display?.defaultTimeframe     ?? prev.defaultTimeframe,
-        defaultLayout:        ctxSettings.display?.defaultLayout        ?? prev.defaultLayout,
-        showGridLines:        ctxSettings.display?.showGridLines        ?? prev.showGridLines,
-        showIndicators:       ctxSettings.display?.showIndicators       ?? prev.showIndicators,
-        defaultModule:        ctxSettings.dashboard?.defaultModule      ?? prev.defaultModule,
-        autoRefreshWatchlist: ctxSettings.dashboard?.autoRefreshWatchlist ?? prev.autoRefreshWatchlist,
-        defaultStopLoss:      ctxSettings.risk?.defaultStopLossPct      ?? prev.defaultStopLoss,
-        defaultTakeProfit:    ctxSettings.risk?.defaultTakeProfitPct    ?? prev.defaultTakeProfit,
-        priceAlerts:          ctxSettings.alerts?.priceAlerts           ?? prev.priceAlerts,
-      }));
-    } catch (e) { /* ignore mapping errors */ }
-  }, [ctxSettings]);
+  // Right Card State: Alerts & Security
+  const [alerts, setAlerts] = useState({
+    priceAlerts: true,
+    technicalSignals: true, // Breakout Alerts
+    volumeSpikes: true,     // RSI Alerts
+    marketNewsAlerts: true, // News Alerts
+  });
 
-  // Warn on unsaved changes
-  useEffect(() => {
-    const handler = (e) => { if (isDirty) { e.preventDefault(); e.returnValue = ''; } };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [isDirty]);
+  const [security, setSecurity] = useState({
+    twoFactorAuth: false,
+  });
 
-  const handleSave = async () => {
-    const payload = {
-      display: {
-        defaultTimeframe: settings.defaultTimeframe,
-        defaultLayout:    settings.defaultLayout,
-        showGridLines:    !!settings.showGridLines,
-        showIndicators:   !!settings.showIndicators,
-      },
-      dashboard: {
-        defaultModule:        settings.defaultModule,
-        autoRefreshWatchlist: !!settings.autoRefreshWatchlist,
-      },
-      risk: {
-        defaultStopLossPct:   Number(settings.defaultStopLoss)  || 2,
-        defaultTakeProfitPct: Number(settings.defaultTakeProfit) || 5,
-      },
-      alerts: {
-        priceAlerts: !!settings.priceAlerts,
-      },
-    };
-    setIsSaving(true);
-    try {
-      await saveToServer(payload);
-      setLastSaved(new Date());
-      setIsDirty(false);
-    } catch (err) {
-      console.error('Failed to save settings:', err);
-    } finally {
-      setIsSaving(false);
-    }
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  const [savingAll, setSavingAll] = useState(false);
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   };
 
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
+
+  // Sync state with settings context
+  useEffect(() => {
+    if (!ctxSettings) return;
+    setTerminal({
+      defaultLandingPage: ctxSettings.terminal?.defaultLandingPage || 'Dashboard',
+      defaultChartTimeframe: ctxSettings.terminal?.defaultChartTimeframe || '5m',
+      defaultChartType: ctxSettings.terminal?.defaultChartType || 'Candlestick',
+    });
+    setMarketDisplay({
+      defaultMarket: ctxSettings.marketDisplay?.defaultMarket || 'NSE',
+      currencyFormat: ctxSettings.marketDisplay?.currencyFormat || 'INR',
+      theme: ctxSettings.marketDisplay?.theme || 'Dark',
+      showMarketStatusBadge: ctxSettings.marketDisplay?.showMarketStatusBadge ?? true,
+    });
+    setAlerts({
+      priceAlerts: ctxSettings.alerts?.priceAlerts ?? true,
+      technicalSignals: ctxSettings.alerts?.technicalSignals ?? true,
+      volumeSpikes: ctxSettings.alerts?.volumeSpikes ?? true,
+      marketNewsAlerts: ctxSettings.alerts?.marketNewsAlerts ?? true,
+    });
+    setSecurity({
+      twoFactorAuth: ctxSettings.security?.twoFactorAuth ?? false,
+    });
+  }, [ctxSettings]);
+
   const handleBack = () => {
-    if (isDirty && !window.confirm('You have unsaved changes. Leave without saving?')) return;
     navigate('/trader/dashboard');
   };
 
-  const set = (key, value) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    setIsDirty(true);
-  };
-  const toggle = (key) => set(key, !settings[key]);
+  // Unified save handler
+  const handleSaveAll = async (e) => {
+    if (e) e.preventDefault();
+    setSavingAll(true);
+    try {
+      // 1. If password fields are typed, validate and update first
+      if (passwordForm.currentPassword || passwordForm.newPassword || passwordForm.confirmPassword) {
+        const { currentPassword, newPassword, confirmPassword } = passwordForm;
+        if (!currentPassword) {
+          showToast('error', 'Please enter your current password.');
+          setSavingAll(false);
+          return;
+        }
+        if (!newPassword || newPassword.length < 8) {
+          showToast('error', 'New password must be at least 8 characters.');
+          setSavingAll(false);
+          return;
+        }
+        if (newPassword !== confirmPassword) {
+          showToast('error', 'New passwords do not match.');
+          setSavingAll(false);
+          return;
+        }
+        await api.patch('/user/password', { currentPassword, newPassword });
+        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      }
 
-  const timeframeOptions  = ['1m', '5m', '15m', '1h', '1D'];
-  const layoutOptions     = [
-    { value: '1-grid', label: '1 Chart' },
-    { value: '2-grid', label: '2 Charts' },
-    { value: '4-grid', label: '4 Charts' },
-  ];
-  const moduleOptions     = [
-    { value: 'DASHBOARD',    label: 'Dashboard' },
-    { value: 'MULTI-CHART',  label: 'Multi-Chart' },
-    { value: 'WATCHLIST',    label: 'Watchlist' },
-    { value: 'SCREENERS',    label: 'Screeners' },
-  ];
+      // 2. Save preferences settings to DB (including syncing display parameters)
+      await saveToServer({
+        display: {
+          ...ctxSettings?.display,
+          chartType: terminal.defaultChartType.toLowerCase(),
+          defaultTimeframe: terminal.defaultChartTimeframe,
+          theme: marketDisplay.theme.toLowerCase(),
+        },
+        terminal: {
+          ...ctxSettings?.terminal,
+          ...terminal,
+        },
+        marketDisplay: {
+          ...ctxSettings?.marketDisplay,
+          ...marketDisplay,
+        },
+        alerts: {
+          ...ctxSettings?.alerts,
+          ...alerts,
+        },
+        security: {
+          ...ctxSettings?.security,
+          twoFactorAuth: security.twoFactorAuth,
+        }
+      });
+      showToast('success', 'Preferences saved successfully.');
+    } catch (err) {
+      showToast('error', err?.response?.data?.error || 'Failed to save settings.');
+    } finally {
+      setSavingAll(false);
+    }
+  };
+
+  // Reset to default presets
+  const handleResetDefaults = async () => {
+    setSavingAll(true);
+    const defaults = {
+      display: {
+        ...ctxSettings?.display,
+        chartType: 'candlestick',
+        defaultTimeframe: '5m',
+        theme: 'dark',
+      },
+      terminal: {
+        ...ctxSettings?.terminal,
+        defaultLandingPage: 'Dashboard',
+        defaultChartTimeframe: '5m',
+        defaultChartType: 'Candlestick',
+      },
+      marketDisplay: {
+        ...ctxSettings?.marketDisplay,
+        defaultMarket: 'NSE',
+        currencyFormat: 'INR',
+        theme: 'Dark',
+        showMarketStatusBadge: true,
+      },
+      alerts: {
+        ...ctxSettings?.alerts,
+        priceAlerts: true,
+        technicalSignals: true,
+        volumeSpikes: true,
+        marketNewsAlerts: true,
+      },
+      security: {
+        ...ctxSettings?.security,
+        twoFactorAuth: false,
+      }
+    };
+
+    try {
+      await saveToServer(defaults);
+      setTerminal({
+        defaultLandingPage: 'Dashboard',
+        defaultChartTimeframe: '5m',
+        defaultChartType: 'Candlestick',
+      });
+      setMarketDisplay({
+        defaultMarket: 'NSE',
+        currencyFormat: 'INR',
+        theme: 'Dark',
+        showMarketStatusBadge: true,
+      });
+      setAlerts({
+        priceAlerts: true,
+        technicalSignals: true,
+        volumeSpikes: true,
+        marketNewsAlerts: true,
+      });
+      setSecurity({
+        twoFactorAuth: false,
+      });
+      showToast('success', 'Restored default settings.');
+    } catch (err) {
+      showToast('error', err?.response?.data?.error || 'Failed to reset settings.');
+    } finally {
+      setSavingAll(false);
+    }
+  };
+
+  const handleLogoutAll = async () => {
+    setLoggingOutAll(true);
+    try {
+      await api.post('/user/logout-all');
+      localStorage.removeItem('token');
+      showToast('success', 'Logged out from all devices.');
+      setTimeout(() => navigate('/login'), 1200);
+    } catch (err) {
+      showToast('error', err?.response?.data?.error || 'Logout failed.');
+      setLoggingOutAll(false);
+    }
+  };
+
+  const renderSwitch = (label, value, onChange) => (
+    <div className={`settings-switch-item ${value ? 'active' : ''}`} onClick={() => onChange(!value)}>
+      <span className="settings-switch-label">{label}</span>
+      <div className="settings-switch-track">
+        <div className="settings-switch-thumb" />
+      </div>
+    </div>
+  );
+
+  const renderDropdown = (label, value, options, onChange) => (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="form-select">
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
 
   return (
     <div className="settings-page">
-      {/* Header */}
+      {/* Background Glow */}
+      <div className="settings-gradient-bg" />
+
+      {/* Header (Matching Help & Support exactly) */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.5 }}
         className="settings-header"
       >
         <div className="settings-header-content">
-          {!embedded && (
-            <button onClick={handleBack} className="back-btn">
-              <ArrowLeft size={20} /> Back to Dashboard
-            </button>
-          )}
-          <div className="settings-title-section">
+          <div className="settings-header-left">
+            {!embedded && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleBack}
+                className="settings-back-btn"
+              >
+                <ArrowLeft size={18} />
+                Back to Dashboard
+              </motion.button>
+            )}
             <h1 className="settings-title">Settings</h1>
-            <p className="settings-subtitle">Customize your trading dashboard experience</p>
+            <p className="settings-subtitle">Customize your RADAR trading experience</p>
           </div>
         </div>
       </motion.div>
 
+      {/* Container (Matching Help & Support Container) */}
       <div className="settings-container">
-        <div className="settings-grid">
+        <form onSubmit={handleSaveAll}>
+          {/* Two-Column Grid */}
+          <div className="settings-main-content">
+            
+            {/* LEFT COLUMN: Terminal & Market */}
+            <div className="settings-column">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="settings-card"
+              >
+                <h3 className="settings-card-title">Terminal & Market</h3>
+                
+                {renderDropdown(
+                  'Default Landing Page',
+                  terminal.defaultLandingPage,
+                  [
+                    { value: 'Dashboard', label: 'Dashboard' },
+                    { value: 'Watchlist', label: 'Watchlist' },
+                    { value: 'Screener', label: 'Screener' },
+                    { value: 'News', label: 'News' }
+                  ],
+                  (v) => setTerminal(prev => ({ ...prev, defaultLandingPage: v }))
+                )}
 
-          {/* ── 1. Chart & Display ─────────────────────────────────── */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="settings-card"
-          >
-            <div className="card-header">
-              <Monitor size={24} />
-              <div>
-                <h2 className="card-title">1. Chart &amp; Display</h2>
-                <p className="card-description">Controls the workspace charts directly.</p>
-              </div>
-            </div>
+                {renderDropdown(
+                  'Default Chart Timeframe',
+                  terminal.defaultChartTimeframe,
+                  [
+                    { value: '1m', label: '1 Minute (1m)' },
+                    { value: '5m', label: '5 Minutes (5m)' },
+                    { value: '15m', label: '15 Minutes (15m)' },
+                    { value: '1H', label: '1 Hour (1H)' },
+                    { value: '1D', label: '1 Day (1D)' }
+                  ],
+                  (v) => setTerminal(prev => ({ ...prev, defaultChartTimeframe: v }))
+                )}
 
-            <div className="card-content">
-              {/* Default Timeframe */}
-              <div className="setting-item">
-                <label className="setting-label">Default Timeframe</label>
-                <div className="button-group">
-                  {timeframeOptions.map(tf => (
-                    <button
-                      key={tf}
-                      className={`button-option ${settings.defaultTimeframe === tf ? 'active' : ''}`}
-                      onClick={() => set('defaultTimeframe', tf)}
-                    >{tf}</button>
-                  ))}
-                </div>
-              </div>
+                {renderDropdown(
+                  'Default Chart Type',
+                  terminal.defaultChartType,
+                  [
+                    { value: 'Candlestick', label: 'Candlestick' },
+                    { value: 'Line', label: 'Line' },
+                    { value: 'Area', label: 'Area' }
+                  ],
+                  (v) => setTerminal(prev => ({ ...prev, defaultChartType: v }))
+                )}
 
-              {/* Default Chart Layout */}
-              <div className="setting-item">
-                <label className="setting-label">Default Chart Layout</label>
-                <div className="button-group">
-                  {layoutOptions.map(l => (
-                    <button
-                      key={l.value}
-                      className={`button-option ${settings.defaultLayout === l.value ? 'active' : ''}`}
-                      onClick={() => set('defaultLayout', l.value)}
-                    >{l.label}</button>
-                  ))}
-                </div>
-              </div>
+                {renderDropdown(
+                  'Default Market',
+                  marketDisplay.defaultMarket,
+                  [
+                    { value: 'NSE', label: 'NSE (India)' },
+                    { value: 'BSE', label: 'BSE (India)' }
+                  ],
+                  (v) => setMarketDisplay(prev => ({ ...prev, defaultMarket: v }))
+                )}
 
-              {/* Toggles */}
-              <div className="toggle-row">
-                <div className="toggle-item">
-                  <label>Show Grid Lines</label>
-                  <button
-                    type="button"
-                    className={`toggle-switch ${settings.showGridLines ? 'active' : ''}`}
-                    onClick={() => toggle('showGridLines')}
-                  ><span className="toggle-circle" /></button>
-                </div>
-                <div className="toggle-item">
-                  <label>Show MA Indicators</label>
-                  <button
-                    type="button"
-                    className={`toggle-switch ${settings.showIndicators ? 'active' : ''}`}
-                    onClick={() => toggle('showIndicators')}
-                  ><span className="toggle-circle" /></button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
+                {renderDropdown(
+                  'Currency Format',
+                  marketDisplay.currencyFormat,
+                  [
+                    { value: 'INR', label: 'INR (₹)' },
+                    { value: 'USD', label: 'USD ($)' }
+                  ],
+                  (v) => setMarketDisplay(prev => ({ ...prev, currencyFormat: v }))
+                )}
 
-          {/* ── 2. Dashboard Preferences ───────────────────────────── */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="settings-card"
-          >
-            <div className="card-header">
-              <LayoutGrid size={24} />
-              <div>
-                <h2 className="card-title">2. Dashboard Preferences</h2>
-                <p className="card-description">Controls what loads when you open the dashboard.</p>
-              </div>
-            </div>
+                <div className="settings-switches-group">
+                  {renderSwitch(
+                    'Dark Mode',
+                    marketDisplay.theme === 'Dark',
+                    (isDark) => setMarketDisplay(prev => ({ ...prev, theme: isDark ? 'Dark' : 'Light' }))
+                  )}
 
-            <div className="card-content">
-              {/* Default Landing Module */}
-              <div className="setting-item">
-                <label htmlFor="defaultModule" className="setting-label">Default Landing Module</label>
-                <select
-                  id="defaultModule"
-                  value={settings.defaultModule}
-                  onChange={e => set('defaultModule', e.target.value)}
-                  className="select-input"
-                >
-                  {moduleOptions.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Auto-refresh Watchlist */}
-              <div className="toggle-item">
-                <label>Auto-refresh Watchlist</label>
-                <button
-                  className={`toggle-switch ${settings.autoRefreshWatchlist ? 'active' : ''}`}
-                  onClick={() => toggle('autoRefreshWatchlist')}
-                ><span className="toggle-circle" /></button>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* ── 3. Risk Defaults ───────────────────────────────────── */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="settings-card"
-          >
-            <div className="card-header">
-              <Shield size={24} />
-              <div>
-                <h2 className="card-title">3. Risk Defaults</h2>
-                <p className="card-description">Pre-fills your Trade Decision Zone automatically.</p>
-              </div>
-            </div>
-
-            <div className="card-content">
-              <div className="number-input-group">
-                <div className="number-input-item">
-                  <label htmlFor="stopLoss" className="setting-label">Default Stop Loss (%)</label>
-                  <div className="number-input-wrapper">
-                    <input
-                      id="stopLoss" type="number" step="0.1" min="0.1" max="20"
-                      value={settings.defaultStopLoss}
-                      onChange={e => set('defaultStopLoss', parseFloat(e.target.value))}
-                      className="number-input"
-                    />
-                    <span className="input-suffix">%</span>
-                  </div>
-                </div>
-                <div className="number-input-item">
-                  <label htmlFor="takeProfit" className="setting-label">Default Take Profit (%)</label>
-                  <div className="number-input-wrapper">
-                    <input
-                      id="takeProfit" type="number" step="0.1" min="0.1" max="50"
-                      value={settings.defaultTakeProfit}
-                      onChange={e => set('defaultTakeProfit', parseFloat(e.target.value))}
-                      className="number-input"
-                    />
-                    <span className="input-suffix">%</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* ── 4. Alerts ──────────────────────────────────────────── */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="settings-card"
-          >
-            <div className="card-header">
-              <Bell size={24} />
-              <div>
-                <h2 className="card-title">4. Alerts</h2>
-                <p className="card-description">Manage alert preferences (in-app delivery).</p>
-              </div>
-            </div>
-
-            <div className="card-content">
-              <div className="toggle-item">
-                <label>Price Alerts</label>
-                <button
-                  className={`toggle-switch ${settings.priceAlerts ? 'active' : ''}`}
-                  onClick={() => toggle('priceAlerts')}
-                ><span className="toggle-circle" /></button>
-              </div>
-              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '8px' }}>
-                Triggers in-app notifications when a watchlist stock crosses a price threshold.
-              </p>
-            </div>
-          </motion.div>
-
-        </div>
-
-        {/* Save Bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-        >
-          <div className="tip-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Info size={20} />
-              <div>
-                <p className="tip-text">Changes to Chart &amp; Display take effect immediately after saving.</p>
-                <div className="save-status">
-                  {isSaving ? (
-                    <span className="saving-indicator"><span className="spinner" /> Saving…</span>
-                  ) : lastSaved ? (
-                    <span className="saved-indicator"><CheckCircle2 size={16} /> Saved at {lastSaved.toLocaleTimeString()}</span>
-                  ) : isDirty ? (
-                    <span className="waiting-indicator" style={{ color: '#f59e0b' }}>Unsaved changes</span>
-                  ) : (
-                    <span className="waiting-indicator">Ready</span>
+                  {renderSwitch(
+                    'Show Market Status Badge',
+                    marketDisplay.showMarketStatusBadge,
+                    (v) => setMarketDisplay(prev => ({ ...prev, showMarketStatusBadge: v }))
                   )}
                 </div>
-              </div>
+              </motion.div>
             </div>
-            <button
-              onClick={handleSave}
-              disabled={!isDirty || isSaving}
-              className={`px-6 py-2 rounded-lg font-bold transition-all ${
-                isDirty && !isSaving
-                  ? 'bg-[#10706B] text-white hover:bg-[#0D5C58]'
-                  : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              Save Settings
-            </button>
+
+            {/* RIGHT COLUMN: Alerts & Security */}
+            <div className="settings-column">
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="settings-card"
+              >
+                <h3 className="settings-card-title">Alerts & Security</h3>
+                
+                <div className="settings-switches-group">
+                  {renderSwitch(
+                    'Price Alerts',
+                    alerts.priceAlerts,
+                    (v) => setAlerts(prev => ({ ...prev, priceAlerts: v }))
+                  )}
+
+                  {renderSwitch(
+                    'Breakout Alerts',
+                    alerts.technicalSignals,
+                    (v) => setAlerts(prev => ({ ...prev, technicalSignals: v }))
+                  )}
+
+                  {renderSwitch(
+                    'RSI Alerts',
+                    alerts.volumeSpikes,
+                    (v) => setAlerts(prev => ({ ...prev, volumeSpikes: v }))
+                  )}
+
+                  {renderSwitch(
+                    'News Alerts',
+                    alerts.marketNewsAlerts,
+                    (v) => setAlerts(prev => ({ ...prev, marketNewsAlerts: v }))
+                  )}
+
+                  {renderSwitch(
+                    'Two Factor Authentication (2FA)',
+                    security.twoFactorAuth,
+                    (v) => setSecurity(prev => ({ ...prev, twoFactorAuth: v }))
+                  )}
+                </div>
+
+                <div className="settings-divider" />
+
+                {/* Change Password Section */}
+                <div className="settings-sub-section">
+                  <h4 className="settings-sub-title">Change Password</h4>
+                  
+                  <div className="form-group">
+                    <label className="form-label">Current Password</label>
+                    <input
+                      type="password"
+                      placeholder="Enter current password"
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                      autoComplete="current-password"
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">New Password</label>
+                    <input
+                      type="password"
+                      placeholder="Enter new password"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                      autoComplete="new-password"
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Confirm Password</label>
+                    <input
+                      type="password"
+                      placeholder="Confirm new password"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      autoComplete="new-password"
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="settings-divider" />
+
+                {/* Logout Trigger */}
+                <button
+                  type="button"
+                  onClick={handleLogoutAll}
+                  disabled={loggingOutAll}
+                  className="settings-logout-btn"
+                >
+                  {loggingOutAll ? 'Logging out...' : 'Logout All Devices'}
+                </button>
+              </motion.div>
+            </div>
+
           </div>
-        </motion.div>
+
+          {/* Centered Footer Submit Action */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="settings-actions-footer"
+          >
+            <button type="submit" className="settings-submit-btn" disabled={savingAll}>
+              <Save size={18} />
+              {savingAll ? 'Saving Settings...' : 'Save Settings'}
+            </button>
+            
+            <button type="button" onClick={handleResetDefaults} className="settings-reset-link" disabled={savingAll}>
+              Reset to Defaults
+            </button>
+          </motion.div>
+        </form>
       </div>
+
+      {/* Toast (Matches Help Page Success notification styles) */}
+      {toast && (
+        <div className={`settings-toast toast-${toast.type}`}>
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+          <span>{toast.message}</span>
+        </div>
+      )}
     </div>
   );
 };

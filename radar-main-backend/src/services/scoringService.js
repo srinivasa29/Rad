@@ -62,6 +62,18 @@ const getPriceActionPoints = (lastChangePercent) => {
     return 24;
 };
 
+const getVolatilityPoints = (atr, lastPrice) => {
+    const atrValue = Number(atr);
+    const price = Number(lastPrice);
+    if (!Number.isFinite(atrValue) || !Number.isFinite(price) || price <= 0) return 8;
+    const atrPct = (atrValue / price) * 100;
+    if (atrPct < 0.8) return 6;
+    if (atrPct < 1.8) return 14;
+    if (atrPct < 3.2) return 10;
+    if (atrPct < 5) return 6;
+    return 3;
+};
+
 const getBias = (score) => {
     if (score >= 65) return 'bullish';
     if (score >= 40) return 'neutral';
@@ -86,8 +98,9 @@ const getInstrumentScore = async (assetType, symbol, options = {}) => {
     const volumePoints = getVolumePoints(indicators.volumeStatus);
     const trendPoints = getTrendPoints(trendMatrix);
     const priceActionPoints = getPriceActionPoints(indicators.lastChangePercent);
+    const volatilityPoints = getVolatilityPoints(indicators.atr, indicators.lastPrice);
 
-    let score = Math.min(100, rsiPoints + macdPoints + volumePoints + trendPoints + priceActionPoints);
+    let score = Math.min(100, rsiPoints + macdPoints + volumePoints + trendPoints + priceActionPoints + volatilityPoints);
     let bias = getBias(score);
 
     const lastChange = Number(indicators.lastChangePercent);
@@ -99,8 +112,19 @@ const getInstrumentScore = async (assetType, symbol, options = {}) => {
         bias = 'neutral';
     }
 
+    let confidence = score;
+    if (indicators.status === 'insufficient_data' || indicators.status === 'error') {
+        confidence -= 15;
+    }
+    if (!indicators.macd) confidence -= 5;
+    if (!Number.isFinite(Number(indicators.rsi))) confidence -= 5;
+    if (!indicators.volumeStatus) confidence -= 4;
+    if (!Number.isFinite(Number(indicators.lastChangePercent))) confidence -= 3;
+    confidence = Math.min(99, Math.max(40, Math.round(confidence)));
+
     return {
         score,
+        confidence,
         bias,
         breakdown: {
             rsi: rsiPoints,
@@ -108,10 +132,12 @@ const getInstrumentScore = async (assetType, symbol, options = {}) => {
             volume: volumePoints,
             trend: trendPoints,
             priceAction: priceActionPoints,
+            volatility: volatilityPoints,
         },
         context: {
             lastChangePercent: Number.isFinite(lastChange) ? lastChange : null,
             lastUpdatedAt: indicators.lastUpdatedAt || null,
+            atr: indicators.atr || null,
             forceBearishDropPercent: FORCE_BEARISH_DROP_PCT,
             capBullishDropPercent: CAP_BULLISH_DROP_PCT,
         },

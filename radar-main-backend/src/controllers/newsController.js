@@ -6,9 +6,10 @@ const getMarketNews = async (req, res) => {
         const symbol = String(req.query.symbol || '').trim();
         const limit = Number.parseInt(req.query.limit || '15', 10);
 
-        // Accept region from frontend: 'india' → IN, 'global' → GLOBAL
+        // Accept region from frontend: 'india'/'in' → IN, 'global' → GLOBAL
         const regionRaw = String(req.query.region || '').toLowerCase().trim();
-        const region = regionRaw === 'global' ? 'GLOBAL' : (regionRaw === 'india' ? 'IN' : null);
+        const region = regionRaw === 'global' ? 'GLOBAL'
+            : (regionRaw === 'india' || regionRaw === 'in' ? 'IN' : null);
 
         // Accept assetClass from frontend: 'crypto' → crypto news, 'stocks' → business/equity news
         const assetClass = String(req.query.assetClass || '').toLowerCase().trim();

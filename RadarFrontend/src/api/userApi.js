@@ -10,6 +10,16 @@ export const fetchUserProfile = async () => {
     }
 };
 
+export const updateUserProfile = async (payload) => {
+    try {
+        const response = await api.patch('/user/profile', payload);
+        return response.data?.data ?? response.data;
+    } catch (error) {
+        console.error('Error updating user profile:', error);
+        throw error;
+    }
+};
+
 export const fetchUserMode = async () => {
     try {
         const response = await api.get('/user/mode');

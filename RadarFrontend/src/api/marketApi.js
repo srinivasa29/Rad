@@ -59,6 +59,38 @@ export const fetchMarketData = async (params = {}) => {
     }
 };
 
+export const fetchMarketQuotes = async (symbols = [], options = {}) => {
+    try {
+        const cleanSymbols = (Array.isArray(symbols) ? symbols : [])
+            .map((symbol) => String(symbol || '').trim())
+            .filter(Boolean);
+
+        if (!cleanSymbols.length) {
+            return [];
+        }
+
+        const params = { symbols: cleanSymbols.join(',') };
+        if (options.strictLive) {
+            params.strictLive = true;
+        }
+
+        const response = await api.get('/market/quotes', {
+            params,
+        });
+
+        const payload = response.data?.data ?? response.data;
+        const rows = Array.isArray(payload) ? payload.map(sanitizeMarketRow) : [];
+        return rows.map((row) => ({
+            ...row,
+            name: row.name || row.companyName || row.shortName,
+            companyName: row.companyName || row.name,
+        }));
+    } catch (error) {
+        console.error('Error fetching market quotes:', error);
+        throw error;
+    }
+};
+
 export const fetchMarketHistory = async (symbol, type = 'STOCK', interval = '1D', options = {}) => {
     try {
         const { strictLive = false } = options;
@@ -98,6 +130,7 @@ export const fetchMarketHistory = async (symbol, type = 'STOCK', interval = '1D'
                     high: Number.isFinite(high) ? high : close,
                     low: Number.isFinite(low) ? low : close,
                     close,
+                    volume: Number(point?.volume ?? point?.totalTradedVolume ?? 0),
                 };
             })
             .filter(Boolean);
@@ -186,5 +219,26 @@ export const logSearchQuery = async (query) => {
         await api.post('/market/search/log', { query });
     } catch (error) {
         console.error('Error logging search query:', error);
+    }
+};
+
+export const fetchWatchlistData = async (symbols = []) => {
+    try {
+        const cleanSymbols = (Array.isArray(symbols) ? symbols : [])
+            .map((symbol) => String(symbol || '').trim())
+            .filter(Boolean);
+
+        if (!cleanSymbols.length) {
+            return [];
+        }
+
+        const response = await api.get('/watchlist/data', {
+            params: { symbols: cleanSymbols.join(',') },
+        });
+
+        return response.data?.data ?? response.data ?? [];
+    } catch (error) {
+        console.error('Error fetching watchlist aggregator data:', error);
+        throw error;
     }
 };

@@ -211,10 +211,13 @@ const getStockNewsSentiment = async (symbol) => {
 
     const category = isCrypto ? 'crypto' : 'business';
     const rawNews = await fetchMarketNews(category, { symbol: normalized, limit: 20 });
-    const rows = (Array.isArray(rawNews) ? rawNews : []).filter((item) => {
+    let rows = (Array.isArray(rawNews) ? rawNews : []).filter((item) => {
         const text = `${item?.title || ''} ${item?.summary || ''} ${item?.description || ''}`.toUpperCase();
         return text.includes(normalized);
     });
+    if (rows.length === 0 && rawNews && rawNews.length > 0) {
+        rows = rawNews;
+    }
 
     const scored = rows.slice(0, 20).map((item, index) => {
         const cls = classifySentiment(item?.title);
@@ -226,6 +229,7 @@ const getStockNewsSentiment = async (symbol) => {
             sentiment: cls.sentiment,
             sentimentScore: cls.score,
             url: item?.url || null,
+            image: item?.image || null
         };
     });
 

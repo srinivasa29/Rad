@@ -8,13 +8,12 @@ const {
 const { protect } = require('../middleware/authMiddleware');
 
 
+router.get('/symbols/list', getAvailableSymbols);
+
 
 router.get('/:symbol', getHistoricalData);
 
 
 router.get('/:symbol/latest', getLatestCandle);
-
-
-router.get('/symbols/list', getAvailableSymbols);
 
 module.exports = router;

@@ -18,6 +18,14 @@ const authMiddleware = async (req, res, next) => {
                 return res.status(401).json({ error: 'Not authorized, user not found' });
             }
 
+            // If tokenVersion present in token, ensure it matches user's current tokenVersion
+            if (typeof decoded.tokenVersion !== 'undefined') {
+                const current = req.user.tokenVersion || 0;
+                if (decoded.tokenVersion !== current) {
+                    return res.status(401).json({ error: 'Token has been revoked. Please login again.' });
+                }
+            }
+
             next();
         } catch (error) {
             const reason = error?.name === 'JsonWebTokenError' ? 'invalid signature' : error?.message || 'unknown';
@@ -33,6 +41,12 @@ const authMiddleware = async (req, res, next) => {
                 req.user = await User.findById(decoded.id).select('-password');
                 if (!req.user) {
                     return res.status(401).json({ error: 'Not authorized, user not found' });
+                }
+                if (typeof decoded.tokenVersion !== 'undefined') {
+                    const current = req.user.tokenVersion || 0;
+                    if (decoded.tokenVersion !== current) {
+                        return res.status(401).json({ error: 'Token has been revoked. Please login again.' });
+                    }
                 }
                 next();
             } catch (error) {

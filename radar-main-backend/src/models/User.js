@@ -24,6 +24,15 @@ const UserSchema = new mongoose.Schema({
         enum: ['email', 'google'],
         default: 'email'
     },
+    address: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    profilePicture: {
+        type: String,
+        default: ''
+    },
     preferredMode: {
         type: String,
         enum: ['TRADER', 'INVESTOR'],
@@ -67,6 +76,12 @@ const UserSchema = new mongoose.Schema({
         }
     }],
 
+    // Incrementing this invalidates previously issued JWTs when increased.
+    tokenVersion: {
+        type: Number,
+        default: 0
+    },
+
     // Investor Identity — saved after onboarding assessment
     investorDNA: {
         dominant:            { type: String, enum: ['TRADER', 'INVESTOR'], default: null },
@@ -92,6 +107,25 @@ const UserSchema = new mongoose.Schema({
         priceAlerts:     { type: Boolean, default: true },
         earningsUpdates: { type: Boolean, default: true },
         importantNews:   { type: Boolean, default: true }
+    },
+
+    // Acadamy course completion progress
+    learningProgress: {
+        type: Map,
+        of: {
+            chapters: {
+                type: Map,
+                of: Boolean
+            },
+            quizScores: {
+                score: Number,
+                correct: Number,
+                total: Number,
+                passed: Boolean,
+                submittedAt: Date
+            }
+        },
+        default: {}
     },
 
     resetPasswordToken: String,

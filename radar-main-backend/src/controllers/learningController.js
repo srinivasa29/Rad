@@ -1,5 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
+const mongoose = require('mongoose');
+const User = require('../models/User');
 const logger = require('../config/logger');
 
 // In-memory progress store (replace with DB model if you have a User.progress field)
@@ -55,9 +57,21 @@ const getCourse = async (req, res) => {
 
 // GET /api/learning/progress/:userId
 const getProgress = async (req, res) => {
-    const userId = req.params.userId || req.user?.id || 'anonymous';
-    const progress = progressStore[userId] || {};
-    res.json({ success: true, data: progress });
+    try {
+        const userId = req.params.userId || req.user?.id || 'anonymous';
+        
+        let progress = progressStore[userId] || {};
+        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+            const user = await User.findById(userId);
+            if (user && user.learningProgress) {
+                progress = Object.fromEntries(user.learningProgress.entries());
+            }
+        }
+        res.json({ success: true, data: progress });
+    } catch (error) {
+        logger.error('Failed to get progress:', error);
+        res.status(500).json({ success: false, error: 'Failed to get progress' });
+    }
 };
 
 // POST /api/learning/progress  — save chapter completion
@@ -69,9 +83,30 @@ const saveProgress = async (req, res) => {
         if (!courseId || !chapterId) {
             return res.status(400).json({ success: false, error: 'courseId and chapterId are required' });
         }
+        
+        // Update in-memory fallback
         if (!progressStore[userId]) progressStore[userId] = {};
         if (!progressStore[userId][courseId]) progressStore[userId][courseId] = { chapters: {}, quizScores: {} };
         progressStore[userId][courseId].chapters[chapterId] = Boolean(completed);
+
+        // Update MongoDB if user exists
+        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+            const user = await User.findById(userId);
+            if (user) {
+                if (!user.learningProgress) {
+                    user.learningProgress = new Map();
+                }
+                let courseData = user.learningProgress.get(courseId) || { chapters: {}, quizScores: {} };
+                if (!courseData.chapters) {
+                    courseData.chapters = {};
+                }
+                courseData.chapters[chapterId] = Boolean(completed);
+                user.learningProgress.set(courseId, courseData);
+                user.markModified('learningProgress');
+                await user.save();
+            }
+        }
+
         res.json({ success: true, data: progressStore[userId] });
     } catch (error) {
         logger.error('Failed to save progress:', error);
@@ -102,16 +137,32 @@ const submitQuiz = async (req, res) => {
 
         const score = Math.round((correct / course.quiz.length) * 100);
 
-        // Persist score
+        // Persist in-memory fallback
         if (!progressStore[userId]) progressStore[userId] = {};
         if (!progressStore[userId][courseId]) progressStore[userId][courseId] = { chapters: {}, quizScores: {} };
-        progressStore[userId][courseId].quizScores = {
+        const quizScores = {
             score,
             correct,
             total: course.quiz.length,
             passed: score >= 70,
             submittedAt: new Date().toISOString(),
         };
+        progressStore[userId][courseId].quizScores = quizScores;
+
+        // Persist database score if userId is valid ObjectId
+        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+            const user = await User.findById(userId);
+            if (user) {
+                if (!user.learningProgress) {
+                    user.learningProgress = new Map();
+                }
+                let courseData = user.learningProgress.get(courseId) || { chapters: {}, quizScores: {} };
+                courseData.quizScores = quizScores;
+                user.learningProgress.set(courseId, courseData);
+                user.markModified('learningProgress');
+                await user.save();
+            }
+        }
 
         res.json({ success: true, data: { score, correct, total: course.quiz.length, passed: score >= 70, results } });
     } catch (error) {

@@ -35,7 +35,7 @@ const getUniqueUniverse = () => {
   return [...new Set(combined)];
 };
 
-const TWELVE_KEY = process.env.TWELVE_API_KEY || process.env.TWELVE_DATA_API_KEY;
+const TWELVE_KEY = process.env.TWELVE_API_KEY;
 const EXCHANGE = (process.env.EXCHANGE || 'NSE').toUpperCase();
 const OUTPUT_SIZE = process.env.OUTPUT_SIZE || 500;
 

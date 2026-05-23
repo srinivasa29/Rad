@@ -309,6 +309,15 @@ const InvestorStockPage = () => {
         setIsInWatchlist(true);
         showToast(`${symbol} added to watchlist ✓`, 'success');
       }
+      // Notify other parts of the app (watchlist views) to refresh immediately
+      try {
+        if (typeof window !== 'undefined') {
+          const action = isInWatchlist ? 'removed' : 'added';
+          window.dispatchEvent(new CustomEvent('watchlist:changed', { detail: { symbol, action } }));
+        }
+      } catch (e) {
+        // non-fatal
+      }
     } catch (err) {
       const status = err?.response?.status;
       if (status === 401 || status === 403) {

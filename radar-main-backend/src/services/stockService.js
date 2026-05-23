@@ -2,6 +2,8 @@ const axios = require('axios');
 const { generateHistory } = require('../utils/mockGenerator');
 const logger = require('../utils/logger');
 const { getActiveSymbolsWithSuffix, SEED_SYMBOLS } = require('../utils/symbolRegistry');
+const { getUniqueUniverse } = require('../config/marketUniverse');
+const candleEngine = require('./candleEngine');
 
 const QUOTE_CACHE_TTL_MS = Number.parseInt(process.env.STOCK_QUOTES_CACHE_TTL_MS || '20000', 10);
 // Reduced from 180s → 90s so blocked providers recover faster after transient failures
@@ -27,6 +29,22 @@ let _resolvedSymbolsCache = null;
 let _resolvedSymbolsExpiry = 0;
 const SYMBOLS_CACHE_TTL_MS = 5 * 60 * 1000; // re-read DB every 5 minutes
 
+const MIN_DB_SYMBOLS = 20;
+
+const buildUniverseSymbols = () => {
+    const universe = getUniqueUniverse();
+    if (!Array.isArray(universe) || universe.length === 0) return [];
+    if (DEFAULT_MARKET_REGION === 'IN' || DEFAULT_MARKET_REGION === 'GLOBAL') {
+        return universe.map((symbol) => String(symbol || '').includes('.') ? String(symbol).toUpperCase() : `${String(symbol).toUpperCase()}.NS`);
+    }
+    return universe.map((symbol) => String(symbol).toUpperCase());
+};
+
+const mergeSymbols = (primary, secondary) => {
+    const merged = [...primary, ...secondary].map((s) => String(s).toUpperCase());
+    return [...new Set(merged)];
+};
+
 const getDefaultSymbols = async () => {
     // 1. Env override (comma-separated)
     const fromEnv = process.env.STOCK_SYMBOLS;
@@ -41,15 +59,30 @@ const getDefaultSymbols = async () => {
         return _resolvedSymbolsCache;
     }
 
+    const universeSymbols = buildUniverseSymbols();
+
     try {
         const symbols = await getActiveSymbolsWithSuffix();
-        if (symbols.length > 0) {
+        if (symbols.length >= MIN_DB_SYMBOLS) {
             _resolvedSymbolsCache = symbols;
             _resolvedSymbolsExpiry = now + SYMBOLS_CACHE_TTL_MS;
             return symbols;
         }
+
+        if (symbols.length > 0 && universeSymbols.length > 0) {
+            const merged = mergeSymbols(symbols, universeSymbols);
+            _resolvedSymbolsCache = merged;
+            _resolvedSymbolsExpiry = now + SYMBOLS_CACHE_TTL_MS;
+            return merged;
+        }
     } catch (err) {
         logger.error(`stockService.getDefaultSymbols DB error: ${err.message}`);
+    }
+
+    if (universeSymbols.length > 0) {
+        _resolvedSymbolsCache = universeSymbols;
+        _resolvedSymbolsExpiry = now + SYMBOLS_CACHE_TTL_MS;
+        return universeSymbols;
     }
 
     // 3. Hardcoded fallback
@@ -270,6 +303,7 @@ const buildFallbackQuotes = (symbols) => symbols.map((symbol, index) => {
         name: fallbackStockMeta[symbol]?.name || symbol,
         price: Number(basePrice.toFixed(2)),
         change: dailyChange,
+        volume: 500000 + (seed % 5000000),
         type: 'STOCK',
         details: buildStockDetails(
             symbol,
@@ -283,12 +317,16 @@ const buildFallbackQuotes = (symbols) => symbols.map((symbol, index) => {
     };
 });
 
-const hasEnoughLiveData = (quotes, expectedCount = 0) => {
+const hasEnoughLiveData = (quotes, expectedCount = 0, allowPartial = false) => {
     if (!Array.isArray(quotes)) {
         return false;
     }
 
     const validPriced = quotes.filter((quote) => Number(quote.price) > 0).length;
+
+    if (allowPartial) {
+        return validPriced > 0;
+    }
     
     if (expectedCount > 0 && expectedCount < 6) {
         return validPriced >= Math.max(1, Math.floor(expectedCount * 0.5));
@@ -548,6 +586,73 @@ const fetchTiingoHistory = async (symbol, interval = '1D') => {
         }))
         .filter((item) => Number.isFinite(item.price));
 };
+
+// --- Twelve Data (optional provider) -------------------------------------------------
+const fetchTwelveQuotes = async (symbols) => {
+    if (!process.env.TWELVE_API_KEY) throw new Error('Missing TWELVE_API_KEY');
+    const unique = [...new Set(symbols.map(s => String(s || '').toUpperCase()))];
+    if (!unique.length) return [];
+
+    const qs = unique.join(',');
+    const url = 'https://api.twelvedata.com/quote';
+    const resp = await axios.get(url, { params: { symbol: qs, apikey: process.env.TWELVE_API_KEY }, timeout: 7000 });
+    const data = resp.data || {};
+
+    // TwelveData returns object per symbol when multiple requested
+    const rows = unique.map(sym => {
+        const entry = data[sym] || data[sym.replace('.NS','')] || data[sym.replace('.NS','').toUpperCase()] || data;
+        const price = Number(entry?.price ?? entry?.close ?? 0);
+        if (!Number.isFinite(price) || price <= 0) return null;
+        const prev = Number(entry?.previous_close ?? entry?.previous_close ?? entry?.prev_close ?? 0);
+        const change = Number.isFinite(entry?.percent_change) ? Number(entry.percent_change) : (prev > 0 ? Number((((price - prev) / prev) * 100).toFixed(2)) : 0);
+        return {
+            symbol: sym,
+            name: entry?.name || fallbackStockMeta[sym]?.name || sym,
+            price: Number(price.toFixed(2)),
+            change,
+            volume: Number(entry?.volume) || 0,
+            type: 'STOCK',
+            details: buildStockDetails(sym, NaN, fallbackStockMeta[sym]?.sector, entry?.name || fallbackStockMeta[sym]?.name, NaN, NaN),
+            financials: null,
+        };
+    }).filter(Boolean);
+    return rows;
+};
+
+const fetchTwelveHistory = async (symbol, interval = '1D') => {
+    if (!process.env.TWELVE_API_KEY) throw new Error('Missing TWELVE_API_KEY');
+    const normalized = String(symbol || '').toUpperCase();
+    const intervalMap = { '5M': '5min', '15M': '15min', '1H': '60min', '1D': '1day', '1W': '1week', '1M': '1month' };
+    const tdInterval = intervalMap[String(interval || '1D').toUpperCase()] || '1day';
+    const url = 'https://api.twelvedata.com/time_series';
+    const params = { symbol: normalized, interval: tdInterval, outputsize: 500, apikey: process.env.TWELVE_API_KEY }; 
+    const resp = await axios.get(url, { params, timeout: 8000 });
+    const series = resp.data?.values || resp.data?.data || [];
+    return series.map(item => ({ date: item.datetime || item.timestamp || new Date().toISOString(), price: Number(item.close) })).filter(i => Number.isFinite(i.price));
+};
+
+// --- Alpha Vantage (optional provider) ---------------------------------------------
+const fetchAlphaQuote = async (symbol) => {
+    if (!process.env.ALPHA_VANTAGE_KEY) throw new Error('Missing ALPHA_VANTAGE_KEY');
+    const url = 'https://www.alphavantage.co/query';
+    const resp = await axios.get(url, { params: { function: 'GLOBAL_QUOTE', symbol, apikey: process.env.ALPHA_VANTAGE_KEY }, timeout: 8000 });
+    const data = resp.data?.['Global Quote'] || {};
+    const price = Number(data['05. price'] || data['05. price'] || 0);
+    if (!Number.isFinite(price) || price <= 0) return null;
+    const prev = Number(data['08. previous close'] || 0);
+    const change = prev > 0 ? Number((((price - prev) / prev) * 100).toFixed(2)) : 0;
+    return { symbol: String(symbol).toUpperCase(), name: fallbackStockMeta[symbol]?.name || symbol, price: Number(price.toFixed(2)), change, volume: 0, type: 'STOCK', details: buildStockDetails(symbol, NaN, fallbackStockMeta[symbol]?.sector, fallbackStockMeta[symbol]?.name, NaN, NaN) };
+};
+
+const fetchAlphaHistory = async (symbol, interval = '1D') => {
+    if (!process.env.ALPHA_VANTAGE_KEY) throw new Error('Missing ALPHA_VANTAGE_KEY');
+    const func = 'TIME_SERIES_DAILY_ADJUSTED';
+    const url = 'https://www.alphavantage.co/query';
+    const resp = await axios.get(url, { params: { function: func, symbol, apikey: process.env.ALPHA_VANTAGE_KEY, outputsize: 'compact' }, timeout: 9000 });
+    const series = resp.data?.['Time Series (Daily)'] || {};
+    return Object.keys(series).map(date => ({ date: new Date(date).toISOString(), price: Number(series[date]['4. close']) })).sort((a,b)=> new Date(a.date) - new Date(b.date));
+};
+
 
 const fetchFinnhubQuotes = async (symbols) => {
     if (!process.env.FINNHUB_API_KEY) {
@@ -885,64 +990,47 @@ const fetchStooqQuotes = async (symbols) => {
 };
 
 const fetchYahooHistory = async (symbol, interval = '1D') => {
-    const normalizedSymbol = String(symbol || '').toUpperCase();
-    const intervalMap = {
-        '5M': { range: '5d', interval: '5m' },
-        '15M': { range: '5d', interval: '15m' },
-        '1H': { range: '1mo', interval: '60m' },
-        '1D': { range: '6mo', interval: '1d' },
-        '1W': { range: '1y', interval: '1wk' },
-        '1M': { range: '3mo', interval: '1d' },
-        '3M': { range: '6mo', interval: '1d' },
-        '6M': { range: '1y', interval: '1d' },
-        '1Y': { range: '2y', interval: '1d' },
+    // Map internal interval to candleEngine's timeframe format ('15m', '1h', '1d')
+    let timeframe = '1d';
+    if (interval === '15M' || interval === '15m') timeframe = '15m';
+    else if (interval === '1H' || interval === '1h') timeframe = '1h';
+    else if (interval === '5M' || interval === '5m') timeframe = '15m'; // closest fallback for 5m
+
+    const rangeMap = {
+        '5M': '5d',
+        '15M': '5d',
+        '1H': '1mo',
+        '1D': '1y',
+        '1W': '1y',
+        '1M': '3mo',
+        '3M': '6mo',
+        '6M': '1y',
+        '1Y': '1y'
     };
-    const config = intervalMap[String(interval).toUpperCase()] || { range: '3mo', interval: '1d' };
+    const range = rangeMap[String(interval).toUpperCase()] || '1y';
 
-    const response = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${normalizedSymbol}`, {
-        params: {
-            range: config.range,
-            interval: config.interval,
-            includePrePost: false,
-        },
-        timeout: 6000,
-        headers: {
-            'User-Agent': 'Mozilla/5.0',
-            Accept: 'application/json',
-        },
-    });
-
-    const result = response.data?.chart?.result?.[0];
-    const timestamps = result?.timestamp || [];
-    const quote = result?.indicators?.quote?.[0] || {};
-    const closes = quote.close || [];
-    const opens = quote.open || [];
-    const highs = quote.high || [];
-    const lows = quote.low || [];
-    const volumes = quote.volume || [];
-
-    return timestamps
-        .map((timestamp, index) => {
-            const close = Number(closes[index]);
-            if (!Number.isFinite(close)) {
-                return null;
-            }
-
-            return {
-                timestamp: timestamp * 1000,
-                date: new Date(timestamp * 1000).toISOString(),
-                price: close,
-                open: Number(opens[index]) || close,
-                high: Number(highs[index]) || close,
-                low: Number(lows[index]) || close,
-                close: close,
-                volume: Number(volumes[index]) || 0
-            };
-        })
-        .filter(Boolean);
+    try {
+        const candles = await candleEngine.getHistoricalData(symbol, timeframe, range);
+        if (!candles || candles.length === 0) return [];
+        
+        return candles.map(c => ({
+            timestamp: c.time * 1000,
+            date: new Date(c.time * 1000).toISOString(),
+            price: c.close,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume
+        }));
+    } catch (err) {
+        logger.error(`[stockService] candleEngine failed for ${symbol}: ${err.message}`);
+        return [];
+    }
 };
 
-const fetchStockData = async (customSymbols = null) => {
+const fetchStockData = async (customSymbols = null, options = {}) => {
+    const { strictLive = false } = options || {};
     const now = Date.now();
     if (!customSymbols && quotesCache.data && now < quotesCache.expiresAt) {
         return quotesCache.data;
@@ -981,7 +1069,7 @@ const fetchStockData = async (customSymbols = null) => {
                 }
             }
 
-            if (hasEnoughLiveData(yahooQuotes, symbols.length)) {
+            if (hasEnoughLiveData(yahooQuotes, symbols.length, strictLive)) {
                 clearProviderFailure('yahoo');
                 data = yahooQuotes;
             } else {
@@ -999,7 +1087,7 @@ const fetchStockData = async (customSymbols = null) => {
         if (!data && !isProviderBlocked('tiingo')) {
             try {
                 const tiingoQuotes = await fetchTiingoQuotes(symbols);
-                if (hasEnoughLiveData(tiingoQuotes, symbols.length)) {
+                if (hasEnoughLiveData(tiingoQuotes, symbols.length, strictLive)) {
                     clearProviderFailure('tiingo');
                     data = tiingoQuotes;
                 } else {
@@ -1018,7 +1106,7 @@ const fetchStockData = async (customSymbols = null) => {
         if (!data && !isProviderBlocked('finnhub')) {
             try {
                 const finnhubQuotes = await fetchFinnhubQuotes(symbols);
-                if (hasEnoughLiveData(finnhubQuotes, symbols.length)) {
+                if (hasEnoughLiveData(finnhubQuotes, symbols.length, strictLive)) {
                     clearProviderFailure('finnhub');
                     data = finnhubQuotes;
                 } else {
@@ -1034,10 +1122,26 @@ const fetchStockData = async (customSymbols = null) => {
             }
         }
 
+        // Try Twelve Data as an additional quote provider (if configured)
+        if (!data && !isProviderBlocked('twelvedata')) {
+            try {
+                const td = await fetchTwelveQuotes(symbols);
+                if (hasEnoughLiveData(td, symbols.length, strictLive)) {
+                    clearProviderFailure('twelvedata');
+                    data = td;
+                } else {
+                    markProviderFailure('twelvedata', 'Sparse quote payload');
+                }
+            } catch (error) {
+                markProviderFailure('twelvedata', error.message);
+                warnThrottled(`quotes:twelvedata-failed:${error.message}`, 'TwelveData quote fetch failed.', { error: error.message });
+            }
+        }
+
         if (!data && !isProviderBlocked('polygon')) {
             try {
                 const polygonQuotes = await fetchPolygonQuotes(symbols);
-                if (hasEnoughLiveData(polygonQuotes, symbols.length)) {
+                if (hasEnoughLiveData(polygonQuotes, symbols.length, strictLive)) {
                     clearProviderFailure('polygon');
                     data = polygonQuotes;
                 } else {
@@ -1053,10 +1157,32 @@ const fetchStockData = async (customSymbols = null) => {
             }
         }
 
+        // Try AlphaVantage as a fallback quotes provider (low-rate, optional)
+        if (!data && !isProviderBlocked('alpha')) {
+            try {
+                const alphaRows = [];
+                for (const s of symbols.slice(0, 40)) { // don't spam API: limit batch
+                    try {
+                        const r = await fetchAlphaQuote(s);
+                        if (r) alphaRows.push(r);
+                    } catch (_) {}
+                }
+                if (hasEnoughLiveData(alphaRows, symbols.length, strictLive)) {
+                    clearProviderFailure('alpha');
+                    data = alphaRows;
+                } else {
+                    markProviderFailure('alpha', 'Sparse quote payload');
+                }
+            } catch (error) {
+                markProviderFailure('alpha', error.message);
+                warnThrottled(`quotes:alpha-failed:${error.message}`, 'AlphaVantage quote fetch failed.', { error: error.message });
+            }
+        }
+
         if (!data && !isProviderBlocked('marketstack')) {
             try {
                 const marketstackQuotes = await fetchMarketstackQuotes(symbols);
-                if (hasEnoughLiveData(marketstackQuotes, symbols.length)) {
+                if (hasEnoughLiveData(marketstackQuotes, symbols.length, strictLive)) {
                     clearProviderFailure('marketstack');
                     data = marketstackQuotes;
                 } else {
@@ -1075,7 +1201,7 @@ const fetchStockData = async (customSymbols = null) => {
         if (!data && !isProviderBlocked('stooq')) {
             try {
                 const stooqQuotes = await fetchStooqQuotes(symbols);
-                if (hasEnoughLiveData(stooqQuotes, symbols.length)) {
+                if (hasEnoughLiveData(stooqQuotes, symbols.length, strictLive)) {
                     clearProviderFailure('stooq');
                     data = stooqQuotes;
                 } else {
@@ -1106,6 +1232,10 @@ const fetchStockData = async (customSymbols = null) => {
         }
 
         if (!data) {
+            if (strictLive) {
+                logger.warn(`Live quotes unavailable for ${symbols.length} symbols — strictLive enabled, returning empty set.`);
+                return [];
+            }
             if (lastKnownGoodQuotes) {
                 logger.warn(`All live quote providers failed. Serving stale cache for ${symbols.length} symbols.`);
                 if (customSymbols) {
@@ -1147,7 +1277,14 @@ const fetchStockData = async (customSymbols = null) => {
 
 const fetchStockHistory = async (symbol, interval = '1D', options = {}) => {
     const { allowSynthetic = false } = options;
-    const normalizedSymbol = String(symbol || '').toUpperCase();
+    const rawSymbol = String(symbol || '').trim().toUpperCase();
+    const normalizedSymbol = (() => {
+        if (!rawSymbol) return rawSymbol;
+        if (rawSymbol.includes('.') || rawSymbol.startsWith('^') || rawSymbol.endsWith('-USD') || rawSymbol.includes('=X')) {
+            return rawSymbol;
+        }
+        return `${rawSymbol}.NS`;
+    })();
     const normalizedInterval = String(interval || '1D').toUpperCase();
     const requiresIntraday = ['5M', '15M', '1H'].includes(normalizedInterval);
 
@@ -1189,6 +1326,21 @@ const fetchStockHistory = async (symbol, interval = '1D', options = {}) => {
         }
     }
 
+    // Twelve Data history (optional)
+    if (!isProviderBlocked('twelvedata')) {
+        try {
+            const tdHistory = await fetchTwelveHistory(normalizedSymbol, normalizedInterval);
+            if (tdHistory.length > 0) {
+                clearProviderFailure('twelvedata');
+                return tdHistory;
+            }
+            markProviderFailure('twelvedata', `Sparse history payload for ${normalizedSymbol}`);
+        } catch (error) {
+            markProviderFailure('twelvedata', error.message);
+            warnThrottled(`history:twelvedata-failed:${error.message}`, 'TwelveData history fetch failed, trying Finnhub...', { error: error.message });
+        }
+    }
+
     if (!isProviderBlocked('finnhub')) {
         try {
             const finnhubHistory = await fetchFinnhubHistory(normalizedSymbol, normalizedInterval);
@@ -1205,6 +1357,21 @@ const fetchStockHistory = async (symbol, interval = '1D', options = {}) => {
                 'Finnhub history fetch failed, trying Polygon...',
                 { error: error.message },
             );
+        }
+    }
+
+    // AlphaVantage history fallback (low-rate)
+    if (!isProviderBlocked('alpha')) {
+        try {
+            const alphaHistory = await fetchAlphaHistory(normalizedSymbol, normalizedInterval);
+            if (alphaHistory.length > 0) {
+                clearProviderFailure('alpha');
+                return alphaHistory;
+            }
+            markProviderFailure('alpha', `Sparse history payload for ${normalizedSymbol}`);
+        } catch (error) {
+            markProviderFailure('alpha', error.message);
+            warnThrottled(`history:alpha-failed:${error.message}`, 'AlphaVantage history fetch failed, trying Polygon...', { error: error.message });
         }
     }
 
@@ -1301,16 +1468,7 @@ const fetchStockHistory = async (symbol, interval = '1D', options = {}) => {
         }
     }
 
-    if (!allowSynthetic) {
-        throw new Error(`Live history unavailable for ${normalizedSymbol}`);
-    }
-
-    warnThrottled(
-        `history:synthetic-fallback:${normalizedInterval}`,
-        'Using generated synthetic fallback history.',
-        { symbol: normalizedSymbol, interval: normalizedInterval },
-    );
-    return generateHistory(150, 0.02, normalizedInterval);
+    throw new Error(`Live history unavailable for ${normalizedSymbol} and synthetic fallbacks are disabled.`);
 };
 
 module.exports = { fetchStockData, fetchStockHistory };

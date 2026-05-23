@@ -1,7 +1,7 @@
 const axios = require('axios');
 const { generateHistory } = require('../utils/mockGenerator');
 const logger = require('../utils/logger');
-const TWELVE_DATA_KEY = process.env.TWELVEDATA_API_KEY || process.env.TWELVE_DATA_API_KEY;
+const TWELVE_DATA_KEY = process.env.TWELVE_API_KEY;
 
 const parseForexSymbol = (symbol = '') => {
     const cleaned = String(symbol).toUpperCase().replace(/[^A-Z]/g, '');

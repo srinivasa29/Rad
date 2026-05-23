@@ -38,32 +38,42 @@ const getPreMarketPulse = async (req, res) => {
 
 const getSectorHeatmap = async (req, res) => {
     try {
-        const heatmapData = [
+        const stocks = await fetchStockData();
+        const sectorMap = {};
+
+        for (const stock of stocks) {
+            const sector = stock.details?.sector || stock.sector || 'General';
+            if (['Unknown', 'Other', 'Currency', 'N/A', '', 'Broad Market'].includes(sector)) continue;
+            if (!sectorMap[sector]) {
+                sectorMap[sector] = [];
+            }
+            sectorMap[sector].push({
+                name: String(stock.symbol || '').replace(/\.(NS|BO)$/i, ''),
+                change: Number(stock.change || 0)
+            });
+        }
+
+        const heatmapData = Object.entries(sectorMap).map(([sector, children]) => ({
+            name: sector,
+            children: children.slice(0, 5) // Limit to top 5 stocks per sector for rendering clarity
+        }));
+
+        res.json(heatmapData.length ? heatmapData : [
             {
                 name: "Technology",
                 children: [
-                    { name: "AAPL", size: 2700, change: 1.25 },
-                    { name: "MSFT", size: 2300, change: -0.5 },
-                    { name: "NVDA", size: 1200, change: 5.4 }
-                ]
-            },
-            {
-                name: "Automotive",
-                children: [
-                    { name: "TSLA", size: 750, change: -3.1 },
-                    { name: "F", size: 45, change: 0.2 }
+                    { name: "TCS", change: 0.5 },
+                    { name: "INFY", change: 1.2 }
                 ]
             },
             {
                 name: "Finance",
                 children: [
-                    { name: "JPM", size: 400, change: 1.1 },
-                    { name: "BAC", size: 250, change: 0.8 }
+                    { name: "HDFCBANK", change: -0.2 },
+                    { name: "SBIN", change: 0.8 }
                 ]
             }
-        ];
-
-        res.json(heatmapData);
+        ]);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server Error' });

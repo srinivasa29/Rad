@@ -6,8 +6,10 @@ import { fetchRealtimeQuote } from '../api/quotesApi';
 import api from '../api/api';
 import { fetchStockFundamentals } from '../api/fundamentalApi';
 import Header from '../components/common/Header';
+import TraderChartPanel from '../components/trader/stockResearch/TraderChartPanel';
 
 import { getAssetMetadata } from '../utils/assetClassifier';
+import TraderStockPage from './TraderStockPage';
 
 const INDEX_MAP = {
     NIFTY: '^NSEI', BANKNIFTY: '^NSEBANK', SENSEX: '^BSESN',
@@ -186,24 +188,24 @@ function TraderPanel({ backendSymbol, history, toneClass, quoteStatus, historySt
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
-                <div className="xl:col-span-2 rounded-2xl border border-slate-700 bg-[#111827] p-4 shadow-lg">
+                <div className="xl:col-span-2 rounded-2xl border border-slate-700 bg-[#111827] p-4 shadow-lg flex flex-col justify-between">
                     <div className="flex items-center justify-between gap-3 mb-3">
-                        <h2 className="text-sm font-black text-slate-100 uppercase tracking-wider">TradingView</h2>
-                        <span className="text-[11px] text-slate-400 font-semibold">{tradingViewSymbol}</span>
+                        <h2 className="text-sm font-black text-slate-100 uppercase tracking-wider">Trading Terminal</h2>
+                        <span className="text-[11px] text-slate-400 font-semibold">{backendSymbol.replace(/\.(NS|BO)$/i, '')}</span>
                     </div>
                     <div className="h-[460px] rounded-xl border border-slate-700 overflow-hidden bg-[#0F172A]">
-                        <iframe
-                            title={`TradingView-${tradingViewSymbol}`}
-                            src={`https://s.tradingview.com/widgetembed/?frameElementId=tv-widget&symbol=${encodeURIComponent(tradingViewSymbol)}&interval=60&hidesidetoolbar=1&symboledit=1&saveimage=0&toolbarbg=F1F3F6&studies=[]&theme=light&style=1&timezone=Etc%2FUTC&withdateranges=1&hideideas=1&locale=en`}
-                            width="100%"
-                            height="100%"
-                            frameBorder="0"
-                            allowTransparency
-                            scrolling="no"
+                        <TraderChartPanel 
+                            symbol={backendSymbol.replace(/\.(NS|BO)$/i, '')} 
+                            price={currentPrice} 
+                            assetType={backendSymbol.endsWith('.NS') || backendSymbol.endsWith('.BO') ? 'STOCK' : 'CRYPTO'} 
+                            variant="advanced" 
+                            hideHeaderSymbol={true} 
+                            hideRightPanel={true} 
+                            height={460}
                         />
                     </div>
                     <p className="mt-2 text-[11px] font-semibold text-slate-400">
-                        If the widget cannot load, use the live history chart below. Quote status: {quoteStatus.live ? 'live' : 'delayed'}.
+                        Interactive lightweight charts dashboard. Synchronized with live exchange quote updates.
                     </p>
                 </div>
 
@@ -570,6 +572,18 @@ export default function StockPage() {
     const toneClass = isPositive ? 'text-emerald-600' : 'text-rose-600';
     const warning = quoteStatus.warning || historyStatus.warning || newsStatus.warning || screenerWarning;
     const isTraderMode = mode === 'TRADER';
+
+    if (!isLoading && !hasError && !isNotFound && isTraderMode) {
+        return (
+            <TraderStockPage 
+                overrideSymbol={normalizedSymbol} 
+                onBack={() => {
+                    localStorage.setItem('mode', 'INVESTOR');
+                    setMode('INVESTOR');
+                }} 
+            />
+        );
+    }
 
     return (
         <div

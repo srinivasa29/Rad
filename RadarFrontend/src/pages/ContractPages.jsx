@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import api from '../api/api';
+import api, { toggleWatchlist } from '../api/api';
 import { fetchCourses, getProgressKey } from '../api/learningApi';
 import { submitSupportMessage } from '../api/supportApi';
 import Header from '../components/common/Header';
 import InvestorWatchlist from '../components/investor/Watchlist';
-import TraderWatchlist from '../components/trader/AdvancedWatchlist';
+import ResearchWatchlist from '../components/watchlist/ResearchWatchlist';
+import AdvancedWatchlist from '../components/trader/AdvancedWatchlist';
 import './Profile.css';
 import './InvestorDashboard.css';
 import { 
@@ -508,6 +509,12 @@ export function NewsPage() {
         return { text: 'Neutral', color: 'slate' };
     };
 
+    const openNewsLink = (item) => {
+        const url = String(item?.url || '').trim();
+        if (!url || url === '#') return;
+        window.open(url, '_blank', 'noopener');
+    };
+
     const TABS = ['live', 'top news', 'watchlist'];
 
     return (
@@ -530,6 +537,9 @@ export function NewsPage() {
                             <div>
                                 <h1 className="text-2xl font-black tracking-tight">Financial News</h1>
                                 <p className="mt-0.5 text-sm text-slate-400">Aggregated market feed from configured news providers.</p>
+                                <p className="mt-2 inline-flex items-center rounded-full bg-amber-100/20 text-amber-200 border border-amber-300/30 px-3 py-1 text-xs font-bold shadow-sm">
+                                    Demo mode: free sources prioritized, paid-provider fallback ready for production.
+                                </p>
                             </div>
                         </div>
 
@@ -670,9 +680,24 @@ export function NewsPage() {
                         {(!watchlistLoading || activeTab !== 'watchlist') && !watchlistError && filteredNews.length > 0 ? (
                             filteredNews.map((item, index) => {
                                 const impactBadge = getImpactBadge(item);
+                                const impactClasses = (impactBadge.color === 'emerald')
+                                    ? 'inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                    : (impactBadge.color === 'rose')
+                                        ? 'inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                        : 'inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-white/10';
+
                                 return (
                                     <article
                                         key={`${item.title}-${index}`}
+                                        onClick={() => openNewsLink(item)}
+                                        role="button"
+                                        tabIndex={0}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                openNewsLink(item);
+                                            }
+                                        }}
                                         className="group rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/[0.02] hover:border-cyan-500/30 hover:bg-white/10 transition-all p-5 cursor-pointer"
                                     >
                                         <div className="flex gap-4">
@@ -696,17 +721,18 @@ export function NewsPage() {
                                                             {item.source} • {item.time || item.publishedAt || '-'}
                                                         </p>
                                                     </div>
-                                                    <a
-                                                        href={item.url}
-                                                        target="_blank"
-                                                        rel="noreferrer"
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            openNewsLink(item);
+                                                        }}
                                                         className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                                         </svg>
-                                                    </a>
+                                                    </button>
                                                 </div>
 
                                                 {item.description && (
@@ -717,9 +743,28 @@ export function NewsPage() {
 
                                                 {/* Tags and Impact */}
                                                 <div className="flex items-center gap-2 mt-3 flex-wrap">
-                                                    <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-${impactBadge.color}-500/20 text-${impactBadge.color}-300 border border-${impactBadge.color}-500/30`}>
+                                                                        {/* Breaking badge */}
+                                                                        {item.breaking && (
+                                                                            <span className="inline-block px-2.5 py-1 rounded-full text-xs font-bold bg-rose-600/20 text-rose-300 border border-rose-600/30">
+                                                                                BREAKING
+                                                                            </span>
+                                                                        )}
+                                                                        {/* Market session */}
+                                                                        {item.marketSession && (
+                                                                            <span className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-white/10">
+                                                                                {item.marketSession}
+                                                                            </span>
+                                                                        )}
+                                                    <span className={impactClasses}>
                                                         {impactBadge.text}
                                                     </span>
+                                                                        {/* Sentiment percent */}
+                                                                        {typeof item.sentimentPercent === 'number' && (
+                                                                            <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-800 text-cyan-300 border border-white/10">
+                                                                                <span className="font-bold">{item.sentiment}</span>
+                                                                                <span className="text-xs text-slate-400">{item.sentimentPercent}%</span>
+                                                                            </span>
+                                                                        )}
                                                     {/* Watchlist symbol tag */}
                                                     {item.affectedSymbol && (
                                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
@@ -727,16 +772,34 @@ export function NewsPage() {
                                                             {item.affectedSymbol}
                                                         </span>
                                                     )}
-                                                    {item.symbols && item.symbols.length > 0 && (
-                                                        <div className="flex gap-1">
-                                                            {item.symbols.slice(0, 3).map((symbol) => (
-                                                                <span key={symbol} className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800 border border-white/10 text-cyan-400">
-                                                                    {symbol}
-                                                                </span>
+                                                    {item.relatedSymbols && item.relatedSymbols.length > 0 && (
+                                                        <div className="flex gap-1 items-center">
+                                                            {item.relatedSymbols.slice(0, 4).map((symbol) => (
+                                                                <div key={symbol} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800 border border-white/10 text-cyan-400">
+                                                                    <span>{symbol}</span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            (async () => {
+                                                                                try {
+                                                                                    await toggleWatchlist(symbol, userMode.toLowerCase());
+                                                                                    window.dispatchEvent(new CustomEvent('watchlist:changed'));
+                                                                                } catch (err) {
+                                                                                    const ev = new CustomEvent('api-error', { detail: { message: 'Failed to add to watchlist' } });
+                                                                                    window.dispatchEvent(ev);
+                                                                                }
+                                                                            })();
+                                                                        }}
+                                                                        className="ml-2 text-xs text-slate-300 hover:text-emerald-300"
+                                                                    >
+                                                                        +
+                                                                    </button>
+                                                                </div>
                                                             ))}
-                                                            {item.symbols.length > 3 && (
+                                                            {item.relatedSymbols.length > 4 && (
                                                                 <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800 border border-white/10 text-slate-400">
-                                                                    +{item.symbols.length - 3}
+                                                                    +{item.relatedSymbols.length - 4}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -764,13 +827,18 @@ export function NewsPage() {
                             <h3 className="font-black text-sm">TOP STORIES</h3>
                             <div className="space-y-3">
                                 {rows.slice(0, 5).map((item, index) => (
-                                    <div key={`top-${index}`} className="pb-3 border-b border-white/10 last:pb-0 last:border-0">
+                                    <button
+                                        key={`top-${index}`}
+                                        type="button"
+                                        onClick={() => openNewsLink(item)}
+                                        className="w-full text-left pb-3 border-b border-white/10 last:pb-0 last:border-0"
+                                    >
                                         <p className="text-xs font-bold text-cyan-400 mb-1">{index + 1}</p>
                                         <p className="text-xs line-clamp-2 leading-snug text-slate-200 font-semibold">
                                             {item.title}
                                         </p>
                                         <p className="text-xs text-slate-500 mt-1">{item.source}</p>
-                                    </div>
+                                    </button>
                                 ))}
                             </div>
                         </div>
@@ -807,7 +875,7 @@ export function InvestorWatchlistsPage() {
 }
 
 export function TraderWatchlistsPage() {
-    return <TraderWatchlist />;
+    return <AdvancedWatchlist />;
 }
 
 export function PortfolioPage() {
