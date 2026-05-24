@@ -7,3 +7,5 @@ coverage/
 .vscode/
 .idea/
 .vite/
+logs/
+*.log
