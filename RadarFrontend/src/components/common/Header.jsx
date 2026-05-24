@@ -59,6 +59,9 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [showDisclaimer, setShowDisclaimer] = useState(() => {
+        return localStorage.getItem('hideDataDisclaimer') !== 'true';
+    });
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [trendingSearches, setTrendingSearches] = useState([]);
@@ -163,9 +166,16 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
     return (
         <>
             <header className="navbar rounded-[32px] mx-auto border border-white/40 shadow-xl relative z-[110] bg-white/95 backdrop-blur-xl px-10 py-3 flex items-center justify-between w-[96%] max-w-[1500px] mt-6">
-                {/* Left Side: Brand removed per request */}
-                <div className="flex items-center gap-3 shrink-0">
-                    <Link to="/" className="sr-only">Home</Link>
+                {/* Left Side: Logo & Brand */}
+                <div className="flex items-center gap-2.5 shrink-0 cursor-pointer" onClick={() => navigate('/investor/dashboard')}>
+                    <img 
+                        src="/radar-icon.jpg" 
+                        alt="Radar Logo" 
+                        className="w-9 h-9 rounded-full object-cover"
+                    />
+                    <span className="text-xl font-black tracking-wider text-[#3E84F6]">
+                        RADAR
+                    </span>
                 </div>
 
                 <div className="flex items-center gap-8 ml-4">
@@ -277,15 +287,23 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                     {/* Profile Button Only */}
                     <div className="flex items-center gap-2 border-l border-blue-100/30 pl-4">
                         <div className="relative">
-                            <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="w-9 h-9 rounded-full bg-[#3E84F6] text-white flex items-center justify-center text-xs font-black cursor-pointer hover:scale-110 transition-all shadow-lg shadow-blue-500/20">
-                                {userInitial}
+                            <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="w-9 h-9 rounded-full bg-[#3E84F6] text-white flex items-center justify-center text-xs font-black cursor-pointer hover:scale-110 transition-all shadow-lg shadow-blue-500/20 overflow-hidden">
+                                {userImage ? (
+                                    <img src={userImage} alt="Profile" className="w-full h-full object-cover" />
+                                ) : (
+                                    userInitial
+                                )}
                             </div>
                             {isProfileOpen && (
                                 <div className="absolute right-0 top-12 w-[320px] bg-white border border-slate-100 rounded-[28px] shadow-[0_20px_50px_rgba(0,0,0,0.12)] overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2">
                                     {/* Header Section with Avatar */}
                                     <div className="px-6 py-5 bg-[#F8FAFF] flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-500/20 flex-shrink-0">
-                                        {userInitial}
+                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-500/20 flex-shrink-0 overflow-hidden">
+                                        {userImage ? (
+                                            <img src={userImage} alt="Profile" className="w-full h-full object-cover" />
+                                        ) : (
+                                            userInitial
+                                        )}
                                     </div>
                                         <div className="overflow-hidden">
                                             <p className="text-base font-black text-slate-900 leading-tight">{profile?.username || 'User'}</p>
@@ -373,6 +391,35 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                     </div>
                 </div>
             </header>
+
+            {(() => {
+                const currentPath = location.pathname.toLowerCase();
+                const isInvestorPage = currentPath.includes('investor');
+                const isExceptedPage = currentPath.includes('settings') || currentPath.includes('profile') || currentPath.includes('support') || currentPath.includes('help');
+                const shouldRenderDisclaimer = isInvestorPage && !isExceptedPage && showDisclaimer;
+                
+                if (!shouldRenderDisclaimer) return null;
+
+                return (
+                    <div className="w-[96%] max-w-[1500px] mx-auto mt-4 bg-[#FEFBF0] border border-[#FDEFC8] rounded-[20px] px-6 py-4 flex items-center justify-between gap-4 text-[#B07D2B] shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex items-center gap-3">
+                            <AlertTriangle size={18} className="text-[#E2A03F] flex-shrink-0" />
+                            <p className="text-xs md:text-[13px] font-medium leading-relaxed">
+                                <span className="font-bold text-[#8A5A16]">Data Disclaimer:</span> Market values and metrics may show slight discrepancies compared to direct exchange feeds due to our current data provider (Yahoo Finance) aggregation delays.
+                            </p>
+                        </div>
+                        <button 
+                            onClick={() => {
+                                setShowDisclaimer(false);
+                                localStorage.setItem('hideDataDisclaimer', 'true');
+                            }}
+                            className="text-[#E2A03F] hover:text-[#8A5A16] transition-colors p-1 flex-shrink-0"
+                        >
+                            <span className="text-base font-bold leading-none">✕</span>
+                        </button>
+                    </div>
+                );
+            })()}
 
             {showLogoutModal && (
                 <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">

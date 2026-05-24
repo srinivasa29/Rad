@@ -1399,8 +1399,12 @@ export function ProfilePage({ embedded = false } = {}) {
                 {/* Header Section (Inline) */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 pb-10 border-b border-slate-50">
                     <div className="flex items-center gap-6">
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-blue-100 border-4 border-white">
-                            {initial}
+                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-blue-100 border-4 border-white overflow-hidden">
+                            {profile?.profilePicture ? (
+                                <img src={profile.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                                initial
+                            )}
                         </div>
                         <div className="user-meta">
                             <h1 className="text-3xl font-black text-slate-800 tracking-tight">{profile?.username}</h1>
@@ -1720,6 +1724,10 @@ export function SettingsPage() {
                 const res = await api.get('/user/profile');
                 const data = res.data;
                 setProfile(data);
+                if (data.profilePicture) {
+                    setSelectedImage(data.profilePicture);
+                    localStorage.setItem('profileImage', data.profilePicture);
+                }
                 // Load persisted notification prefs
                 if (data.notificationPreferences) {
                     setNotifications({
@@ -1829,43 +1837,6 @@ export function SettingsPage() {
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Email Address</label>
                                 <p className="text-sm font-bold text-slate-800">{profile?.email || 'guest@radar.com'}</p>
                             </div>
-                        </div>
-                    </section>
-
-                    {/* 2. NOTIFICATIONS SECTION */}
-                    <section className="pt-12 border-t border-slate-50 space-y-8 animate-in fade-in slide-in-from-bottom-4 delay-100 duration-500 border border-blue-100/80 bg-white shadow-sm p-8 rounded-[24px]">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
-                                <Bell size={20} />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-black text-slate-800">Notification Channels</h2>
-                                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-0.5">Updates & Alerts</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4 pt-4 border-t border-slate-50">
-                            {[
-                                { id: 'priceAlerts', label: 'Price Alerts', desc: 'Real-time notifications for watchlist price crossing' },
-                                { id: 'earningsUpdates', label: 'Earnings Updates', desc: 'Alerts for upcoming and released quarterly results' },
-                                { id: 'importantNews', label: 'Market Intelligence', desc: 'Curated news headlines based on your sector DNA' }
-                            ].map(n => (
-                                <div key={n.id} className="flex items-center justify-between p-5 rounded-2xl bg-slate-50/50 border border-slate-100 group hover:bg-slate-50 transition-all">
-                                    <div>
-                                        <p className="text-sm font-black text-slate-800">{n.label}</p>
-                                        <p className="text-[11px] text-slate-400 font-bold">{n.desc}</p>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            className="sr-only peer" 
-                                            checked={notifications[n.id].enabled}
-                                            onChange={() => handleNotificationToggle(n.id)}
-                                        />
-                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                                    </label>
-                                </div>
-                            ))}
                         </div>
                     </section>
 
@@ -2042,16 +2013,26 @@ export function SettingsPage() {
                             const username = formData.get('username')?.trim();
                             const email    = formData.get('email')?.trim();
                             try {
-                                const res = await api.patch('/user/profile', { username, email });
+                                const payload = { username, email };
+                                if (selectedImage) {
+                                    payload.profilePicture = selectedImage;
+                                }
+                                const res = await api.patch('/user/profile', payload);
                                 if (res.data?.success) {
                                     const updatedUser = res.data.data;
-                                    setProfile(prev => ({ ...prev, username: updatedUser.username, email: updatedUser.email }));
+                                    setProfile(prev => ({ 
+                                        ...prev, 
+                                        username: updatedUser.username, 
+                                        email: updatedUser.email,
+                                        profilePicture: updatedUser.profilePicture 
+                                    }));
                                     if (updatedUser.username) localStorage.setItem('username', updatedUser.username);
                                     if (updatedUser.email) localStorage.setItem('email', updatedUser.email);
                                     if (updatedUser.token) localStorage.setItem('token', updatedUser.token);
                                     
-                                    if (selectedImage && selectedImage.startsWith('data:image')) {
-                                        localStorage.setItem('profileImage', selectedImage);
+                                    if (updatedUser.profilePicture) {
+                                        localStorage.setItem('profileImage', updatedUser.profilePicture);
+                                        setSelectedImage(updatedUser.profilePicture);
                                     }
 
                                     window.dispatchEvent(new Event('profile_updated'));
@@ -2068,8 +2049,12 @@ export function SettingsPage() {
                             
                             {/* Avatar Initial Display */}
                             <div className="flex flex-col items-center gap-2">
-                                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-2xl font-black shadow-xl shadow-blue-100 border-4 border-white">
-                                    {profile?.username?.charAt(0).toUpperCase() || 'U'}
+                                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-2xl font-black shadow-xl shadow-blue-100 border-4 border-white overflow-hidden">
+                                    {selectedImage ? (
+                                        <img src={selectedImage} alt="Profile" className="w-full h-full object-cover" />
+                                    ) : (
+                                        profile?.username?.charAt(0).toUpperCase() || 'U'
+                                    )}
                                 </div>
                                 <input 
                                     type="file" 
@@ -2499,9 +2484,6 @@ export function HelpSupportPage() {
                                 <h2 className="text-2xl font-black text-slate-800">Common Questions</h2>
                                 <p className="text-sm text-slate-500 font-medium">Quick answers from our knowledge base.</p>
                             </div>
-                            <button className="text-blue-600 text-xs font-black flex items-center gap-1 hover:underline">
-                                View all articles <ArrowRight size={14} />
-                            </button>
                         </div>
 
                         <div className="space-y-3">
