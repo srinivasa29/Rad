@@ -1,6 +1,6 @@
-require('dotenv').config();
-const axios = require('axios');
 const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+const axios = require('axios');
 
 const { connectDB } = require('../src/config/db');
 const OHLC = require('../src/models/OHLC');

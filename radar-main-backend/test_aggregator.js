@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 const { fetchSymbolData } = require('./src/services/marketAggregator');
 const mongoose = require('mongoose');
 

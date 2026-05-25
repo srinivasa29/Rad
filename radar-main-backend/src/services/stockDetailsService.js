@@ -34,24 +34,87 @@ const getStockDetails = async (symbol) => {
     yahooSymbol = `${yahooSymbol}.NS`;
   }
 
-  const quote = await yahooFinance.quote(yahooSymbol);
+  let quote;
+  let summary;
 
-  const summary = await yahooFinance.quoteSummary(
-    yahooSymbol,
-    {
-      modules: [
-        'assetProfile',
-        'financialData',
-        'defaultKeyStatistics',
-        'price',
-        'summaryDetail',
-        'incomeStatementHistory',
-        'incomeStatementHistoryQuarterly',
-        'majorHoldersBreakdown'
-      ]
-    }
-  );
-  console.log(summary.assetProfile);
+  try {
+    quote = await yahooFinance.quote(yahooSymbol);
+    summary = await yahooFinance.quoteSummary(
+      yahooSymbol,
+      {
+        modules: [
+          'assetProfile',
+          'financialData',
+          'defaultKeyStatistics',
+          'price',
+          'summaryDetail',
+          'incomeStatementHistory',
+          'incomeStatementHistoryQuarterly',
+          'majorHoldersBreakdown'
+        ]
+      }
+    );
+  } catch (error) {
+    console.warn(`[stockDetailsService] Primary Yahoo fetch failed for ${yahooSymbol}, trying database/fallback:`, error.message);
+    
+    const cleanSym = symbol.toUpperCase().replace(/\.(NS|BO)$/i, '');
+    const QuoteModel = require('../models/Quote');
+    const FundamentalsSnapshot = require('../models/FundamentalsSnapshot');
+    
+    const dbQuote = await QuoteModel.findOne({ symbol: new RegExp(`^${cleanSym}$`, 'i') }).lean().catch(() => null);
+    const dbFundamentals = await FundamentalsSnapshot.findOne({ symbol: new RegExp(`^${cleanSym}$`, 'i') }).lean().catch(() => null);
+    
+    quote = {
+      symbol: yahooSymbol,
+      longName: dbQuote?.longName || dbQuote?.shortName || cleanSym,
+      shortName: dbQuote?.shortName || cleanSym,
+      regularMarketPrice: dbQuote?.price || 0,
+      regularMarketOpen: dbQuote?.price || 0,
+      regularMarketDayHigh: dbQuote?.price || 0,
+      regularMarketDayLow: dbQuote?.price || 0,
+      regularMarketPreviousClose: dbQuote?.price || 0,
+      regularMarketVolume: dbQuote?.volume || 0,
+      marketCap: dbQuote?.marketCap || dbFundamentals?.marketCap || 0,
+      fiftyTwoWeekHigh: dbQuote?.fiftyTwoWeekHigh || dbFundamentals?.fiftyTwoWeekHigh || 0,
+      fiftyTwoWeekLow: dbQuote?.fiftyTwoWeekLow || dbFundamentals?.fiftyTwoWeekLow || 0,
+    };
+    
+    summary = {
+      assetProfile: {
+        sector: dbFundamentals?.sector || '-',
+        industry: dbFundamentals?.industry || '-',
+        website: dbFundamentals?.website || '-',
+        fullTimeEmployees: dbFundamentals?.fullTimeEmployees || null,
+        city: '',
+        country: dbFundamentals?.country || '',
+        companyOfficers: dbFundamentals?.ceo ? [{ name: dbFundamentals.ceo }] : [],
+        longBusinessSummary: dbFundamentals?.longBusinessSummary || null
+      },
+      defaultKeyStatistics: {
+        forwardPE: dbFundamentals?.forwardPe || dbFundamentals?.pe || dbQuote?.forwardPE || dbQuote?.pe || 0,
+        profitMargins: dbFundamentals?.profitMargins ? dbFundamentals.profitMargins / 100 : 0
+      },
+      financialData: {
+        returnOnEquity: dbFundamentals?.roe ? dbFundamentals.roe / 100 : 0,
+        debtToEquity: dbFundamentals?.debtToEquity || 0,
+        revenueGrowth: dbFundamentals?.revenueGrowth ? dbFundamentals.revenueGrowth / 100 : 0
+      },
+      incomeStatementHistory: {
+        incomeStatementHistory: []
+      },
+      incomeStatementHistoryQuarterly: {
+        incomeStatementHistory: []
+      },
+      majorHoldersBreakdown: {
+        insidersPercentHeld: 0,
+        institutionsPercentHeld: 0
+      }
+    };
+  }
+
+  if (summary && summary.assetProfile) {
+    console.log(summary.assetProfile);
+  }
   const quarterly = summary?.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
   const yearly = summary?.incomeStatementHistory?.incomeStatementHistory || [];
 

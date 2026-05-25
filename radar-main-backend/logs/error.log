@@ -1149,3 +1149,101 @@
 {"level":"error","message":"[stockService] candleEngine failed for NIFTY.NS: All candle aggregation providers failed for symbol: NIFTY.NS","service":"radar-backend","timestamp":"2026-05-24 19:04:58"}
 {"level":"error","message":"[stockService] candleEngine failed for NIFTY.NS: All candle aggregation providers failed for symbol: NIFTY.NS","service":"radar-backend","timestamp":"2026-05-24 19:04:59"}
 {"level":"error","message":"[stockService] candleEngine failed for NIFTY.NS: All candle aggregation providers failed for symbol: NIFTY.NS","service":"radar-backend","timestamp":"2026-05-24 19:04:59"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:33:06"}
+{"level":"error","message":"[Gemini] Failed to generate insights for GAIL: Request failed with status code 404","service":"radar-backend","timestamp":"2026-05-24 20:36:22"}
+{"level":"error","message":"[Gemini] Failed to generate insights for GAIL: Request failed with status code 404","service":"radar-backend","timestamp":"2026-05-24 20:36:58"}
+{"level":"error","message":"[Gemini] Failed to generate insights for GAIL: Request failed with status code 404","service":"radar-backend","timestamp":"2026-05-24 20:37:00"}
+{"level":"error","message":"[Gemini] Failed to generate insights for GAIL: Request failed with status code 404","service":"radar-backend","timestamp":"2026-05-24 20:37:00"}
+{"level":"error","message":"[Gemini] Failed to generate insights for GAIL: Request failed with status code 404","service":"radar-backend","timestamp":"2026-05-24 20:37:02"}
+{"level":"error","message":"[Gemini] Failed to generate insights for GAIL: Request failed with status code 404","service":"radar-backend","timestamp":"2026-05-24 20:37:03"}
+{"level":"error","message":"[Gemini] Failed to generate insights for GAIL: Request failed with status code 404","service":"radar-backend","timestamp":"2026-05-24 20:37:05"}
+{"level":"error","message":"[Gemini] Failed to generate insights for GAIL: Request failed with status code 404","service":"radar-backend","timestamp":"2026-05-24 20:37:07"}
+{"level":"error","message":"[Gemini] Failed to generate insights for GAIL: Request failed with status code 404","service":"radar-backend","timestamp":"2026-05-24 20:37:12"}
+{"level":"error","message":"[Gemini] Failed to generate insights for GAIL: Request failed with status code 404","service":"radar-backend","timestamp":"2026-05-24 20:37:15"}
+{"level":"error","message":"[Gemini] Failed to generate insights for GAIL: Request failed with status code 404","service":"radar-backend","timestamp":"2026-05-24 20:37:59"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:39:01"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:45:35"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:48:10"}
+{"level":"error","message":"[Candle Engine DB Error] Failed to save candles: Cannot call `ohlcs.find()` before initial connection is complete if `bufferCommands = false`. Make sure you `await mongoose.connect()` if you have `bufferCommands = false`.","service":"radar-backend","timestamp":"2026-05-24 20:54:17"}
+{"level":"error","message":"[Candle Engine DB Error] Failed to save candles: Cannot call `ohlcs.find()` before initial connection is complete if `bufferCommands = false`. Make sure you `await mongoose.connect()` if you have `bufferCommands = false`.","service":"radar-backend","timestamp":"2026-05-24 20:54:17"}
+{"level":"error","message":"[Candle Engine DB Error] Failed to save candles: Cannot call `ohlcs.find()` before initial connection is complete if `bufferCommands = false`. Make sure you `await mongoose.connect()` if you have `bufferCommands = false`.","service":"radar-backend","timestamp":"2026-05-24 20:54:17"}
+{"level":"error","message":"[Candle Engine DB Error] Failed to save candles: Cannot call `ohlcs.find()` before initial connection is complete if `bufferCommands = false`. Make sure you `await mongoose.connect()` if you have `bufferCommands = false`.","service":"radar-backend","timestamp":"2026-05-24 20:54:17"}
+{"level":"error","message":"[Candle Engine] Provider yahoo reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:54:19"}
+{"level":"error","message":"[Candle Engine] Provider yahoo reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:54:19"}
+{"level":"error","message":"symbolRegistry error: Cannot call `symbols.find()` before initial connection is complete if `bufferCommands = false`. Make sure you `await mongoose.connect()` if you have `bufferCommands = false`.","service":"radar-backend","timestamp":"2026-05-24 20:54:19"}
+{"level":"error","message":"symbolRegistry error: Cannot call `symbols.find()` before initial connection is complete if `bufferCommands = false`. Make sure you `await mongoose.connect()` if you have `bufferCommands = false`.","service":"radar-backend","timestamp":"2026-05-24 20:54:19"}
+{"level":"error","message":"[Candle Engine] Provider yahoo reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:54:23"}
+{"level":"error","message":"[Candle Engine] Provider yahoo reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:54:23"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:54:23"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:54:25"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:54:25"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 20:55:34"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 21:47:55"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 21:56:14"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 22:02:54"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 22:05:19"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 22:11:55"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 22:17:44"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 22:56:31"}
+{"level":"error","message":"Error in Alert Engine: getaddrinfo ENOTFOUND ac-qniixwa-shard-00-00.sotr6qj.mongodb.net","service":"radar-backend","timestamp":"2026-05-24 22:58:56"}
+{"level":"error","message":"Error in Alert Engine: getaddrinfo ENOTFOUND ac-qniixwa-shard-00-00.sotr6qj.mongodb.net","service":"radar-backend","timestamp":"2026-05-24 22:58:56"}
+{"level":"error","message":"Error in Alert Engine: getaddrinfo ENOTFOUND ac-qniixwa-shard-00-00.sotr6qj.mongodb.net","service":"radar-backend","timestamp":"2026-05-24 22:58:56"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 23:05:10"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 23:13:39"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 23:26:08"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 23:48:15"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-24 23:55:34"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 00:02:15"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 00:37:44"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 00:45:36"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:02:01"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:11:07"}
+{"error":"Request failed with status code 429","level":"error","message":"News insight generation failed","service":"radar-backend","timestamp":"2026-05-25 01:12:18"}
+{"error":"Request failed with status code 429","level":"error","message":"News insight generation failed","service":"radar-backend","timestamp":"2026-05-25 01:12:18"}
+{"error":"Request failed with status code 429","level":"error","message":"News insight generation failed","service":"radar-backend","timestamp":"2026-05-25 01:12:18"}
+{"level":"error","message":"[Candle Engine] Provider yahoo reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:57"}
+{"level":"error","message":"[Candle Engine] Provider yahoo reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:57"}
+{"level":"error","message":"[Candle Engine] Provider yahoo reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"[Candle Engine] Provider yahoo reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for B0=F.NS: All candle aggregation providers failed for symbol: B0=F.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for B0=F.NS: All candle aggregation providers failed for symbol: B0=F.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for T.NS: All candle aggregation providers failed for symbol: T.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for JOYT.NS: All candle aggregation providers failed for symbol: JOYT.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TECY.NS: All candle aggregation providers failed for symbol: TECY.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TECY.NS: All candle aggregation providers failed for symbol: TECY.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCSB.TO.NS: All candle aggregation providers failed for symbol: TCSB.TO.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCAN.NS: All candle aggregation providers failed for symbol: TCAN.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCAN.NS: All candle aggregation providers failed for symbol: TCAN.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCAN.NS: All candle aggregation providers failed for symbol: TCAN.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCAN.NS: All candle aggregation providers failed for symbol: TCAN.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCOM.NS: All candle aggregation providers failed for symbol: TCOM.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for JOYT.NS: All candle aggregation providers failed for symbol: JOYT.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCSB.TO.NS: All candle aggregation providers failed for symbol: TCSB.TO.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:58"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCS.TO.NS: All candle aggregation providers failed for symbol: TCS.TO.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCS.TO.NS: All candle aggregation providers failed for symbol: TCS.TO.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCSEX.NS: All candle aggregation providers failed for symbol: TCSEX.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for T.NS: All candle aggregation providers failed for symbol: T.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"[Candle Engine] Provider yahoo reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TC.NS: All candle aggregation providers failed for symbol: TC.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCSEX.NS: All candle aggregation providers failed for symbol: TCSEX.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCS.F.NS: All candle aggregation providers failed for symbol: TCS.F.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCS.F.NS: All candle aggregation providers failed for symbol: TCS.F.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TC.NS: All candle aggregation providers failed for symbol: TC.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCBK.NS: All candle aggregation providers failed for symbol: TCBK.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCNNF.NS: All candle aggregation providers failed for symbol: TCNNF.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCBK.NS: All candle aggregation providers failed for symbol: TCBK.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCNNF.NS: All candle aggregation providers failed for symbol: TCNNF.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Error in yahooFinanceService.fetchHistoricalData for TCOM.NS: All candle aggregation providers failed for symbol: TCOM.NS","service":"radar-backend","timestamp":"2026-05-25 01:12:59"}
+{"level":"error","message":"Finnhub API error for TCS.TO.NS: Request failed with status code 403","service":"radar-backend","timestamp":"2026-05-25 01:13:01"}
+{"level":"error","message":"Finnhub API error for TCS.F.NS: Request failed with status code 403","service":"radar-backend","timestamp":"2026-05-25 01:13:01"}
+{"level":"error","message":"Finnhub API error for TCSB.TO.NS: Request failed with status code 403","service":"radar-backend","timestamp":"2026-05-25 01:13:02"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 05:17:49"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 05:25:39"}

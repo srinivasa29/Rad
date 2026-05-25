@@ -1,11 +1,23 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, BookOpen, Calendar, Camera, Edit2, Hash, Save, UserRound, X, Zap } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, BookOpen, Calendar, Hash, UserRound, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchCourses, fetchProgress, getProgressKey } from '../../api/learningApi';
-import { fetchUserProfile, updateUserProfile } from '../../api/userApi';
+import { fetchUserProfile } from '../../api/userApi';
 import { fetchWatchlistLiveData } from '../../api/watchlistApi';
 import api from '../../api/api';
 import './TraderProfilePage.css';
+
+// Keep in sync with LearningAcademy.jsx — bump when course IDs change
+const ACADEMY_SCHEMA_VERSION = 'v3_2025_05';
+const migrateAcademyStorage = () => {
+  const stored = localStorage.getItem('radar_academy_schema_version');
+  if (stored !== ACADEMY_SCHEMA_VERSION) {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('radar_academy_progress_'))
+      .forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('radar_academy_schema_version', ACADEMY_SCHEMA_VERSION);
+  }
+};
 
 const unwrap = (value, fallback) => value?.data?.data ?? value?.data ?? value ?? fallback;
 
@@ -16,32 +28,12 @@ const formatJoined = (createdAt) => {
   return date.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-const resizeProfileImage = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onerror = () => reject(new Error('Unable to read profile picture'));
-  reader.onload = () => {
-    const image = new Image();
-    image.onerror = () => reject(new Error('Unable to process profile picture'));
-    image.onload = () => {
-      const maxSize = 360;
-      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-      const width = Math.max(1, Math.round(image.width * scale));
-      const height = Math.max(1, Math.round(image.height * scale));
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(image, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.78));
-    };
-    image.src = String(reader.result || '');
-  };
-  reader.readAsDataURL(file);
-});
 
 const TraderProfilePage = ({ embedded = false } = {}) => {
+  // Clear stale academy progress if schema has changed
+  migrateAcademyStorage();
+
   const navigate = useNavigate();
-  const fileRef = useRef(null);
   const [profile, setProfile] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
   const [watchlistAll, setWatchlistAll] = useState([]);
@@ -52,10 +44,7 @@ const TraderProfilePage = ({ embedded = false } = {}) => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ username: '', email: '', address: '', profilePicture: '' });
 
   const initial = useMemo(() => {
     const source = profile?.username || profile?.email || 'R';
@@ -78,12 +67,6 @@ const TraderProfilePage = ({ embedded = false } = {}) => {
 
       const profileData = unwrap(profileRes, {});
       setProfile(profileData);
-      setDraft({
-        username: profileData.username || '',
-        email: profileData.email || '',
-        address: profileData.address || '',
-        profilePicture: profileData.profilePicture || '',
-      });
 
       const watchlistRows = Array.isArray(watchlistRes) ? watchlistRes : [];
       setWatchlist(watchlistRows.slice(0, 5));
@@ -165,59 +148,16 @@ const TraderProfilePage = ({ embedded = false } = {}) => {
 
   useEffect(() => {
     loadProfile();
+    const handleProfileUpdated = (event) => {
+      if (event.detail) {
+        setProfile(event.detail);
+      }
+    };
+    window.addEventListener('radar:profile-updated', handleProfileUpdated);
+    return () => {
+      window.removeEventListener('radar:profile-updated', handleProfileUpdated);
+    };
   }, []);
-
-  const handleDraftChange = (event) => {
-    const { name, value } = event.target;
-    setDraft((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handlePhotoPick = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setError('');
-    try {
-      const resized = await resizeProfileImage(file);
-      setDraft((prev) => ({ ...prev, profilePicture: resized }));
-      setEditing(true);
-    } catch (err) {
-      setError(err.message || 'Unable to use this profile picture');
-    } finally {
-      event.target.value = '';
-    }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setError('');
-    try {
-      const updated = await updateUserProfile(draft);
-      const nextProfile = { ...profile, ...updated };
-      setProfile(nextProfile);
-      setDraft({
-        username: nextProfile.username || '',
-        email: nextProfile.email || '',
-        address: nextProfile.address || '',
-        profilePicture: nextProfile.profilePicture || '',
-      });
-      window.dispatchEvent(new CustomEvent('radar:profile-updated', { detail: nextProfile }));
-      setEditing(false);
-    } catch (err) {
-      setError(err?.response?.data?.error || err?.response?.data?.message || err.message || 'Failed to save profile');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleCancel = () => {
-    setDraft({
-      username: profile?.username || '',
-      email: profile?.email || '',
-      address: profile?.address || '',
-      profilePicture: profile?.profilePicture || '',
-    });
-    setEditing(false);
-  };
 
   const getCourseProgress = (course) => {
     const courseId = course.id || course._id;
@@ -225,13 +165,8 @@ const TraderProfilePage = ({ embedded = false } = {}) => {
     const key = getProgressKey(courseId, currentMode);
     try {
       const progress = JSON.parse(localStorage.getItem(key) || '{}');
-      const completed = Object.values(progress.chapters || {}).filter(Boolean).length;
-      let total = course.chapters?.length;
-      if (total === undefined || total === null) {
-        if (courseId === 'technical-analysis-101' || courseId === 'technical-analysis') total = 3;
-        else if (courseId === 'options-mastery' || courseId === 'options-derivatives') total = 3;
-        else total = Object.keys(progress.chapters || {}).length || 3;
-      }
+      const completed = course.chapters ? course.chapters.filter(ch => progress?.chapters?.[ch.id] === true).length : 0;
+      const total = course.chapters?.length || 0;
       const pct = total ? Math.round((completed / total) * 100) : 0;
       return { pct, completed, total };
     } catch (e) {
@@ -245,12 +180,11 @@ const TraderProfilePage = ({ embedded = false } = {}) => {
   ];
 
   const overallPct = useMemo(() => {
-    const activeCourses = courses.length > 0 ? courses : [
-      { id: 'technical-analysis', title: 'Technical Analysis Mastery', description: 'Master chart patterns, candlesticks, and indicators.' },
-      { id: 'options-derivatives', title: 'Options & Derivatives Basics', description: 'Deep dive into greeks, spreads, and volatility.' },
-    ];
-    let totalChapters = 0;
-    let completedChapters = 0;
+    const activeCourses = courses.length > 0 ? courses : [];
+    if (!activeCourses.length) return { overallPct: 0, totalXP: 0, skillLevel: 'Novice', completedCoursesCount: 0, learningStreak: 1 };
+    
+    let totalXP = 0;
+    let completedCoursesCount = 0;
     
     activeCourses.forEach(c => {
       const courseId = c.id || c._id;
@@ -258,19 +192,25 @@ const TraderProfilePage = ({ embedded = false } = {}) => {
       const key = getProgressKey(courseId, currentMode);
       try {
         const progress = JSON.parse(localStorage.getItem(key) || '{}');
-        const completed = Object.values(progress.chapters || {}).filter(Boolean).length;
-        let total = c.chapters?.length;
-        if (total === undefined || total === null) {
-          if (courseId === 'technical-analysis-101' || courseId === 'technical-analysis') total = 3;
-          else if (courseId === 'options-mastery' || courseId === 'options-derivatives') total = 3;
-          else total = Object.keys(progress.chapters || {}).length || 3;
+        const total = c.chapters?.length || 0;
+        const completed = c.chapters ? c.chapters.filter(ch => progress?.chapters?.[ch.id] === true).length : 0;
+        
+        if (total > 0 && completed === total) {
+          completedCoursesCount++;
         }
-        completedChapters += completed;
-        totalChapters += total;
+        
+        if (total > 0) {
+          const xpPerChapter = (c.xpReward || 150) / total;
+          totalXP += Math.round(completed * xpPerChapter);
+        }
       } catch (e) {}
     });
     
-    return totalChapters ? Math.round((completedChapters / totalChapters) * 100) : 0;
+    const overallPctVal = Math.round((completedCoursesCount / activeCourses.length) * 100);
+    const skillLevel = totalXP < 300 ? 'Novice' : totalXP < 700 ? 'Developing Trader' : totalXP < 1200 ? 'Momentum Trader' : totalXP < 1600 ? 'Professional Trader' : 'Elite Trader';
+    const learningStreak = Math.max(1, Math.floor(totalXP / 100));
+    
+    return { overallPct: overallPctVal, totalXP, skillLevel, completedCoursesCount, learningStreak };
   }, [courses]);
 
   const analytics = useMemo(() => {
@@ -419,55 +359,22 @@ const TraderProfilePage = ({ embedded = false } = {}) => {
         )}
 
         <section className="profile-hero-card">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="profile-file-input"
-            onChange={handlePhotoPick}
-          />
-          <button className="profile-photo" onClick={() => fileRef.current?.click()} aria-label="Change profile picture">
-            {draft.profilePicture || profile?.profilePicture ? (
-              <img src={draft.profilePicture || profile.profilePicture} alt="" />
+          <div className="profile-photo" aria-label="Profile picture">
+            {profile?.profilePicture && profile.profilePicture !== 'null' && profile.profilePicture !== 'undefined' ? (
+              <img src={profile.profilePicture} alt="" />
             ) : (
               <span>{initial}</span>
             )}
-            <span className="profile-camera"><Camera size={14} /></span>
-          </button>
+          </div>
 
           <div className="profile-main-copy">
-            {editing ? (
-              <div className="profile-edit-grid">
-                <input name="username" value={draft.username} onChange={handleDraftChange} placeholder="Name" />
-                <input name="email" value={draft.email} onChange={handleDraftChange} placeholder="Email" />
-                <input name="address" value={draft.address} onChange={handleDraftChange} placeholder="Address" />
-              </div>
-            ) : (
-              <>
-                <h1>{profile?.username || 'Radar User'}</h1>
-                <p>{profile?.email || 'account@radar.com'}</p>
-                <p className="profile-address">{profile?.address || 'Address not added yet'}</p>
-                <p className="profile-photo-help">Click the photo to add or change your profile picture.</p>
-              </>
-            )}
+            <h1>{profile?.username || 'Radar User'}</h1>
+            <p>{profile?.email || 'account@radar.com'}</p>
+            {profile?.phone && <p className="profile-phone-text" style={{ fontSize: '12px', opacity: 0.8, marginTop: '4px' }}>📞 {profile.phone}</p>}
           </div>
 
           <div className="profile-actions">
             <span className="profile-status-badge">Active</span>
-            {editing ? (
-              <div className="profile-action-row">
-                <button className="profile-secondary-btn" onClick={handleCancel} disabled={saving}>
-                  <X size={16} /> Cancel
-                </button>
-                <button className="profile-primary-btn" onClick={handleSave} disabled={saving}>
-                  <Save size={16} /> {saving ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            ) : (
-              <button className="profile-primary-btn" onClick={() => setEditing(true)}>
-                <Edit2 size={16} /> Edit Profile
-              </button>
-            )}
           </div>
         </section>
 
@@ -639,17 +546,8 @@ const TraderProfilePage = ({ embedded = false } = {}) => {
         <section className="profile-panel">
           <div className="profile-academy-header">
             <h2>Trader Academy</h2>
-            {overallPct > 0 && (
-              <div className="profile-overall-progress">
-                <span className="profile-overall-progress-label">Overall Progress:</span>
-                <span className="profile-overall-progress-val">{overallPct}%</span>
-                <div className="profile-overall-progress-bar-bg">
-                  <div className="profile-overall-progress-bar-fill" style={{ width: `${overallPct}%` }} />
-                </div>
-              </div>
-            )}
           </div>
-          <p className="profile-section-note"><BookOpen size={19} /> Enhance your trading skills with our latest courses and materials.</p>
+          <p className="profile-section-note"><BookOpen size={19} /> Enhance your trading skills and earn XP to unlock higher ranks.</p>
           <div className="profile-course-grid">
             {courseFallbacks.map((course, index) => {
               const { pct, completed, total } = getCourseProgress(course);

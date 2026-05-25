@@ -69,7 +69,12 @@ export default function Login() {
       window.location.href = '/dashboard';
     } catch (error) {
       setLoading(false);
-      setErrors({ general: error.response?.data?.error || 'Login Failed' });
+      const data = error.response?.data;
+      setErrors({ 
+        general: data?.error || 'Login Failed',
+        needsVerification: data?.needsVerification,
+        email: data?.email
+      });
     }
   };
 
@@ -86,9 +91,19 @@ export default function Login() {
         </div>
 
         {errors.general && (
-          <div className="mb-6 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 flex items-center">
-            <AlertCircle className="w-4 h-4 mr-2" />
-            {errors.general}
+          <div className="mb-6 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 flex flex-col items-start gap-2">
+            <div className="flex items-center">
+              <AlertCircle className="w-4 h-4 mr-2" />
+              <span>{errors.general}</span>
+            </div>
+            {errors.needsVerification && errors.email && (
+              <a 
+                href={`/verify-email?email=${encodeURIComponent(errors.email)}`}
+                className="text-xs text-[#10706B] hover:underline font-bold ml-6"
+              >
+                Resend verification email
+              </a>
+            )}
           </div>
         )}
 

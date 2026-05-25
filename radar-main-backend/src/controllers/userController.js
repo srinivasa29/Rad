@@ -7,9 +7,18 @@ const asyncHandler = require('express-async-handler');
 const sendEmail = require('../services/mailService');
 const logger = require('../config/logger');
 const { getDbStatus } = require('../config/db');
+const {
+    getWelcomeTemplate,
+    getVerifyTemplate,
+    getResetTemplate,
+    getLoginAlertTemplate,
+    getSupportConfirmTemplate,
+    getPasswordChangedTemplate
+} = require('../utils/emailTemplates');
 
 
 const generateToken = (id, tokenVersion = 0) => {
+    console.log(`[auth-debug] Generating JWT token for user ID: ${id}, tokenVersion: ${tokenVersion}`);
     return jwt.sign({ id, tokenVersion }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 
@@ -22,6 +31,7 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     const { username, password, email, identifier } = req.body;
+    console.log(`[auth-debug] Register attempt: username=${username}, email=${email || identifier}`);
 
     const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;
     if (!passwordRegex.test(password)) {
@@ -29,33 +39,82 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     try {
-        const normalizedUsername = String(username || '').trim();
+        const normalizedUsername = String(username || '').trim().toLowerCase();
         const normalizedEmail = normalizeIdentifier(email || identifier || '');
+        if (!normalizedEmail) {
+            return res.status(400).json({ error: 'Email address is required' });
+        }
+
+        let user;
         const userExists = await User.findOne({
             $or: [
                 { username: normalizedUsername },
-                ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+                { email: normalizedEmail }
             ],
         });
+
         if (userExists) {
-            return res.status(400).json({ error: 'User already exists' });
-        }
-
-        const user = await User.create({
-            username: normalizedUsername,
-            password,
-            ...(normalizedEmail ? { email: normalizedEmail } : {}),
-        });
-
-        if (user) {
-            res.status(201).json({
-                _id: user._id,
-                username: user.username,
-                email: user.email || null,
-                preferredMode: user.preferredMode,
-                token: generateToken(user._id, user.tokenVersion)
+            if (userExists.isVerified === false) {
+                console.log(`[auth-debug] Unverified user already exists. Overwriting/updating password and credentials...`);
+                userExists.password = password;
+                userExists.username = normalizedUsername;
+                userExists.email = normalizedEmail;
+                user = userExists;
+            } else {
+                return res.status(400).json({ error: 'Username or Email already registered' });
+            }
+        } else {
+            user = new User({
+                username: normalizedUsername,
+                password,
+                email: normalizedEmail,
+                isVerified: false
             });
         }
+
+        const hasSmtp = (process.env.SMTP_EMAIL && !process.env.SMTP_EMAIL.includes('YOUR_') && !process.env.SMTP_EMAIL.includes('your_')) ||
+                        (process.env.EMAIL_USER && !process.env.EMAIL_USER.includes('your_') && !process.env.EMAIL_USER.includes('YOUR_'));
+        
+        if (!hasSmtp) {
+            console.log(`[auth-debug] Auto-verifying new registration (reason: SMTP credentials not configured).`);
+            user.isVerified = true;
+        } else {
+            console.log(`[auth-debug] SMTP credentials configured. Initializing verification flow.`);
+            user.isVerified = false;
+        }
+
+        let verificationToken;
+        if (!user.isVerified) {
+            verificationToken = user.getVerificationToken();
+        }
+
+        await user.save();
+
+        if (user.isVerified) {
+            return res.status(201).json({
+                success: true,
+                message: 'Registration successful! You can now log in.',
+                verified: true
+            });
+        }
+
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const verifyUrl = `${frontendUrl}/verify-email/${verificationToken}`;
+
+        logger.info(`[registerUser] User created. Verification URL: ${verifyUrl}`);
+
+        const emailHtml = getVerifyTemplate(user.username, verifyUrl);
+        await sendEmail({
+            email: user.email,
+            subject: 'Verify your RADAR account',
+            message: `Welcome to RADAR! Please verify your account using this link: ${verifyUrl}`,
+            html: emailHtml
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Registration successful! We have sent a verification email to your address. Please verify your email before logging in.'
+        });
     } catch (error) {
         logger.error('Error during user registration:', error);
         res.status(400).json({ error: 'Invalid user data', details: error.message });
@@ -109,6 +168,10 @@ const googleAuth = asyncHandler(async (req, res) => {
                 user.profilePicture = picture;
                 saveNeeded = true;
             }
+            if (!user.isVerified) {
+                user.isVerified = true;
+                saveNeeded = true;
+            }
             if (saveNeeded) {
                 await user.save();
             }
@@ -122,9 +185,7 @@ const googleAuth = asyncHandler(async (req, res) => {
                 isNewUser: false
             });
         } else {
-            if (!isSignup) {
-                return res.status(404).json({ error: 'Account not found. Please sign up first.' });
-            }
+            console.log(`[auth-debug] Google user not found. Automatically creating new user for email: ${email}`);
             
             const randomPassword = crypto.randomBytes(16).toString('hex');
             user = await User.create({
@@ -132,7 +193,8 @@ const googleAuth = asyncHandler(async (req, res) => {
                 email: email,
                 password: randomPassword,
                 authProvider: 'google',
-                profilePicture: picture || ''
+                profilePicture: picture || '',
+                isVerified: true
             });
 
             res.status(201).json({
@@ -154,37 +216,62 @@ const googleAuth = asyncHandler(async (req, res) => {
 
 const loginUser = asyncHandler(async (req, res) => {
     if (!getDbStatus()) {
+        console.warn(`[auth-debug] Login failed because DB status is disconnected.`);
         return res.status(503).json({ error: 'Database not connected. Please try again shortly.' });
     }
 
     const { username, identifier, password } = req.body;
-    // Safe debug logging for login attempts (do NOT log raw passwords in non-dev environments)
-    try {
-        const masked = password ? `${'*'.repeat(Math.min(3, String(password).length))} (len=${String(password).length})` : 'no-password';
-        logger.debug(`[loginUser] attempt: username='${username||''}', identifier='${identifier||''}', password=${masked}, ip=${req.ip}`);
-    } catch (logErr) {
-        // swallow logging errors
-    }
     const loginId = String(username || identifier || '').trim();
     const normalized = normalizeIdentifier(loginId);
 
+    console.log(`[auth-debug] Login attempt received for identifier: "${loginId}"`);
+
     try {
         if (!loginId || !password) {
+            console.warn(`[auth-debug] Login rejected: username/email or password field is missing.`);
             return res.status(400).json({ error: 'Username/email and password are required' });
         }
 
-        // Lookup username case-insensitively to avoid login failures from casing differences
-        const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const usernameRegex = new RegExp(`^${escapeRegex(loginId)}$`, 'i');
-
         const user = await User.findOne({
             $or: [
-                { username: usernameRegex },
+                { username: normalized },
                 { email: normalized },
             ],
         });
 
-        if (user && (await user.matchPassword(password))) {
+        if (!user) {
+            console.warn(`[auth-debug] Login failed: No user found matching "${loginId}"`);
+            return res.status(401).json({ error: 'Invalid username or password' });
+        }
+
+        const isMatch = await user.matchPassword(password);
+        if (isMatch) {
+            if (!user.isVerified) {
+                console.warn(`[auth-debug] Login failed: User "${user.username}" is not verified.`);
+                return res.status(401).json({ 
+                    error: 'Please verify your email address before logging in.',
+                    needsVerification: true,
+                    email: user.email
+                });
+            }
+
+            console.log(`[auth-debug] Login successful for user: "${user.username}"`);
+
+            // Send login security alert email (non-blocking)
+            if (user.email) {
+                const alertHtml = getLoginAlertTemplate(user.username, {
+                    ip: req.ip || 'Unknown',
+                    device: req.headers['user-agent'] || 'Unknown Device',
+                    time: new Date().toLocaleString()
+                });
+                sendEmail({
+                    email: user.email,
+                    subject: 'Security Alert: New Login Detected',
+                    message: `Hello ${user.username}, a new login was detected on your RADAR account. IP: ${req.ip || 'Unknown'}.`,
+                    html: alertHtml
+                }).catch(e => logger.warn(`Failed to send login alert: ${e.message}`));
+            }
+
             res.json({
                 _id: user._id,
                 username: user.username,
@@ -193,10 +280,12 @@ const loginUser = asyncHandler(async (req, res) => {
                 token: generateToken(user._id, user.tokenVersion)
             });
         } else {
+            console.warn(`[auth-debug] Login failed: Incorrect password for user "${user.username}"`);
             res.status(401).json({ error: 'Invalid username or password' });
         }
     } catch (error) {
         logger.error('Error during user login:', error);
+        console.error(`[auth-debug] Login exception caught: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 });
@@ -208,6 +297,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
         username:     u.username,
         email:        u.email || null,
         address:      u.address || '',
+        phone:        u.phone || '',
         profilePicture: u.profilePicture || '',
         preferredMode: u.preferredMode,
         createdAt:    u.createdAt,
@@ -227,7 +317,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
 });
 
 const updateUserProfile = asyncHandler(async (req, res) => {
-    const { username, email, address, profilePicture } = req.body;
+    const { username, email, address, phone, profilePicture } = req.body;
     logger.info(`[updateUserProfile] Received: username=${username}, email=${email}, userId=${req.user?._id}`);
 
     const user = await User.findById(req.user._id);
@@ -252,6 +342,9 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     if (address !== undefined) {
         user.address = String(address || '').trim();
     }
+    if (phone !== undefined) {
+        user.phone = String(phone || '').trim();
+    }
     if (profilePicture !== undefined) {
         const nextPicture = String(profilePicture || '').trim();
         if (nextPicture.length > MAX_PROFILE_PICTURE_LENGTH) {
@@ -275,6 +368,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
             username: user.username,
             email: user.email,
             address: user.address || '',
+            phone: user.phone || '',
             profilePicture: user.profilePicture || '',
             preferredMode: user.preferredMode,
             createdAt: user.createdAt,
@@ -486,10 +580,10 @@ const getUserEvents = asyncHandler(async (req, res) => {
 });
 
 const forgotPassword = asyncHandler(async (req, res) => {
-    const user = await User.findOne({ email: req.body.email });
+    const user = await User.findOne({ email: normalizeIdentifier(req.body.email) });
 
     if (!user) {
-        return res.status(404).json({ error: 'There is no user with that email' });
+        return res.status(404).json({ error: 'There is no user with that email address.' });
     }
 
     // Get reset token
@@ -498,40 +592,42 @@ const forgotPassword = asyncHandler(async (req, res) => {
     await user.save({ validateBeforeSave: false });
 
     // Create reset URL
-    const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
-    const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please click the link below to reset your password: \n\n ${resetUrl}`;
+    logger.info(`[forgotPassword] Created reset URL: ${resetUrl}`);
+
+    const message = `You are receiving this email because you (or someone else) has requested a password reset. Please reset your password at: ${resetUrl}`;
+    const emailHtml = getResetTemplate(user.username, resetUrl);
 
     try {
         await sendEmail({
             email: user.email,
-            subject: 'Password recovery link',
+            subject: 'Reset your RADAR Password',
             message,
-            html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-                    <h2 style="color: #10706B;">Password Reset Request</h2>
-                    <p>You are receiving this email because you (or someone else) has requested the reset of a password for your RADAR account.</p>
-                    <p>Please click the button below to reset your password. This link is valid for 10 minutes.</p>
-                    <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #10706B; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a>
-                    <p style="margin-top: 20px; font-size: 0.8em; color: #777;">If you did not request this, please ignore this email and your password will remain unchanged.</p>
-                </div>
-            `
+            html: emailHtml
         });
 
-        res.status(200).json({ success: true, data: 'Email sent' });
+        res.status(200).json({ success: true, message: 'Password reset link sent to your email.' });
     } catch (err) {
-        console.error(err);
+        logger.error('Failed to send password reset email:', err);
         user.resetPasswordToken = undefined;
         user.resetPasswordExpire = undefined;
-
         await user.save({ validateBeforeSave: false });
 
-        return res.status(500).json({ error: 'Email could not be sent' });
+        return res.status(500).json({ error: 'Email could not be sent. Please check SMTP settings.' });
     }
 });
 
 const resetPassword = asyncHandler(async (req, res) => {
+    const { password } = req.body;
+    console.log(`[auth-debug] Password reset attempt with token: ${req.params.resetToken?.substring(0, 10)}...`);
+
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;
+    if (!password || !passwordRegex.test(password)) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters long and contain a mix of letters, numbers, and symbols.' });
+    }
+
     // Get hashed token
     const resetPasswordToken = crypto
         .createHash('sha256')
@@ -544,19 +640,37 @@ const resetPassword = asyncHandler(async (req, res) => {
     });
 
     if (!user) {
+        console.warn(`[auth-debug] Password reset failed: invalid or expired token.`);
         return res.status(400).json({ error: 'Invalid or expired token' });
     }
 
     // Set new password
-    user.password = req.body.password;
+    user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
 
     await user.save();
 
+    console.log(`[auth-debug] Password reset successful for user: ${user.username}`);
+
+    // Send confirmation email (non-blocking)
+    if (user.email) {
+        const changedHtml = getPasswordChangedTemplate(user.username);
+        sendEmail({
+            email: user.email,
+            subject: 'RADAR Password Changed Successfully',
+            message: `Hello ${user.username}, this is a confirmation that your RADAR password has been changed.`,
+            html: changedHtml
+        }).catch(err => console.error('[SMTP-debug] Failed to send password change confirmation email:', err));
+    }
+
     res.status(200).json({
         success: true,
-        data: 'Password reset successful',
+        message: 'Password reset successful',
+        _id: user._id,
+        username: user.username,
+        email: user.email || null,
+        preferredMode: user.preferredMode,
         token: generateToken(user._id, user.tokenVersion)
     });
 });
@@ -569,6 +683,81 @@ const logoutAll = asyncHandler(async (req, res) => {
     await user.save();
 
     res.json({ success: true, message: 'Logged out from all devices' });
+});
+
+const verifyEmail = asyncHandler(async (req, res) => {
+    const verificationToken = crypto
+        .createHash('sha256')
+        .update(req.params.verificationToken)
+        .digest('hex');
+
+    const user = await User.findOne({
+        verificationToken,
+        verificationTokenExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+        return res.status(400).json({ error: 'Invalid or expired email verification link.' });
+    }
+
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpire = undefined;
+
+    await user.save();
+
+    // Send welcome email (non-blocking)
+    if (user.email) {
+        const welcomeHtml = getWelcomeTemplate(user.username);
+        sendEmail({
+            email: user.email,
+            subject: 'Welcome to RADAR!',
+            message: `Welcome to RADAR, ${user.username}! Your email has been successfully verified.`,
+            html: welcomeHtml
+        }).catch(e => logger.warn(`Failed to send welcome email: ${e.message}`));
+    }
+
+    res.status(200).json({
+        success: true,
+        message: 'Your email has been verified successfully! You can now log in.',
+        token: generateToken(user._id, user.tokenVersion)
+    });
+});
+
+const resendVerification = asyncHandler(async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).json({ error: 'Please provide your email address.' });
+    }
+
+    const user = await User.findOne({ email: normalizeIdentifier(email) });
+    if (!user) {
+        return res.status(404).json({ error: 'No account found with this email address.' });
+    }
+
+    if (user.isVerified) {
+        return res.status(400).json({ error: 'This email is already verified.' });
+    }
+
+    const verificationToken = user.getVerificationToken();
+    await user.save({ validateBeforeSave: false });
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const verifyUrl = `${frontendUrl}/verify-email/${verificationToken}`;
+
+    const emailHtml = getVerifyTemplate(user.username, verifyUrl);
+    try {
+        await sendEmail({
+            email: user.email,
+            subject: 'Verify your RADAR account',
+            message: `Please verify your email address at: ${verifyUrl}`,
+            html: emailHtml
+        });
+        res.status(200).json({ success: true, message: 'Verification email has been resent.' });
+    } catch (err) {
+        logger.error('Failed to resend verification email:', err);
+        return res.status(500).json({ error: 'Failed to send verification email. Please try again later.' });
+    }
 });
 
 // Dev-only: Inspect a user by username/email and optionally test a password.
@@ -640,6 +829,8 @@ module.exports = {
     googleAuth,
     forgotPassword,
     resetPassword,
+    verifyEmail,
+    resendVerification,
     devInspectUser,
     devListUsers,
     getUserProfile,
@@ -650,12 +841,11 @@ module.exports = {
     updateNotificationPreferences,
     getMode, 
     updateMode, 
-    googleAuth,
     getUserPortfolio,
     getUserPerformance,
     getUserHoldings,
     getUserInsights,
     getUserNews,
-    getUserEvents
-    ,logoutAll
+    getUserEvents,
+    logoutAll
 };

@@ -79,7 +79,7 @@
   font-weight: 900;
   display: grid;
   place-items: center;
-  cursor: pointer;
+  cursor: default;
   overflow: visible;
 }
 

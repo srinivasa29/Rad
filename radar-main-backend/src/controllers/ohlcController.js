@@ -10,21 +10,19 @@ const getHistoricalData = async (req, res) => {
         const { symbol } = req.params;
         const { interval = '1d' } = req.query;
 
-        const result = await yahooFinance.chart(symbol, {
-            period1: '2025-01-01',
-            period2: new Date(),
-            interval: interval
-        });
+        const chartService = require('../services/chartService');
+        const chartData = await chartService.getChartData(symbol, interval, null, null, 365);
 
-        const candles =
-            result?.quotes?.map(candle => ({
-                datetime: candle.date,
-                open: candle.open,
-                high: candle.high,
-                low: candle.low,
-                close: candle.close,
-                volume: candle.volume
-            })) || [];
+        const candles = chartData.map(c => ({
+            datetime: new Date(c.time * 1000).toISOString(),
+            timestamp: new Date(c.time * 1000).toISOString(),
+            time: c.time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume
+        }));
 
         return res.json({
             success: true,

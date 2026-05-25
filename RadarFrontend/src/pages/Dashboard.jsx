@@ -648,7 +648,7 @@ export default function Dashboard() {
                   onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 20px rgba(0,198,255,0.7)'; e.currentTarget.style.borderColor = 'rgba(0,198,255,0.7)'; }}
                   onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 12px rgba(0,198,255,0.45)'; e.currentTarget.style.borderColor = 'rgba(0,198,255,0.3)'; }}
                 >
-                  {(profile?.profilePicture || userImage) ? (
+                  {((profile?.profilePicture && profile.profilePicture !== 'null' && profile.profilePicture !== 'undefined') || (userImage && userImage !== 'null' && userImage !== 'undefined')) ? (
                     <img 
                       src={profile?.profilePicture || userImage} 
                       alt="Profile" 
@@ -656,7 +656,7 @@ export default function Dashboard() {
                       onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                     />
                   ) : null}
-                  <span style={{ display: (profile?.profilePicture || userImage) ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                  <span style={{ display: ((profile?.profilePicture && profile.profilePicture !== 'null' && profile.profilePicture !== 'undefined') || (userImage && userImage !== 'null' && userImage !== 'undefined')) ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
                     {userInitial}
                   </span>
                 </div>

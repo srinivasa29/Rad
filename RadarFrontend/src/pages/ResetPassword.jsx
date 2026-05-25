@@ -35,12 +35,21 @@ export default function ResetPassword() {
         try {
             const res = await api.put(`/auth/reset-password/${token}`, { password });
             setStatus('success');
-            setMessage('Your password has been successfully reset.');
+            setMessage('Your password has been successfully reset! Logging you in...');
             
-            // Redirect to login after 3 seconds
+            // Store auth details for auto-login
+            localStorage.setItem('token', res.data.token);
+            if (res.data._id) localStorage.setItem('userId', res.data._id);
+            localStorage.setItem('userEmail', res.data.email || '');
+            localStorage.setItem('user', JSON.stringify({ username: res.data.username, email: res.data.email }));
+            if (res.data.preferredMode) {
+                localStorage.setItem('mode', res.data.preferredMode.toUpperCase());
+            }
+
+            // Redirect to dashboard after 2 seconds
             setTimeout(() => {
-                navigate('/login');
-            }, 3000);
+                window.location.href = '/dashboard';
+            }, 2000);
         } catch (error) {
             setStatus('error');
             setMessage(error.response?.data?.error || 'Failed to reset password. The link may have expired.');
@@ -68,7 +77,7 @@ export default function ResetPassword() {
                     </div>
                     <h3 className="text-gray-900 font-bold text-lg mb-2">Password Reset!</h3>
                     <p className="text-gray-500 text-sm mb-6">{message}</p>
-                    <p className="text-xs text-gray-400">Redirecting to login in 3 seconds...</p>
+                    <p className="text-xs text-gray-400">Redirecting to dashboard...</p>
                 </motion.div>
             ) : (
                 <form onSubmit={handleSubmit} className="space-y-6">

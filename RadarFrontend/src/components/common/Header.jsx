@@ -289,7 +289,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                     <div className="flex items-center gap-2 border-l border-blue-100/30 pl-4">
                         <div className="relative">
                             <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="w-9 h-9 rounded-full bg-[#3E84F6] text-white flex items-center justify-center text-xs font-black cursor-pointer hover:scale-110 transition-all shadow-lg shadow-blue-500/20 overflow-hidden">
-                                {(profile?.profilePicture || userImage) ? (
+                                {((profile?.profilePicture && profile.profilePicture !== 'null' && profile.profilePicture !== 'undefined') || (userImage && userImage !== 'null' && userImage !== 'undefined')) ? (
                                     <img 
                                         src={profile?.profilePicture || userImage} 
                                         alt="Profile" 
@@ -297,7 +297,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                                         onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                                     />
                                 ) : null}
-                                <span style={{ display: (profile?.profilePicture || userImage) ? 'none' : 'flex' }}>
+                                <span style={{ display: ((profile?.profilePicture && profile.profilePicture !== 'null' && profile.profilePicture !== 'undefined') || (userImage && userImage !== 'null' && userImage !== 'undefined')) ? 'none' : 'flex' }}>
                                     {userInitial}
                                 </span>
                             </div>
@@ -306,7 +306,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                                     {/* Header Section with Avatar */}
                                     <div className="px-6 py-5 bg-[#F8FAFF] flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-500/20 flex-shrink-0 overflow-hidden">
-                                        {(profile?.profilePicture || userImage) ? (
+                                        {((profile?.profilePicture && profile.profilePicture !== 'null' && profile.profilePicture !== 'undefined') || (userImage && userImage !== 'null' && userImage !== 'undefined')) ? (
                                             <img 
                                                 src={profile?.profilePicture || userImage} 
                                                 alt="Profile" 
@@ -314,7 +314,7 @@ const Header = ({ activeModule, setActiveModule, onToggleMode }) => {
                                                 onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                                             />
                                         ) : null}
-                                        <span style={{ display: (profile?.profilePicture || userImage) ? 'none' : 'flex' }}>
+                                        <span style={{ display: ((profile?.profilePicture && profile.profilePicture !== 'null' && profile.profilePicture !== 'undefined') || (userImage && userImage !== 'null' && userImage !== 'undefined')) ? 'none' : 'flex' }}>
                                             {userInitial}
                                         </span>
                                     </div>

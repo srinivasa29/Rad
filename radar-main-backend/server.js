@@ -5,7 +5,7 @@ const { Server } = require("socket.io");
 const cors = require('cors');
 const logger = require('./src/config/logger');
 const { connectDB, getDbStatus } = require('./src/config/db');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
 if (!process.env.JWT_SECRET || !process.env.MONGO_URI) {
     logger.error("FATAL ERROR: Missing required environment variables (JWT_SECRET or MONGO_URI).");
@@ -22,9 +22,29 @@ const { startFundamentalsRefreshCron } = require('./src/crons/fundamentalsRefres
 
 const app = express();
 const server = http.createServer(app);
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:3000'];
+if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
+const checkOrigin = (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const isLocal = origin.startsWith('http://localhost:') || 
+                    origin.startsWith('https://localhost:') || 
+                    origin.startsWith('http://127.0.0.1:') ||
+                    origin === 'http://localhost' || 
+                    origin === 'http://127.0.0.1';
+
+    if (isLocal || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+    } else {
+        callback(new Error('Not allowed by CORS'));
+    }
+};
+
 const io = new Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL, "http://localhost:5173"] : "http://localhost:5173",
+        origin: checkOrigin,
         methods: ["GET", "POST"],
         credentials: true
     }
@@ -45,18 +65,8 @@ let alertEngineStarted = false;
 let reconnectTimer = null;
 let currentPort = BASE_PORT;
 
-const allowedOrigins = process.env.FRONTEND_URL 
-    ? [process.env.FRONTEND_URL, 'http://localhost:5173'] 
-    : ['http://localhost:5173'];
-
 app.use(cors({
-    origin: function(origin, callback) {
-        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: checkOrigin,
     credentials: true
 }));
 app.use(express.json({ limit: '5mb' }));

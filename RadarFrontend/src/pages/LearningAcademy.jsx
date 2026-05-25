@@ -3,6 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { BookOpen, BookMarked, PlayCircle, Award, ChevronRight, ChevronLeft, CheckCircle, Circle, Zap, Clock, BarChart2, ArrowLeft, X, User } from 'lucide-react';
 import { fetchCourses, saveProgress, submitQuiz, fetchProgress, getProgressKey } from '../api/learningApi';
 
+// ── Schema versioning: bump when course IDs change to wipe stale localStorage progress
+const ACADEMY_SCHEMA_VERSION = 'v3_2025_05';
+const migrateAcademyStorage = () => {
+  const stored = localStorage.getItem('radar_academy_schema_version');
+  if (stored !== ACADEMY_SCHEMA_VERSION) {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('radar_academy_progress_'))
+      .forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('radar_academy_schema_version', ACADEMY_SCHEMA_VERSION);
+    console.log('[Academy] Schema migrated - all stale progress cleared.');
+  }
+};
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const ICON_MAP = { BookMarked, PlayCircle, Award, BookOpen };
 const COLOR_MAP = {
@@ -72,25 +85,47 @@ const saveLocalProgress = (courseId, data, mode = '') => {
 };
 
 // ── Course Card ──────────────────────────────────────────────────────────────
-function CourseCard({ course, isTrader, onClick, progress }) {
+function CourseCard({ course, isTrader, onClick, progress, isLocked }) {
   const cm = isTrader ? COLOR_MAP[course.color] : LIGHT_COLOR_MAP[course.color];
   const Icon = ICON_MAP[course.icon] || BookOpen;
-  const completed = Object.values(progress?.chapters || {}).filter(Boolean).length;
+  const completed = course.chapters ? course.chapters.filter(ch => progress?.chapters?.[ch.id] === true).length : 0;
   const total = course.chapters?.length || 0;
   const pct = total ? Math.round((completed / total) * 100) : 0;
+  
+  const statusBadge = pct === 100 
+    ? { text: 'COMPLETED', classes: isTrader ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700' }
+    : pct > 0 
+      ? { text: 'IN PROGRESS', classes: isTrader ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700' }
+      : { text: 'NOT STARTED', classes: isTrader ? 'bg-slate-500/20 text-slate-400' : 'bg-slate-100 text-slate-500' };
 
   return (
     <div
-      onClick={onClick}
-      className={`p-6 rounded-2xl border cursor-pointer group transition-all duration-200 ${
-        isTrader
-          ? `bg-white/5 border-white/10 hover:border-[${course.color === 'blue' ? '#00f3ff' : '#a855f7'}]/40 hover:bg-white/10`
-          : `bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300`
+      onClick={isLocked ? undefined : onClick}
+      className={`flex flex-col h-full p-6 rounded-2xl border relative overflow-hidden transition-all duration-300 ${
+        isLocked
+          ? `opacity-60 grayscale cursor-not-allowed ${isTrader ? 'bg-[#0f172a]/50 border-white/5' : 'bg-slate-50 border-slate-200'}`
+          : `cursor-pointer group ${isTrader ? `bg-[#0f172a]/80 border-white/10 hover:border-[#00f3ff]/40 hover:shadow-[0_0_20px_rgba(0,243,255,0.1)] hover:-translate-y-1` : 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 hover:-translate-y-1'}`
       }`}
     >
-      <div className={`w-12 h-12 rounded-xl mb-4 flex items-center justify-center ${cm.bg} ${cm.text}`}>
-        <Icon size={24} />
+      {isLocked && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
+          <div className="w-10 h-10 rounded-full bg-slate-800/80 flex items-center justify-center mb-2 border border-white/10">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          </div>
+          <span className="text-xs font-black text-white tracking-widest uppercase">Locked</span>
+          <span className="text-[9px] text-slate-300 mt-1">Complete previous levels</span>
+        </div>
+      )}
+      
+      <div className="flex justify-between items-start mb-4">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${cm.bg} ${cm.text}`}>
+          <Icon size={24} />
+        </div>
+        <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md ${statusBadge.classes}`}>
+          {statusBadge.text}
+        </span>
       </div>
+      
       <div className="flex items-center gap-2 mb-1">
         <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${cm.badge}`}>
           {course.difficulty}
@@ -99,22 +134,23 @@ function CourseCard({ course, isTrader, onClick, progress }) {
           <Clock size={10} /> {course.duration}
         </span>
       </div>
-      <h3 className={`font-black text-base mb-1 group-hover:underline ${isTrader ? 'text-white uppercase tracking-wide' : 'text-slate-800'}`}>
+      <h3 className={`font-black text-base mb-1 ${!isLocked && 'group-hover:underline'} ${isTrader ? 'text-white uppercase tracking-wide' : 'text-slate-800'}`}>
         {course.title}
       </h3>
-      <p className={`text-sm mb-4 leading-snug ${isTrader ? 'text-slate-400' : 'text-slate-500'}`}>
+      <p className={`text-sm mb-4 leading-snug line-clamp-2 ${isTrader ? 'text-slate-400' : 'text-slate-500'}`}>
         {course.description}
       </p>
       {/* Progress bar */}
-      <div className="space-y-1">
+      <div className="space-y-1 mt-auto">
         <div className={`h-1.5 w-full rounded-full ${isTrader ? 'bg-white/10' : 'bg-slate-100'}`}>
           <div
             className={`h-1.5 rounded-full transition-all ${cm.fill}`}
             style={{ width: `${pct}%` }}
           />
         </div>
-        <div className={`text-[10px] font-bold ${isTrader ? 'text-slate-500' : 'text-slate-400'}`}>
-          {pct > 0 ? `${pct}% complete · ${completed}/${total} chapters` : `${total} chapters · ${course.quiz?.length || 0} quiz questions`}
+        <div className={`text-[10px] font-bold flex justify-between ${isTrader ? 'text-slate-500' : 'text-slate-400'}`}>
+          <span>{pct > 0 ? `${pct}% complete` : `${total} chapters`}</span>
+          <span>{pct > 0 ? `${completed}/${total} chapters` : `${course.quiz?.length || 0} quiz questions`}</span>
         </div>
       </div>
     </div>
@@ -387,6 +423,9 @@ function CourseReader({ course, isTrader, onBack, mode }) {
 
 // ── Main Component ───────────────────────────────────────────────────────────
 export default function LearningAcademy() {
+  // Wipe stale localStorage progress if course schema has changed
+  migrateAcademyStorage();
+
   const navigate = useNavigate();
   const isTrader = localStorage.getItem('mode') === 'TRADER';
   const mode     = isTrader ? 'trader' : 'investor';
@@ -454,12 +493,60 @@ export default function LearningAcademy() {
     }
   }, [activeCourse, courses]);
 
-  const overallPct = (() => {
-    if (!courses.length) return 0;
-    const total = courses.reduce((s, c) => s + (c.chapters?.length || 0), 0);
-    const done  = courses.reduce((s, c) => s + Object.values(progressMap[c.id]?.chapters || {}).filter(Boolean).length, 0);
-    return total ? Math.round((done / total) * 100) : 0;
+  const completedCoursesCount = courses.filter(c => {
+    const total = c.chapters?.length || 0;
+    const done = c.chapters ? c.chapters.filter(ch => progressMap[c.id]?.chapters?.[ch.id] === true).length : 0;
+    return total > 0 && done === total;
+  }).length;
+
+  const overallPct = courses.length ? Math.round((completedCoursesCount / courses.length) * 100) : 0;
+
+  const totalXP = (() => {
+    let xp = 0;
+    courses.forEach(c => {
+      const pm = progressMap[c.id];
+      const total = c.chapters?.length || 0;
+      const done = c.chapters ? c.chapters.filter(ch => pm?.chapters?.[ch.id] === true).length : 0;
+      if (total > 0) {
+        const xpPerChapter = (c.xpReward || 150) / total;
+        xp += Math.round(done * xpPerChapter);
+      }
+    });
+    return xp;
   })();
+
+  const skillLevel = totalXP < 300 ? 'Novice' : totalXP < 700 ? 'Developing Trader' : totalXP < 1200 ? 'Momentum Trader' : totalXP < 1600 ? 'Professional Trader' : 'Elite Trader';
+  
+  // Dummy learning streak for premium UI feel (could be connected to backend later)
+  const learningStreak = Math.max(1, Math.floor(totalXP / 100));
+
+  // Helper: check if ALL courses of a given difficulty level are 100% complete
+  const isLevelDone = (level) => {
+    const levelCourses = courses.filter(c => (c.difficulty || '').toLowerCase() === level.toLowerCase());
+    if (!levelCourses.length) return true;
+    return levelCourses.every(c => {
+      const pm = progressMap[c.id];
+      const total = c.chapters?.length || 0;
+      const done = c.chapters ? c.chapters.filter(ch => pm?.chapters?.[ch.id] === true).length : 0;
+      return total > 0 && done === total;
+    });
+  };
+
+  const checkLocked = (course) => {
+    if (!isTrader) return false;
+    const diff = (course.difficulty || '').toLowerCase();
+
+    // Beginner: always unlocked
+    if (diff === 'beginner') return false;
+
+    // Intermediate: locked until ALL Beginner courses are done
+    if (diff === 'intermediate') return !isLevelDone('beginner');
+
+    // Advanced: locked until ALL Intermediate courses are done
+    if (diff === 'advanced') return !isLevelDone('intermediate');
+
+    return false;
+  };
 
   return (
     <div className={`p-8 w-full h-full min-h-[80vh] flex flex-col ${isTrader ? 'text-white' : 'text-slate-800'}`}>
@@ -484,7 +571,16 @@ export default function LearningAcademy() {
                   Master the markets with interactive courses designed for {isTrader ? 'active traders' : 'long-term investors'}.
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-6">
+                <div className={`px-4 py-2 rounded-xl border flex items-center gap-3 ${isTrader ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isTrader ? 'bg-[#00f3ff]/20 text-[#00f3ff]' : 'bg-blue-100 text-blue-600'}`}>
+                    <Award size={18} />
+                  </div>
+                  <div>
+                    <div className={`text-xs font-bold uppercase tracking-widest ${isTrader ? 'text-slate-400' : 'text-slate-500'}`}>{skillLevel}</div>
+                    <div className={`text-lg font-black leading-none ${isTrader ? 'text-white' : 'text-slate-800'}`}>{totalXP} <span className="text-[10px] font-normal">XP</span></div>
+                  </div>
+                </div>
                 {overallPct > 0 && (
                   <div className="text-right">
                     <div className={`text-3xl font-black ${isTrader ? 'text-[#00f3ff]' : 'text-blue-600'}`}>{overallPct}%</div>
@@ -505,42 +601,46 @@ export default function LearningAcademy() {
               </div>
             </div>
 
+            {/* Stats bar moved to top below header */}
+            {!loading && courses.length > 0 && !isTrader && (
+              <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 rounded-2xl border p-5 mb-8 ${isTrader ? 'bg-[#0f172a]/60 border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
+                {[
+                  { icon: CheckCircle, label: 'Courses Completed', value: `${completedCoursesCount}/${courses.length}` },
+                  { icon: Zap, label: 'Total XP', value: totalXP },
+                  { icon: Award, label: 'Trader Rank', value: skillLevel },
+                  { icon: Clock, label: 'Learning Streak', value: `${learningStreak} Days` },
+                ].map(stat => (
+                  <div key={stat.label} className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isTrader ? 'bg-white/5 text-[#00f3ff]' : 'bg-blue-50 text-blue-600'}`}>
+                      <stat.icon size={20} />
+                    </div>
+                    <div>
+                      <div className={`text-xl font-black ${isTrader ? 'text-white' : 'text-slate-800'}`}>{stat.value}</div>
+                      <div className={`text-[11px] font-bold uppercase tracking-wider ${isTrader ? 'text-slate-500' : 'text-slate-400'}`}>{stat.label}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Course grid */}
             {loading ? (
               <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 mb-8`}>
-                {[1,2,3].map(i => (
-                  <div key={i} className={`p-6 rounded-2xl border animate-pulse h-52 ${isTrader ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200'}`} />
+                {[1,2,3,4,5,6].map(i => (
+                  <div key={i} className={`p-6 rounded-2xl border animate-pulse h-64 ${isTrader ? 'bg-[#0f172a]/50 border-white/10' : 'bg-white border-slate-200'}`} />
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                {courses.map(c => (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 items-stretch">
+                {courses.map((c) => (
                   <CourseCard
                     key={c.id}
                     course={c}
                     isTrader={isTrader}
                     progress={progressMap[c.id] || {}}
+                    isLocked={checkLocked(c)}
                     onClick={() => setActiveCourse(c)}
                   />
-                ))}
-              </div>
-            )}
-
-            {/* Stats bar */}
-            {!loading && courses.length > 0 && (
-              <div className={`grid grid-cols-3 gap-4 rounded-2xl border p-5 ${isTrader ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
-                {[
-                  { icon: BookOpen, label: 'Courses', value: courses.length },
-                  { icon: BarChart2, label: 'Chapters', value: courses.reduce((s,c) => s + (c.chapters?.length||0), 0) },
-                  { icon: Zap,      label: 'Quiz Questions', value: courses.reduce((s,c) => s + (c.quiz?.length||0), 0) },
-                ].map(stat => (
-                  <div key={stat.label} className="flex items-center gap-3">
-                    <stat.icon size={20} className={isTrader ? 'text-[#00f3ff]' : 'text-blue-600'} />
-                    <div>
-                      <div className={`text-xl font-black ${isTrader ? 'text-white' : 'text-slate-800'}`}>{stat.value}</div>
-                      <div className={`text-[11px] font-bold ${isTrader ? 'text-slate-500' : 'text-slate-400'}`}>{stat.label}</div>
-                    </div>
-                  </div>
                 ))}
               </div>
             )}

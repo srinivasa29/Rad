@@ -6,7 +6,9 @@ const UserSchema = new mongoose.Schema({
     username: {
         type: String,
         required: true,
-        unique: true
+        unique: true,
+        lowercase: true,
+        trim: true
     },
     email: {
         type: String,
@@ -25,6 +27,11 @@ const UserSchema = new mongoose.Schema({
         default: 'email'
     },
     address: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    phone: {
         type: String,
         trim: true,
         default: ''
@@ -128,9 +135,34 @@ const UserSchema = new mongoose.Schema({
         default: {}
     },
 
+    // Academy course tracking
+    academyProgress: {
+        xpPoints: { type: Number, default: 0 },
+        streak: { type: Number, default: 0 },
+        traderRank: { type: String, default: 'Novice' },
+        completedCourses: [{ type: String }],
+        lastActiveDate: { type: Date, default: null }
+    },
+
     resetPasswordToken: String,
-    resetPasswordExpire: Date
+    resetPasswordExpire: Date,
+    isVerified: {
+        type: Boolean,
+        default: false
+    },
+    verificationToken: String,
+    verificationTokenExpire: Date
 });
+
+UserSchema.methods.getVerificationToken = function () {
+    const verificationToken = crypto.randomBytes(20).toString('hex');
+    this.verificationToken = crypto
+        .createHash('sha256')
+        .update(verificationToken)
+        .digest('hex');
+    this.verificationTokenExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    return verificationToken;
+};
 
 UserSchema.methods.getResetPasswordToken = function () {
     // Generate token
@@ -157,7 +189,28 @@ UserSchema.pre('save', async function () {
 });
 
 UserSchema.methods.matchPassword = async function (enteredPassword) {
-    return await bcrypt.compare(enteredPassword, this.password);
+    const isBcryptHash = (str) => typeof str === 'string' && /^(\$2[aby]\$)/.test(str) && str.length === 60;
+    
+    if (isBcryptHash(this.password)) {
+        try {
+            return await bcrypt.compare(enteredPassword, this.password);
+        } catch (err) {
+            console.error('[auth] bcrypt.compare error:', err);
+            return false;
+        }
+    } else {
+        // Plain text or incompatible hash migration check
+        if (enteredPassword === this.password) {
+            console.log(`[auth] Plain text password detected for user ${this.username}. Upgrading to bcrypt...`);
+            // Automatically upgrade password to bcrypt hash on next save
+            this.password = enteredPassword; 
+            // Mark password as modified so pre('save') hashes it
+            this.markModified('password');
+            await this.save();
+            return true;
+        }
+        return false;
+    }
 };
 
 module.exports = mongoose.model('User', UserSchema);

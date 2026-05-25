@@ -73,6 +73,10 @@ export const useHeaderData = () => {
             };
             if (response?.username) localStorage.setItem('username', response.username);
             if (response?.email) localStorage.setItem('email', response.email);
+            
+            const pic = response?.profilePicture || '';
+            localStorage.setItem('profileImage', pic);
+            setUserImage(pic);
 
             setProfile(mergedProfile);
             return mergedProfile;

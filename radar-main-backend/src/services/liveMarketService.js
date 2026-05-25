@@ -26,6 +26,33 @@ const getLiveMarketData = async (symbol) => {
         };
 
     } catch (error) {
+        try {
+            const cleanSym = symbol.toUpperCase().replace(/\.(NS|BO)$/i, '');
+            const QuoteModel = require('../models/Quote');
+            const dbQuote = await QuoteModel.findOne({ symbol: new RegExp(`^${cleanSym}$`, 'i') }).lean();
+            if (dbQuote) {
+                return {
+                    success: true,
+                    data: {
+                        symbol: symbol,
+                        name: dbQuote.shortName || dbQuote.longName || symbol,
+                        price: dbQuote.price || 0,
+                        change: 0,
+                        changePercent: dbQuote.changePercent || 0,
+                        open: dbQuote.price || 0,
+                        high: dbQuote.price || 0,
+                        low: dbQuote.price || 0,
+                        previousClose: dbQuote.price || 0,
+                        volume: dbQuote.volume || 0,
+                        marketCap: dbQuote.marketCap || 0,
+                        currency: dbQuote.currency || 'INR',
+                        timestamp: dbQuote.updatedAt || new Date()
+                    }
+                };
+            }
+        } catch (dbError) {
+            console.error('Database fallback failed in liveMarketService:', dbError);
+        }
         return {
             success: false,
             message: error.message

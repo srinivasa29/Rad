@@ -5,7 +5,6 @@ import { WatchlistProvider } from './context/WatchlistContext';
 import { fetchUniverse } from './services/universeService';
 
 import {
-  VerifyEmailPage,
   ResetPasswordPage,
   GlobalSearchPage,
   DiscoveryPage,
@@ -27,6 +26,7 @@ const Home = lazy(() => import('./pages/Home'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const TraderStockPage = lazy(() => import('./pages/TraderStockPage'));
@@ -177,7 +177,8 @@ function App() {
               <Route path="/dashboard/investor" element={<Navigate to="/investor/dashboard" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/verify-email/:token" element={<VerifyEmail />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
               <Route path="/auth/oauth/callback" element={<OAuthCallbackRoute />} />

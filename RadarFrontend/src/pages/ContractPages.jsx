@@ -1423,7 +1423,7 @@ export function ProfilePage({ embedded = false } = {}) {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 pb-10 border-b border-slate-50">
                     <div className="flex items-center gap-6">
                         <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-blue-100 border-4 border-white overflow-hidden">
-                            {profile?.profilePicture ? (
+                            {profile?.profilePicture && profile.profilePicture !== 'null' && profile.profilePicture !== 'undefined' ? (
                                 <img 
                                     src={profile.profilePicture} 
                                     alt="Profile" 
@@ -1431,7 +1431,7 @@ export function ProfilePage({ embedded = false } = {}) {
                                     onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                                 />
                             ) : null}
-                            <span style={{ display: profile?.profilePicture ? 'none' : 'flex' }}>
+                            <span style={{ display: profile?.profilePicture && profile.profilePicture !== 'null' && profile.profilePicture !== 'undefined' ? 'none' : 'flex' }}>
                                 {initial}
                             </span>
                         </div>
@@ -2077,7 +2077,7 @@ export function SettingsPage() {
                             {/* Avatar Initial Display */}
                             <div className="flex flex-col items-center gap-2">
                                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-2xl font-black shadow-xl shadow-blue-100 border-4 border-white overflow-hidden">
-                                    {(selectedImage || profile?.profilePicture) ? (
+                                    {((selectedImage && selectedImage !== 'null' && selectedImage !== 'undefined') || (profile?.profilePicture && profile.profilePicture !== 'null' && profile.profilePicture !== 'undefined')) ? (
                                         <img 
                                             src={selectedImage || profile?.profilePicture} 
                                             alt="Profile" 
@@ -2085,7 +2085,7 @@ export function SettingsPage() {
                                             onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                                         />
                                     ) : null}
-                                    <span style={{ display: (selectedImage || profile?.profilePicture) ? 'none' : 'flex' }}>
+                                    <span style={{ display: ((selectedImage && selectedImage !== 'null' && selectedImage !== 'undefined') || (profile?.profilePicture && profile.profilePicture !== 'null' && profile.profilePicture !== 'undefined')) ? 'none' : 'flex' }}>
                                         {profile?.username?.charAt(0).toUpperCase() || 'U'}
                                     </span>
                                 </div>
