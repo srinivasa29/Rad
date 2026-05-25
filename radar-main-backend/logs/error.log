@@ -1257,3 +1257,7 @@
 {"error":"Request failed with status code 429","level":"error","message":"News insight generation failed","service":"radar-backend","timestamp":"2026-05-25 05:31:24"}
 {"error":"Request failed with status code 429","level":"error","message":"News insight generation failed","service":"radar-backend","timestamp":"2026-05-25 05:31:24"}
 {"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 05:35:33"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 05:45:34"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 05:55:09"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 06:05:16"}
+{"level":"error","message":"[Candle Engine] Provider alphavantage reached 3 consecutive failures. Cooldown activated for 1 minute.","service":"radar-backend","timestamp":"2026-05-25 06:15:12"}
